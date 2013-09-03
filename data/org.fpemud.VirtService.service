@@ -1,0 +1,4 @@
+[D-BUS Service]
+Name=org.fpemud.VirtService
+Exec=/usr/bin/python2 /usr/libexec/virt-service/virt-service.py
+User=root
