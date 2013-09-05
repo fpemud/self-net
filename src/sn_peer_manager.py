@@ -5,14 +5,10 @@ from gi.repository import GObject
 
 class SnPeerManager(GObject.GObject):
 
-	def __init__(self, param, cfgPeerList):
+	def __init__(self, param):
 		GObject.GObject.__init__(self)
-
 		self.param = param
-
-		self.peerList = []
-		for pi in cfgPeerList:
-			self.peerList.append(SnPeer(pi))
+		self.activePeerList = []
 
 	def init(self):
 		# create server socket
