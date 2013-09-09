@@ -29,7 +29,12 @@ class SnPeer(GObject.GObject):
 		GObject.GObject.__init__(self)
 
 		self.peerName = peerName
+		self.peerUser = ""
 		self.peerInfo = None
+		self.peerSocket = None
+		self.peerSocketBak = None
+		self.peer
+
 
 	def getName(self):
 		return self.peerName

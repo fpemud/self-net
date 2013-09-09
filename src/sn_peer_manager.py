@@ -43,7 +43,7 @@ class SnPeerManager(GObject.GObject):
 		self.servSocket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
 		self.servSocket.bind(address)  
 		self.servSocket.listen(5)  
-		glib.io_add_watch(self.servSocket, glib.IO_IN | glib.IO_OUT | glib.IO_PRI | glib.IO_ERR, self._onServerSocketEvent)
+		glib.io_add_watch(self.servSocket, glib.IO_IN | glib.IO_PRI | glib.IO_ERR | glib.IO_HUP, self._onServerSocketEvent)
 
 	def _peerProbeTimerProc(self):
 		print "_peerProbeTimerProc"

@@ -306,6 +306,45 @@ class SnUtil:
 		ip4 = nid * 32 + vmId
 		return "%d.%d.%d.%d"%(ip1, ip2, ip3, ip4)
 
+class SecureServerSocket:
+
+	def __init__(self, ip, port, publicKeyFile, privateKeyFile):
+		self.ss = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+		self.ip = ip
+		self.port = port
+		self.publicKeyFile = publicKeyFile
+		self.privateKeyFile = privateKeyFile
+
+	def accept(self):
+		pass
+
+	def close(self):
+		pass
+
+class SecureSocket:
+
+	def __init__(self, hostOrIp, port, publicKeyFile, privateKeyFile):
+		self.ss = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+		self.hostOrIp = hostOrIp
+		self.port = port
+		self.publicKeyFile = publicKeyFile
+		self.privateKeyFile = privateKeyFile
+
+	def connect(self):
+		pass
+
+	def send(self):
+		pass
+
+	def recv(self):
+		pass
+
+	def close(self):
+		pass
+
+	def getFd(self):
+		pass
+
 class SocketMultiplexerSubSock:
 	def __init__(self):
 		pass
@@ -320,6 +359,9 @@ class SocketMultiplexer:
 
 	def freeSubSocket(self, subSock):
 		pass
+
+class SecureBulkFile:
+	pass
 
 class Daemon:
 	"""
