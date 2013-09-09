@@ -7,30 +7,59 @@ class SnCfgPeer:
 	hostname = ""
 	publicKey = ""
 
-class SnConfigManager:
+class SnConfigManager(GObject.GObject):
 	"""/etc/self-net
 	    |----key
-	          |----public-key.rsa			# mode 644
-	          |----private-key.rsa			# mode 600
-	    |----hosts
+	          |----rsa-key-public.pem			# mode 644
+	          |----rsa-key-private.pem			# mode 600
+	    |----peers
 	          |----HOSTNAME1
-	                |----public-key.rsa
+	                |----rsa-key-public.pem
 	          |----HOSTNAME2
-	                |----public-key.rsa"""
+	                |----rsa-key-public.pem"""
+
+	__gsignals__ = {
+		'cfg_peer_added': (gobject.SIGNAL_RUN_LAST, gobject.TYPE_NONE, ()),
+		'cfg_peer_delete': (gobject.SIGNAL_RUN_LAST, gobject.TYPE_NONE, ()),
+	}
 
 	def __init__(self, param):
 		self.param = param
+		self.listenPort = 2107
+		self.publicKey = ""
+		self.cfgPeerList = []
 
 	def init(self):
-		pass
+		# add all peers
+		for f in sorted(os.listdir(self.param.cfgDir)):
+			pobj = SnCfgPeer()
+			pobj.hostname = f
+			pobj.publicKey = ""
+
+			self.cfgPeerList.append(pobj)
+			self.emit("cfg_peer_added", pobj)
+
+	def getPort(self):
+		return self.listenPort
 
 	def getPublicKey(self):
-		pass
+		return self.publicKey
 
 	def getCfgPeerList(self):
-		pass
+		"""Returns peer name list"""
+
+		ret = []
+		for item in self.cfgPeerList:
+			ret.append(item.hostname)
+		return ret
 
 	def getCfgPeer(self, peerName):
-		pass
+		"""Returns SnCfgPeer object"""
 
+		for item in self.cfgPeerList:
+			if item.hostname == peerName:
+				return item
+		assert False
+
+GObject.type_register(SnConfigManager)
 

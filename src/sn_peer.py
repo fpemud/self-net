@@ -31,9 +31,6 @@ class SnPeer(GObject.GObject):
 		self.peerName = peerName
 		self.peerInfo = None
 
-		self.userList = []
-		self.serviceList = []
-
 	def getName(self):
 		return self.peerName
 

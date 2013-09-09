@@ -8,11 +8,13 @@ from gi.repository import GLib
 from dbus.mainloop.glib import DBusGMainLoop
 from sn_util import SnUtil
 from sn_param import SnParam
+from sn_config_manager import SnConfigManager
+from sn_peer_manager import SnPeerManager
 from sn_dbus import DbusMainObject
 
-# create SnParam object
 param = SnParam()
 dbusMainObject = None
+
 try:
 	# create temp directory
 	param.tmpDir = "/tmp/selfnetd"
@@ -22,9 +24,13 @@ try:
 	DBusGMainLoop(set_as_default=True)
 	param.mainloop = GLib.MainLoop()
 
-	# create managers
+	# create config manager
 	param.configManager = SnConfigManager()
+	param.configManager.init()
+
+	# create peer manager
 	param.peerManager = SnPeerManager()
+	param.peerManager.init()
 
 	# create dbus root object
 	dbusMainObject = DbusMainObject(param)
