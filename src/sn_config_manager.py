@@ -26,6 +26,8 @@ class SnConfigManager(GObject.GObject):
 	}
 
 	def __init__(self, param):
+		GObject.GObject.__init__(self)
+
 		self.param = param
 		self.listenPort = 2107
 		self.publicKey = ""
