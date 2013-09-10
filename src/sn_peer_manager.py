@@ -3,6 +3,7 @@
 
 import socket  
 from gi.repository import GObject
+from gi.repository import GLib
 
 class SnPeerManager(GObject.GObject):
 
@@ -18,7 +19,7 @@ class SnPeerManager(GObject.GObject):
 		self._createServerSocket()
 
 		# create peer probe timer
-		gobject.timeout_add_seconds(self.param.peerProbeTimeout, self._peerProbeTimerProc)
+		GObject.timeout_add_seconds(self.param.peerProbeTimeout, self._peerProbeTimerProc)
 
 	def getPeerList(self):
 		"""Returns peer name list"""
@@ -38,7 +39,7 @@ class SnPeerManager(GObject.GObject):
 		self.servSocket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
 		self.servSocket.bind(address)  
 		self.servSocket.listen(5)  
-		glib.io_add_watch(self.servSocket, glib.IO_IN | glib.IO_PRI | glib.IO_ERR | glib.IO_HUP, self._onServerSocketEvent)
+		GLib.io_add_watch(self.servSocket, GLib.IO_IN | GLib.IO_PRI | GLib.IO_ERR | GLib.IO_HUP, self._onServerSocketEvent)
 
 	def _peerProbeTimerProc(self):
 		print "_peerProbeTimerProc"
@@ -47,7 +48,7 @@ class SnPeerManager(GObject.GObject):
 	def _onServerSocketEvent(self, source, cb_condition):
 		assert source == self.servSocket
 
-		if cb_condition & glib.IO_IN:
+		if cb_condition & GLib.IO_IN:
 			ss, addr = source.accept()  
 
 GObject.type_register(SnPeerManager)

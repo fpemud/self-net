@@ -41,7 +41,7 @@ class SnConfigManager(GObject.GObject):
 			pobj.publicKey = ""
 
 			self.cfgPeerList.append(pobj)
-			self.emit("cfg_peer_added", pobj)
+			#self.emit("cfg_peer_added", pobj)
 
 	def getPort(self):
 		return self.listenPort
