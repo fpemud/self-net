@@ -66,12 +66,7 @@ class DbusMainObject(dbus.service.Object):
 		return self.param.configManager.getCfgPeerList()
 
 	def _updatePeerList(self):
-
-
-		for pi in self.param.configManager.getCfgPeerList():
-			np = DbusPeerObject(pi, )
-			self.peerObjList.append(
-
+		pass
 
 class DbusPeerObject(dbus.service.Object):
 
@@ -96,8 +91,8 @@ class DbusPeerObject(dbus.service.Object):
 		assert False
 		return vmId
 
-	@dbus.service.method('org.fpemud.VirtService.Network', sender_keyword='sender',
-	                     in_signature='i')
+	@dbus.service.method('org.fpemud.SelfNet.Peer', sender_keyword='sender',
+	                     in_signature='')
 	def GetPeerInfo(self, sender=None):
 		# check user id
 		SnUtil.dbusCheckUserId(self.connection, sender, self.uid)
@@ -105,9 +100,9 @@ class DbusPeerObject(dbus.service.Object):
 		assert False
 		return None
 
-	@dbus.service.method('org.fpemud.VirtService.Network', sender_keyword='sender',
+	@dbus.service.method('org.fpemud.SelfNet.Peer', sender_keyword='sender',
 	                     in_signature='ss', out_signature='st')
-	def GetPeerConn(self, sender=None):
+	def GetPeerConn(self, userName, serviceName, sender=None):
 		# check user id
 		SnUtil.dbusCheckUserId(self.connection, sender, self.uid)
 

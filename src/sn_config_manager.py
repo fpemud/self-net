@@ -1,7 +1,9 @@
 #!/usr/bin/python2
 # -*- coding: utf-8; tab-width: 4; indent-tabs-mode: t -*-
 
+import os
 import pyinotify
+from gi.repository import GObject
 
 class SnCfgPeer:
 	hostname = ""
@@ -19,8 +21,8 @@ class SnConfigManager(GObject.GObject):
 	                |----rsa-key-public.pem"""
 
 	__gsignals__ = {
-		'cfg_peer_added': (gobject.SIGNAL_RUN_LAST, gobject.TYPE_NONE, ()),
-		'cfg_peer_delete': (gobject.SIGNAL_RUN_LAST, gobject.TYPE_NONE, ()),
+		'cfg_peer_added': (GObject.SIGNAL_RUN_LAST, GObject.TYPE_NONE, ()),
+		'cfg_peer_delete': (GObject.SIGNAL_RUN_LAST, GObject.TYPE_NONE, ()),
 	}
 
 	def __init__(self, param):

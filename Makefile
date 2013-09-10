@@ -30,6 +30,11 @@ install:
 	find "$(DESTDIR)/$(prefix)/lib/selfnetd" -type f | xargs chmod 644
 	find "$(DESTDIR)/$(prefix)/lib/selfnetd" -type d | xargs chmod 755
 
+	install -d -m 0755 "$(DESTDIR)/etc/selfnetd"
+	cp -r cfg/* "$(DESTDIR)/etc/selfnetd"
+	find "$(DESTDIR)/etc/selfnetd" -type f | xargs chmod 644
+	find "$(DESTDIR)/etc/selfnetd" -type d | xargs chmod 755
+
 #	install -d -m 0755 "$(DESTDIR)/etc/xdg/menus"
 #	cp desktop/*.menu "$(DESTDIR)/etc/xdg/menus"
 #	install -d -m 0755 "$(DESTDIR)/$(prefix)/lib/desktop-directories"

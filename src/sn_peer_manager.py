@@ -57,10 +57,6 @@ class SnPeerManager(GObject.GObject):
 
 GObject.type_register(SnPeerManager)
 
-class _PeerExchangeProto:
-
-	def get
-
 
 
 

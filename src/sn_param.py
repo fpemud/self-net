@@ -1,13 +1,13 @@
 #!/usr/bin/python2
 # -*- coding: utf-8; tab-width: 4; indent-tabs-mode: t -*-
 
-class VirtParam:
+class SnParam:
 
 	def __init__(self):
-		self.cfgDir = "/etc/self-net"
-		self.cfgUserDir = ".config/self-net"
-		self.libDir = "/usr/lib/self-net"
-		self.dataDir = "/usr/share/self-net"
+		self.cfgDir = "/etc/selfnetd"
+		self.cfgUserDir = ".config/selfnetd"
+		self.libDir = "/usr/lib/selfnetd"
+		self.dataDir = "/usr/share/selfnetd"
 		self.tmpDir = None
 
 		self.mainloop = None
