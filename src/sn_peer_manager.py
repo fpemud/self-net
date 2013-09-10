@@ -4,16 +4,11 @@
 import socket  
 from gi.repository import GObject
 
-class SnPeerManagerParam:
-	peerProbeTimeout = 0
-	peerKeepAliveTimeout = 0
-
 class SnPeerManager(GObject.GObject):
 
-	def __init__(self, param, pmParam):
+	def __init__(self, param):
 		GObject.GObject.__init__(self)
 		self.param = param
-		self.pmParam = pmParam
 		self.peerList = []
 		self.servSocket = None
 		self.coreSocketDict = dict()
@@ -23,7 +18,7 @@ class SnPeerManager(GObject.GObject):
 		self._createServerSocket()
 
 		# create peer probe timer
-		gobject.timeout_add_seconds(self.pmParam.peerProbeTimeout, self._peerProbeTimerProc)
+		gobject.timeout_add_seconds(self.param.peerProbeTimeout, self._peerProbeTimerProc)
 
 	def getPeerList(self):
 		"""Returns peer name list"""

@@ -10,6 +10,9 @@ class SnParam:
 		self.dataDir = "/usr/share/selfnetd"
 		self.tmpDir = None
 
+		self.peerProbeTimeout = 1000			# 1s
+		self.peerKeepAliveTimeout = 1000		# 1s
+
 		self.mainloop = None
 		self.configManager = None
 		self.peerManager = None
