@@ -15,6 +15,13 @@ class SnPeerManager(GObject.GObject):
 		self.coreSocketDict = dict()
 
 	def init(self):
+		# create peer list
+		for p in self.param.configManager.getCfgPeerList():
+			po = SnPeer(self.param, p.hostname)
+			self.peerList.append(po)
+		self.param.configManager.connect("cfg_peer_added", self._onCfgPeerAdded)
+		self.param.configManager.connect("cfg_peer_deleted", self._onCfgPeerDeleted)
+
 		# create server socket
 		self._createServerSocket()
 
@@ -50,6 +57,12 @@ class SnPeerManager(GObject.GObject):
 
 		if cb_condition & GLib.IO_IN:
 			ss, addr = source.accept()  
+
+	def _onCfgPeerAdded(self):
+		pass
+
+	def _onCfgPeerDeleted(self):
+		pass
 
 GObject.type_register(SnPeerManager)
 

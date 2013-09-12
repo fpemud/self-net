@@ -22,7 +22,7 @@ class SnConfigManager(GObject.GObject):
 
 	__gsignals__ = {
 		'cfg_peer_added': (GObject.SIGNAL_RUN_LAST, GObject.TYPE_NONE, ()),
-		'cfg_peer_delete': (GObject.SIGNAL_RUN_LAST, GObject.TYPE_NONE, ()),
+		'cfg_peer_deleted': (GObject.SIGNAL_RUN_LAST, GObject.TYPE_NONE, ()),
 	}
 
 	def __init__(self, param):
@@ -31,17 +31,15 @@ class SnConfigManager(GObject.GObject):
 		self.param = param
 		self.listenPort = 2107
 		self.publicKey = ""
-		self.cfgPeerList = []
+		self.peerList = []
 
 	def init(self):
 		# add all peers
-		for f in sorted(os.listdir(self.param.cfgDir)):
+		for f in os.listdir(os.path.join(self.param.cfgDir, "peers")):
 			pobj = SnCfgPeer()
 			pobj.hostname = f
 			pobj.publicKey = ""
-
-			self.cfgPeerList.append(pobj)
-			#self.emit("cfg_peer_added", pobj)
+			self.peerList.append(pobj)
 
 	def getPort(self):
 		return self.listenPort
@@ -50,17 +48,14 @@ class SnConfigManager(GObject.GObject):
 		return self.publicKey
 
 	def getCfgPeerList(self):
-		"""Returns peer name list"""
+		"""Returns SnCfgPeer object list"""
 
-		ret = []
-		for item in self.cfgPeerList:
-			ret.append(item.hostname)
-		return ret
+		return self.peerList
 
 	def getCfgPeer(self, peerName):
 		"""Returns SnCfgPeer object"""
 
-		for item in self.cfgPeerList:
+		for item in self.peerList:
 			if item.hostname == peerName:
 				return item
 		assert False

@@ -46,8 +46,8 @@ class DbusMainObject(dbus.service.Object):
 
 	def __init__(self, param):
 		self.param = param
+		self.peerList = []
 
-		self.peerObjList = []
 		self._updatePeerList()
 
 		# register dbus object path
@@ -58,15 +58,22 @@ class DbusMainObject(dbus.service.Object):
 		self.remove_from_connection()
 
 	@dbus.service.method('org.fpemud.SelfNet', sender_keyword='sender', 
-	                     in_signature='s', out_signature='i')
-	def GetPeerList(self, networkType, sender=None):
+	                     in_signature='', out_signature='ai')
+	def GetPeerList(self, sender=None):
 		# get user id
 		uid = SnUtil.dbusGetUserId(self.connection, sender)
 
-		return self.param.configManager.getCfgPeerList()
+		ret = []
+		for po in self.peerList:
+			ret.append(po.peerId)
+		return ret
 
 	def _updatePeerList(self):
-		pass
+		i = 0
+		for p in self.param.configManager.getCfgPeerList():
+			po = DbusPeerObject(self.param, p.hostname, i)
+			self.peerList.append(po)
+			i = i + 1
 
 class DbusPeerObject(dbus.service.Object):
 
