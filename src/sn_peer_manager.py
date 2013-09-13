@@ -8,6 +8,11 @@ from sn_peer import SnPeer
 
 class SnPeerManager(GObject.GObject):
 
+	__gsignals__ = {
+		'peer_add': (GObject.SIGNAL_RUN_LAST, GObject.TYPE_NONE, ()),
+		'peer_delete': (GObject.SIGNAL_RUN_LAST, GObject.TYPE_NONE, ()),
+	}
+
 	def __init__(self, param):
 		GObject.GObject.__init__(self)
 		self.param = param

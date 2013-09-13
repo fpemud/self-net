@@ -48,7 +48,14 @@ class DbusMainObject(dbus.service.Object):
 		self.param = param
 		self.peerList = []
 
-		self._updatePeerList()
+		# initialize peer list and connect peer event
+		i = 0
+		for peerObj in self.param.peerManager.getCfgPeerList():
+			po = DbusPeerObject(self.param, peerObj, i)
+			self.peerList.append(po)
+			i = i + 1
+		self.param.peerManager.connnect("peer_add", self._onPeerAdd)
+		self.param.peerManager.connnect("peer_delete", self._onPeerDelete)
 
 		# register dbus object path
 		bus_name = dbus.service.BusName('org.fpemud.SelfNet', bus=dbus.SystemBus())
@@ -68,18 +75,26 @@ class DbusMainObject(dbus.service.Object):
 			ret.append(po.peerId)
 		return ret
 
-	def _updatePeerList(self):
+	def _onPeerAdd(self, peerObj):
 		i = 0
-		for p in self.param.configManager.getCfgPeerList():
-			po = DbusPeerObject(self.param, p.hostname, i)
-			self.peerList.append(po)
-			i = i + 1
+		for p in self.peerList:
+			i = max(p.peerId, i)
+		po = DbusPeerObject(self.param, peerObj, i + 1)
+		self.peerList.append(po)
 
+	def _onPeerDelete(self, peerName):
+		for p in self.peerList:
+			if p.peerObj.getName() == peerName
+				p.release()
+				self.peerList.remove(p)
+				return
+		assert False
+				
 class DbusPeerObject(dbus.service.Object):
 
-	def __init__(self, param, peerName, peerId):
+	def __init__(self, param, peerObj, peerId):
 		self.param = param
-		self.peerName = peerName
+		self.peerObj = peerObj
 		self.peerId = peerId
 
 		# register dbus object path
@@ -95,8 +110,7 @@ class DbusPeerObject(dbus.service.Object):
 		# check user id
 		SnUtil.dbusCheckUserId(self.connection, sender, self.uid)
 
-		assert False
-		return vmId
+		return self.peerObj.isActive()
 
 	@dbus.service.method('org.fpemud.SelfNet.Peer', sender_keyword='sender',
 	                     in_signature='')
@@ -104,8 +118,7 @@ class DbusPeerObject(dbus.service.Object):
 		# check user id
 		SnUtil.dbusCheckUserId(self.connection, sender, self.uid)
 
-		assert False
-		return None
+		return peerObj.getInfo()
 
 	@dbus.service.method('org.fpemud.SelfNet.Peer', sender_keyword='sender',
 	                     in_signature='ss', out_signature='st')
