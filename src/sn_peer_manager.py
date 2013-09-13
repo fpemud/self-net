@@ -1,9 +1,10 @@
 #!/usr/bin/python2
 # -*- coding: utf-8; tab-width: 4; indent-tabs-mode: t -*-
 
-import socket  
+import socket
 from gi.repository import GObject
 from gi.repository import GLib
+from sn_peer import SnPeer
 
 class SnPeerManager(GObject.GObject):
 
@@ -19,8 +20,8 @@ class SnPeerManager(GObject.GObject):
 		for p in self.param.configManager.getCfgPeerList():
 			po = SnPeer(self.param, p.hostname)
 			self.peerList.append(po)
-		self.param.configManager.connect("cfg_peer_added", self._onCfgPeerAdded)
-		self.param.configManager.connect("cfg_peer_deleted", self._onCfgPeerDeleted)
+		self.param.configManager.connect("cfg_peer_add", self._onCfgPeerAdd)
+		self.param.configManager.connect("cfg_peer_delete", self._onCfgPeerDelete)
 
 		# create server socket
 		self._createServerSocket()
@@ -58,11 +59,11 @@ class SnPeerManager(GObject.GObject):
 		if cb_condition & GLib.IO_IN:
 			ss, addr = source.accept()  
 
-	def _onCfgPeerAdded(self):
-		pass
+	def _onCfgPeerAdd(self):
+		assert False
 
-	def _onCfgPeerDeleted(self):
-		pass
+	def _onCfgPeerDelete(self):
+		assert False
 
 GObject.type_register(SnPeerManager)
 

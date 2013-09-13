@@ -128,6 +128,7 @@ class DbusPeerInfoUser:
 
 class DbusPeerInfoService:
 	name = ""
+	status = ""
 
 class DbusPeerConn:
 	connSocket = None

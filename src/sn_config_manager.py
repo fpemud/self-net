@@ -21,8 +21,8 @@ class SnConfigManager(GObject.GObject):
 	                |----rsa-key-public.pem"""
 
 	__gsignals__ = {
-		'cfg_peer_added': (GObject.SIGNAL_RUN_LAST, GObject.TYPE_NONE, ()),
-		'cfg_peer_deleted': (GObject.SIGNAL_RUN_LAST, GObject.TYPE_NONE, ()),
+		'cfg_peer_add': (GObject.SIGNAL_RUN_LAST, GObject.TYPE_NONE, ()),
+		'cfg_peer_delete': (GObject.SIGNAL_RUN_LAST, GObject.TYPE_NONE, ()),
 	}
 
 	def __init__(self, param):
