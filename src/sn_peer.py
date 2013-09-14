@@ -3,27 +3,14 @@
 
 from gi.repository import GObject
 
-class _SnPeerInfo
-	name = ""
-	publicKey = ""
-	arch = ""
-	coreNumber = -1
-
-class _SnPeerInfoUser:
-	name = ""
-	publicKey = ""
-
-class _SnPeerInfoService:
-	name = ""
-
 class SnPeer(GObject.GObject):
 
-    __gsignals__ = {
-        'activated': (GObject.SIGNAL_RUN_FIRST, None, (int,))
-        'inactivated': (GObject.SIGNAL_RUN_FIRST, None, (int,))
-        'socket-connected': (GObject.SIGNAL_RUN_FIRST, None, (int,))
-        'socket-disconnected': (GObject.SIGNAL_RUN_FIRST, None, (int,))
-    }
+	__gsignals__ = {
+		'activated': (GObject.SIGNAL_RUN_FIRST, None, ()),
+		'inactivated': (GObject.SIGNAL_RUN_FIRST, None, ()),
+		'socket-connected': (GObject.SIGNAL_RUN_FIRST, None, ()),
+		'socket-disconnected': (GObject.SIGNAL_RUN_FIRST, None, ()),
+	}
 
 	def __init__(self, param, peerName):
 		GObject.GObject.__init__(self)
@@ -33,8 +20,6 @@ class SnPeer(GObject.GObject):
 		self.peerInfo = None
 		self.peerSocket = None
 		self.peerSocketBak = None
-		self.peer
-
 
 	def getName(self):
 		return self.peerName
@@ -51,5 +36,5 @@ class SnPeer(GObject.GObject):
 		   connIntf: socket, bulk"""
 		return None
 
-GObject.type_register(SnPeerManager)
+GObject.type_register(SnPeer)
 

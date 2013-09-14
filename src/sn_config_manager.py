@@ -9,6 +9,19 @@ class SnCfgPeer:
 	hostname = ""
 	publicKey = ""
 
+class SnPeerInfo:
+	name = ""
+	publicKey = ""
+	arch = ""
+	coreNumber = -1
+
+class SnPeerInfoUser:
+	name = ""
+	publicKey = ""
+
+class SnPeerInfoService:
+	name = ""
+
 class SnConfigManager(GObject.GObject):
 	"""/etc/self-net
 	    |----key
@@ -23,6 +36,7 @@ class SnConfigManager(GObject.GObject):
 	__gsignals__ = {
 		'cfg_peer_add': (GObject.SIGNAL_RUN_LAST, GObject.TYPE_NONE, ()),
 		'cfg_peer_delete': (GObject.SIGNAL_RUN_LAST, GObject.TYPE_NONE, ()),
+		'local_info_changed': (GObject.SIGNAL_RUN_LAST, GObject.TYPE_NONE, ()),
 	}
 
 	def __init__(self, param):
@@ -31,9 +45,13 @@ class SnConfigManager(GObject.GObject):
 		self.param = param
 		self.listenPort = 2107
 		self.publicKey = ""
+		self.localInfo = None
 		self.peerList = []
 
 	def init(self):
+		# create local info
+		self.localInfo = SnPeerInfo()
+
 		# add all peers
 		for f in os.listdir(os.path.join(self.param.cfgDir, "peers")):
 			pobj = SnCfgPeer()
@@ -44,8 +62,8 @@ class SnConfigManager(GObject.GObject):
 	def getPort(self):
 		return self.listenPort
 
-	def getPublicKey(self):
-		return self.publicKey
+	def getLocalInfo(self):
+		return self.localInfo
 
 	def getCfgPeerList(self):
 		"""Returns SnCfgPeer object list"""

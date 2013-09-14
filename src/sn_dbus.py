@@ -5,6 +5,7 @@ import os
 import shutil
 import dbus
 import dbus.service
+from gi.repository import GObject
 from sn_util import SnUtil
 
 ################################################################################
@@ -50,12 +51,12 @@ class DbusMainObject(dbus.service.Object):
 
 		# initialize peer list and connect peer event
 		i = 0
-		for peerObj in self.param.peerManager.getCfgPeerList():
+		for peerObj in self.param.peerManager.getPeerList():
 			po = DbusPeerObject(self.param, peerObj, i)
 			self.peerList.append(po)
 			i = i + 1
-		self.param.peerManager.connnect("peer_add", self._onPeerAdd)
-		self.param.peerManager.connnect("peer_delete", self._onPeerDelete)
+		self.param.peerManager.connect("peer_add", self._onPeerAdd)
+		self.param.peerManager.connect("peer_delete", self._onPeerDelete)
 
 		# register dbus object path
 		bus_name = dbus.service.BusName('org.fpemud.SelfNet', bus=dbus.SystemBus())
@@ -84,7 +85,7 @@ class DbusMainObject(dbus.service.Object):
 
 	def _onPeerDelete(self, peerName):
 		for p in self.peerList:
-			if p.peerObj.getName() == peerName
+			if p.peerObj.getName() == peerName:
 				p.release()
 				self.peerList.remove(p)
 				return

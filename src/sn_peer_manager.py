@@ -35,9 +35,9 @@ class SnPeerManager(GObject.GObject):
 		GObject.timeout_add_seconds(self.param.peerProbeTimeout, self._peerProbeTimerProc)
 
 	def getPeerList(self):
-		"""Returns peer name list"""
+		"""Returns SnPeer object list"""
 
-		return self.param.configManager.getPeerList()
+		return self.peerList
 
 	def getPeer(self, peerName):
 		"""Returns SnPeer object"""
@@ -71,7 +71,4 @@ class SnPeerManager(GObject.GObject):
 		assert False
 
 GObject.type_register(SnPeerManager)
-
-
-
 
