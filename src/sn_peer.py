@@ -28,7 +28,6 @@ class SnPeer(GObject.GObject):
 		return False
 
 	def getInfo(self):
-		assert self.peerInfo is not None
 		return self.peerInfo
 
 	def getSocket(self, serviceName, connMedia, connIntf):

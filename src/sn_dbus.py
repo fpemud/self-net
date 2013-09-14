@@ -18,7 +18,7 @@ from sn_util import SnUtil
 # Object path           /
 #
 # Methods:
-# array<peerId:int> GetPeerList()
+# array<peerId:int> GetPeerList()									returns peer id list
 #
 # Signals:
 # PeerListChanged(changeData)
@@ -68,9 +68,6 @@ class DbusMainObject(dbus.service.Object):
 	@dbus.service.method('org.fpemud.SelfNet', sender_keyword='sender', 
 	                     in_signature='', out_signature='ai')
 	def GetPeerList(self, sender=None):
-		# get user id
-		uid = SnUtil.dbusGetUserId(self.connection, sender)
-
 		ret = []
 		for po in self.peerList:
 			ret.append(po.peerId)
@@ -108,31 +105,29 @@ class DbusPeerObject(dbus.service.Object):
 	@dbus.service.method('org.fpemud.SelfNet.Peer', sender_keyword='sender',
 	                     in_signature='', out_signature='b')
 	def IsActive(self, sender=None):
-		# check user id
-		SnUtil.dbusCheckUserId(self.connection, sender, self.uid)
-
 		return self.peerObj.isActive()
 
 	@dbus.service.method('org.fpemud.SelfNet.Peer', sender_keyword='sender',
 	                     in_signature='')
 	def GetPeerInfo(self, sender=None):
-		# check user id
-		SnUtil.dbusCheckUserId(self.connection, sender, self.uid)
+		pi = self.peerObj.getInfo()
+		if pi is None:
+			return None
 
-		return peerObj.getInfo()
+		ret = DbusPeerInfo()
+		ret.name = pi.name
+		return ret
 
 	@dbus.service.method('org.fpemud.SelfNet.Peer', sender_keyword='sender',
 	                     in_signature='ss', out_signature='st')
 	def GetPeerConn(self, userName, serviceName, sender=None):
-		# check user id
-		SnUtil.dbusCheckUserId(self.connection, sender, self.uid)
-
 		assert False
 		return None
 
 class DbusPeerInfo:
 	name = ""
 	publicKey = ""
+	isActive = False
 	userList = []
 	serviceList = []
 
