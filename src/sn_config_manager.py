@@ -22,6 +22,10 @@ class SnPeerInfoUser:
 class SnPeerInfoService:
 	name = ""
 
+class SnService:
+	user = ""
+	name = ""
+
 class SnConfigManager(GObject.GObject):
 	"""/etc/self-net
 	    |----key
@@ -37,6 +41,8 @@ class SnConfigManager(GObject.GObject):
 		'cfg_peer_add': (GObject.SIGNAL_RUN_LAST, GObject.TYPE_NONE, ()),
 		'cfg_peer_delete': (GObject.SIGNAL_RUN_LAST, GObject.TYPE_NONE, ()),
 		'local_info_changed': (GObject.SIGNAL_RUN_LAST, GObject.TYPE_NONE, ()),
+		'service_add': (GObject.SIGNAL_RUN_LAST, GObject.TYPE_NONE, ()),
+		'service_delete': (GObject.SIGNAL_RUN_LAST, GObject.TYPE_NONE, ()),
 	}
 
 	def __init__(self, param):
@@ -47,6 +53,7 @@ class SnConfigManager(GObject.GObject):
 		self.publicKey = ""
 		self.localInfo = None
 		self.peerList = []
+		self.serviceDict = dict()
 
 	def init(self):
 		# create local info
@@ -77,6 +84,21 @@ class SnConfigManager(GObject.GObject):
 			if item.hostname == peerName:
 				return item
 		assert False
+
+	def addService(self, userName, serviceName, serviceObj):
+		key = (userName, serviceName)
+		assert key not in self.serviceDict
+		self.serviceDict[key] = serviceObj
+
+	def removeService(self, userName, serviceName):
+		key = (userName, serviceName)
+		self.serviceDict.remove(key)
+
+	def getService(self, userName, serviceName):
+		key = (userName, serviceName)
+		assert key in self.serviceDict
+		self.serviceDict[key]
+
 
 GObject.type_register(SnConfigManager)
 

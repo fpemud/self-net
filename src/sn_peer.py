@@ -2,6 +2,7 @@
 # -*- coding: utf-8; tab-width: 4; indent-tabs-mode: t -*-
 
 from gi.repository import GObject
+from sn_config_manager import SnPeerInfo
 
 class SnPeer(GObject.GObject):
 
