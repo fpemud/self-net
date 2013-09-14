@@ -17,7 +17,10 @@ class SnPeer(GObject.GObject):
 
 		self.peerName = peerName
 		self.peerUser = ""
-		self.peerInfo = None
+
+		self.peerInfo = SnPeerInfo()
+		self.peerInfo.name = self.peerName
+
 		self.peerSocket = None
 		self.peerSocketBak = None
 
