@@ -64,10 +64,16 @@ class SnPeerManager(GObject.GObject):
 		if cb_condition & GLib.IO_IN:
 			ss, addr = source.accept()  
 
-	def _onCfgPeerAdd(self):
-		assert False
+	def _onCfgPeerAdd(self, peerObj):
+		po = SnPeer(self.param, peerObj.hostname)
+		self.peerList.append(po)
 
-	def _onCfgPeerDelete(self):
+	def _onCfgPeerDelete(self, peerName):
+		for p in self.peerList:
+			if p.getName() == peerName:
+				print "peer deleted"
+				self.peerList.remove(p)
+				return
 		assert False
 
 GObject.type_register(SnPeerManager)
