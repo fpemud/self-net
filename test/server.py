@@ -1,16 +1,20 @@
-import socket  
+#!/usr/bin/python2
+# -*- coding: utf-8; tab-width: 4; indent-tabs-mode: t -*-
+
+import sys
+sys.path.append('../src')
+from sn_util import SnUtil
+from sn_util import ServerEndPoint
+
+s = ServerEndPoint("/etc/selfnetd/cert.pem", "/etc/selfnetd/privkey.pem", "/etc/selfnetd/ca-cert.pem")
+s.listen(31500)
+ss = s.accept()
   
-address = ('127.0.0.1', 31500)  
-s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-s.bind(address)  
-s.listen(5)  
+print 'got connected from', ss.getPeerName()
   
-ss, addr = s.accept()  
-print 'got connected from',addr  
-  
-ss.send('byebye')  
-ra = ss.recv(512)  
+ss.send(0, 'byebye')  
+ra = ss.recv(0)
 print ra  
-  
+
 ss.close()  
 s.close()  

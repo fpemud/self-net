@@ -23,7 +23,6 @@ class SnPeer(GObject.GObject):
 		self.peerInfo.name = self.peerName
 
 		self.peerSocket = None
-		self.peerSocketBak = None
 
 	def getName(self):
 		return self.peerName

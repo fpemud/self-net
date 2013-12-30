@@ -9,6 +9,8 @@ import grp
 import pwd
 import socket
 import re
+import ssl
+import struct
 
 class SnUtil:
 
@@ -230,16 +232,6 @@ class SnUtil:
 		return groups
 
 	@staticmethod
-	def getMaxTapId(brname):
-		ret = VirtUtil.shell('/bin/ifconfig -a', 'stdout')
-		matchList = re.findall("^%s.([0-9]+):"%(brname), ret, re.MULTILINE)
-		maxId = 0
-		for m in matchList:
-			if int(m) > maxId:
-				maxId = int(m)
-		return maxId
-
-	@staticmethod
 	def getPidBySocket(socketInfo):
 		"""need to be run by root. socketInfo is like 0.0.0.0:80"""
 
@@ -285,82 +277,112 @@ class SnUtil:
 		inStr += "%s\n"%(password)
 		VirtUtil.shellInteractive("/usr/bin/pdbedit -b tdbsam:%s -a \"%s\" -t"%(filename, username), inStr)
 
-	@staticmethod
-	def getVmMacAddress(macOuiVm, uid, nid, vmId):
-		"""get mac address for virtual machine
-		   this mac address is not the same as the mac address of the tap interface"""
+class ServerEndPoint:
 
-		assert (nid >= 1 and nid < 7) and vmId < 32
-		mac4 = uid / 256
-		mac5 = uid % 256
-		mac6 = nid * 32 + vmId
-		return "%s:%02x:%02x:%02x"%(macOuiVm, mac4, mac5, mac6)
+	def __init__(self, certFile, privkeyFile, caCertFile):
+		self.certFile = certFile
+		self.privkeyFile = privkeyFile
+		self.caCertFile = caCertFile
+		self.port = None
+		self.sock = None
+		self.ssl_sock = None
 
-	@staticmethod
-	def getVmIpAddress(ip1, uid, nid, vmId):
-		"""get ip address for virtual machine"""
-
-		assert (nid >= 1 and nid < 7) and vmId < 32
-		ip2 = uid / 256
-		ip3 = uid % 256
-		ip4 = nid * 32 + vmId
-		return "%d.%d.%d.%d"%(ip1, ip2, ip3, ip4)
-
-class SecureServerSocket:
-
-	def __init__(self, ip, port, publicKeyFile, privateKeyFile):
-		self.ss = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-		self.ip = ip
+	def listen(self, port):
 		self.port = port
-		self.publicKeyFile = publicKeyFile
-		self.privateKeyFile = privateKeyFile
+		self.sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+		self.ssl_sock = ssl.wrap_socket(self.sock, certfile=self.certFile, keyfile=self.privkeyFile,
+		                                cert_reqs=ssl.CERT_REQUIRED, ca_certs=self.caCertFile,
+		                                ssl_version=ssl.PROTOCOL_SSLv3, server_side=True)
+		self.ssl_sock.bind(('0.0.0.0', self.port))
+		self.ssl_sock.listen(5)
 
 	def accept(self):
-		pass
+		while True:
+			new_sock, addr = self.ssl_sock.accept()
+
+			if not self._checkPeerCert(new_sock):
+				new_sock.close()
+				continue
+
+			return Socket(new_sock)
 
 	def close(self):
-		pass
+		self.ssl_sock.close()
+		self.ssl_sock = None
+		self.sock = None
 
-class SecureSocket:
+	def _checkPeerCert(self, new_sock):
+		certDict = new_sock.getpeercert()
+		if "subject" not in certDict:
+			return False
 
-	def __init__(self, hostOrIp, port, publicKeyFile, privateKeyFile):
-		self.ss = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-		self.hostOrIp = hostOrIp
-		self.port = port
-		self.publicKeyFile = publicKeyFile
-		self.privateKeyFile = privateKeyFile
+		for item in certDict["subject"]:
+			if item[0][0] == "commonName":
+				return True
+		return False
 
-	def connect(self):
-		pass
+class ClientEndPoint:
 
-	def send(self):
-		pass
+	def __init__(self, certFile, privkeyFile, caCertFile):
+		self.certFile = certFile
+		self.privkeyFile = privkeyFile
+		self.caCertFile = caCertFile
 
-	def recv(self):
-		pass
+	def connect(self, hostname, port):
+
+		sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)  
+		ssl_sock = ssl.wrap_socket(sock, certfile=self.certFile, keyfile=self.privkeyFile,
+		                           cert_reqs=ssl.CERT_REQUIRED, ca_certs=self.caCertFile,
+		                           ssl_version=ssl.PROTOCOL_SSLv3)
+		ssl_sock.connect((hostname, port))
+
+		return Socket(ssl_sock)
+
+class Socket:
+
+	def __init__(self, ssl_sock):
+		self.ssl_sock = ssl_sock
+
+	def getPeerName(self):
+		"""raise exception when failure"""
+
+		for item in self.ssl_sock.getpeercert()["subject"]:
+			if item[0][0] == "commonName":
+				return item[0][1]
+		assert False
+
+	def send(self, channel, buf):
+		"""raise exception when failure"""
+
+		# send packet header: channel id + data length
+		val = struct.pack("!II", channel, len(buf))
+		self.ssl_sock.sendall(val)
+
+		# send packet content
+		self.ssl_sock.sendall(buf)
+
+	def recv(self, channel):
+		"""raise exception when failure"""
+
+		# receive packet header
+		headerLen = struct.calcsize("!II")
+		buf = ""
+		while len(buf) < headerLen:
+			buf += self.ssl_sock.recv(headerLen - len(buf))
+
+		# receive packet content
+		channel, dataLen = struct.unpack("!II", buf)
+		buf = ""
+		while len(buf) < dataLen:
+			buf += self.ssl_sock.recv(dataLen - len(buf))
+
+		return buf
 
 	def close(self):
-		pass
+		self.ssl_sock.close()
+		self.ssl_sock = None
 
-	def getFd(self):
-		pass
-
-class SocketMultiplexerSubSock:
-	def __init__(self):
-		pass
-
-
-class SocketMultiplexer:
-	def __init__(self, sock):
-		pass
-
-	def newSubSocket(self, subSockName):
-		pass
-
-	def freeSubSocket(self, subSock):
-		pass
-
-class SecureBulkFile:
+class BulkFile:
 	pass
 
 class Daemon:

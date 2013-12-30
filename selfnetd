@@ -25,12 +25,12 @@ try:
 	DBusGMainLoop(set_as_default=True)
 	param.mainloop = GLib.MainLoop()
 
-	# create config manager
+	# create config manager / peer manager
 	param.configManager = SnConfigManager(param)
-	param.configManager.init()
-
-	# create peer manager
 	param.peerManager = SnPeerManager(param)
+
+	# init config manager / peer manager
+	param.configManager.init()
 	param.peerManager.init()
 
 	# create dbus root object

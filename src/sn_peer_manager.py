@@ -4,6 +4,8 @@
 import socket
 from gi.repository import GObject
 from gi.repository import GLib
+from sn_util import ServerEndPoint
+from sn_util import ClientEndPoint
 from sn_peer import SnPeer
 
 class SnPeerManager(GObject.GObject):
@@ -21,12 +23,9 @@ class SnPeerManager(GObject.GObject):
 		self.coreSocketDict = dict()
 
 	def init(self):
-		# create peer list
-		for p in self.param.configManager.getCfgPeerList():
-			po = SnPeer(self.param, p.hostname)
-			self.peerList.append(po)
-		self.param.configManager.connect("cfg_peer_add", self._onCfgPeerAdd)
-		self.param.configManager.connect("cfg_peer_delete", self._onCfgPeerDelete)
+		self.param.configManager.connect("host_add", self._onCfgPeerAdd)
+		self.param.configManager.connect("host_delete", self._onCfgPeerDelete)
+		self.param.configManager.connect("host_delete", self._onCfgPeerDelete)
 
 		# create server socket
 		self._createServerSocket()
@@ -54,16 +53,6 @@ class SnPeerManager(GObject.GObject):
 		self.servSocket.listen(5)  
 		GLib.io_add_watch(self.servSocket, GLib.IO_IN | GLib.IO_PRI | GLib.IO_ERR | GLib.IO_HUP, self._onServerSocketEvent)
 
-	def _peerProbeTimerProc(self):
-		print "_peerProbeTimerProc"
-		return True
-
-	def _onServerSocketEvent(self, source, cb_condition):
-		assert source == self.servSocket
-
-		if cb_condition & GLib.IO_IN:
-			ss, addr = source.accept()  
-
 	def _onCfgPeerAdd(self, peerObj):
 		po = SnPeer(self.param, peerObj.hostname)
 		self.peerList.append(po)
@@ -75,6 +64,38 @@ class SnPeerManager(GObject.GObject):
 				self.peerList.remove(p)
 				return
 		assert False
+
+	def _onPeerProbeTimeout(self):
+		print "_peerProbeTimerProc"
+		return True
+
+	def _onServerSocketEvent(self, source, cb_condition):
+		assert source == self.servSocket
+
+		if cb_condition & GLib.IO_IN:
+			ss, addr = source.accept()
+			if self._getPeerByAddr() == addr[0]:
+				ss.close()
+
+	def _connectToPeer(self, peerObj):
+		assert peerObj.peerSocket is None
+
+		s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+		try:
+			s.connect(peerObj.getName())
+		except:
+			s.close()
+			return
+
+		GLib.io_add_watch(self.servSocket, GLib.IO_IN | GLib.IO_PRI | GLib.IO_ERR | GLib.IO_HUP, self._onServerSocketEvent)
+
+	def _getPeerByAddr(self, addr):
+		for item in self.peerList:
+			if item.peerSocket is None:
+				continue
+			if item.peerSocket.getpeername()[0] == addr:
+				return item
+		return None
 
 GObject.type_register(SnPeerManager)
 
