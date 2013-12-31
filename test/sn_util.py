@@ -279,7 +279,7 @@ class SnUtil:
 
 class ServerEndPoint:
 
-	def __init__(self, certFile, privkeyFile, caCertFile, acceptFunc, sockSendFunc, sockRecvFunc):
+	def __init__(self, certFile, privkeyFile, caCertFile):
 		self.certFile = certFile
 		self.privkeyFile = privkeyFile
 		self.caCertFile = caCertFile
@@ -288,9 +288,20 @@ class ServerEndPoint:
 		self.sock = None
 		self.ssl_sock = None
 
-		self.acceptFunc = acceptFunc
-		self.sendFunc = sockSendFunc
-		self.recvFunc = sockRecvFunc
+		self.mode = Socket.MODE_BLOCKING
+		self.acceptFunc = None
+
+	def setMode(self, mode, **kwargs):
+		self.mode = mode
+
+		if self.mode == Socket.MODE_BLOCKING:
+			self.acceptFunc = None
+		elif self.mode == Socket.MODE_NON_BLOCKING:
+			self.acceptFunc = None
+		elif self.mode == Socket.MODE_ASYNCHRONOUS:
+			self.acceptFunc = kwargs["acceptFunc"]
+		else:
+			assert False
 
 	def listen(self, port):
 		self.port = port
@@ -301,25 +312,24 @@ class ServerEndPoint:
 		self.ssl_sock.bind(('0.0.0.0', self.port))
 		self.ssl_sock.listen(5)
 
-		GLib.io_add_watch(self.sock, GLib.IO_IN | GLib.IO_PRI | GLib.IO_ERR | GLib.IO_HUP, self._onServerSocketEvent)
+	def accept(self):
+		assert self.mode == Socket.MODE_BLOCKING or self.mode == Socket.MODE_NON_BLOCKING
+		return self._accept()
 
 	def close(self):
 		self.ssl_sock.close()
 		self.ssl_sock = None
 		self.sock = None
 
-	def _onServerSocketEvent(self, source, cb_condition):
-		assert source == self.sock
-
-		if cb_condition & GLib.IO_IN:
-			self._accept()
-
 	def _accept(self):
-		new_sock, addr = self.ssl_sock.accept()
-		if not self._checkPeerCert(new_sock):
-			new_sock.close()
-			return
-		self.acceptFunc(Socket(new_sock, self.sendFunc, self.recvFunc))
+		while True:
+			new_sock, addr = self.ssl_sock.accept()
+
+			if not self._checkPeerCert(new_sock):
+				new_sock.close()
+				continue
+
+			return Socket(new_sock)
 
 	def _checkPeerCert(self, new_sock):
 		certDict = new_sock.getpeercert()
@@ -333,30 +343,49 @@ class ServerEndPoint:
 
 class ClientEndPoint:
 
-	def __init__(self, certFile, privkeyFile, caCertFile, sendFunc, recvFunc):
+	def __init__(self, certFile, privkeyFile, caCertFile):
 		self.certFile = certFile
 		self.privkeyFile = privkeyFile
 		self.caCertFile = caCertFile
 
-		self.sendFunc = sendFunc
-		self.recvFunc = recvFunc
+		self.mode = Socket.MODE_BLOCKING
+		self.connectFunc = None
+
+	def setMode(self, mode, **kwargs):
+		self.mode = mode
+
+		if self.mode == Socket.MODE_BLOCKING:
+			self.connectFunc = None
+		elif self.mode == Socket.MODE_NON_BLOCKING:
+			self.connectFunc = None
+		elif self.mode == Socket.MODE_ASYNCHRONOUS:
+			self.connectFunc = kwargs["connectFunc"]
+		else:
+			assert False
 
 	def connect(self, hostname, port):
+		assert self.mode == Socket.MODE_BLOCKING or self.mode == Socket.MODE_NON_BLOCKING
+
 		sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)  
 		ssl_sock = ssl.wrap_socket(sock, certfile=self.certFile, keyfile=self.privkeyFile,
 		                           cert_reqs=ssl.CERT_REQUIRED, ca_certs=self.caCertFile,
 		                           ssl_version=ssl.PROTOCOL_SSLv3)
 		ssl_sock.connect((hostname, port))
 
-		return Socket(ssl_sock, self.sendFunc, self.recvFunc)
+		return Socket(ssl_sock)
 
 class Socket:
 
-	def __init__(self, ssl_sock, sendFunc, recvFunc):
+	MODE_BLOCKING = 0
+	MODE_NON_BLOCKING = 1
+	MODE_ASYNCHRONOUS = 2
+
+	def __init__(self, ssl_sock):
 		self.ssl_sock = ssl_sock
-		self.sendFunc = sendFunc
-		self.recvFunc = recvFunc
-		GLib.io_add_watch(self.sock, GLib.IO_IN | GLib.IO_OUT | GLib.IO_PRI | GLib.IO_ERR | GLib.IO_HUP, self._onSocketEvent)
+
+		self.mode = MODE_BLOCKING
+		self.sendFunc = None
+		self.recvFunc = None
 
 	def getPeerName(self):
 		"""raise exception when failure"""
@@ -366,9 +395,38 @@ class Socket:
 				return item[0][1]
 		assert False
 
+	def setMode(self, mode, **kwargs):
+		self.mode = mode
+
+		if self.mode == MODE_BLOCKING:
+			self.sendFunc = None
+			self.recvFunc = None
+		elif self.mode == MODE_NON_BLOCKING:
+			self.sendFunc = None
+			self.recvFunc = None
+		elif self.mode == MODE_ASYNCHRONOUS:
+			self.sendFunc = kwargs.get("sendFunc")
+			self.recvFunc = kwargs["recvFunc"]
+		else:
+			assert False
+
 	def send(self, channel, buf):
 		"""raise exception when failure"""
 
+		assert self.mode == MODE_BLOCKING or self.mode == MODE_NON_BLOCKING
+		self._send(channel, buf)
+
+	def recv(self, channel):
+		"""raise exception when failure"""
+
+		assert self.mode == MODE_BLOCKING or self.mode == MODE_NON_BLOCKING
+		return self._recv(channel)
+
+	def close(self):
+		self.ssl_sock.close()
+		self.ssl_sock = None
+
+	def _send(self, channel, buf):
 		# send packet header: channel id + data length
 		val = struct.pack("!II", channel, len(buf))
 		self.ssl_sock.sendall(val)
@@ -376,17 +434,7 @@ class Socket:
 		# send packet content
 		self.ssl_sock.sendall(buf)
 
-	def close(self):
-		self.ssl_sock.close()
-		self.ssl_sock = None
-
-	def _onSocketEvent(self, source, cb_condition):
-		assert source == self.sock
-
-		if cb_condition & GLib.IO_IN:
-			self._recv()
-
-	def _recv(self):
+	def _recv(self, channel):
 		# receive packet header
 		headerLen = struct.calcsize("!II")
 		buf = ""
@@ -399,7 +447,7 @@ class Socket:
 		while len(buf) < dataLen:
 			buf += self.ssl_sock.recv(dataLen - len(buf))
 
-		self.recvFunc(0, buf)
+		return buf
 
 class BulkFile:
 	pass

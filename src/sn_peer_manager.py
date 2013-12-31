@@ -28,6 +28,11 @@ class SnPeerManager(GObject.GObject):
 		self.param.configManager.connect("host_delete", self._onCfgPeerDelete)
 
 		# create server socket
+		self.servSocket = ServerEndPoint(self.param.certFile, self.param.privkeyFile,
+		                                 self.param.caCertFile, None, None, None)
+		self.servSocket.listen(self.param.)
+
+		
 		self._createServerSocket()
 
 		# create peer probe timer
