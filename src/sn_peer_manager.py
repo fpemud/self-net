@@ -7,13 +7,21 @@ from sn_util import ClientEndPoint
 from sn_peer import SnPeer
 
 class SnPeerInfo:
+	systemServerList = None			# list<SnPeerInfoServer>
+	systemClientList = None			# list<SnPeerInfoClient>
+	userInfoDict = None				# dict<str, SnPeerInfoUser>
 
-	STATE_INIT = 0
-	STATE_INFO_SENT = 1
-	STATE_INFO_SYNC = 2
+class SnPeerInfoUser:
+	userId = None					# int
+	userServerList = None			# list<SnPeerInfoServer>
+	userClientList = None			# list<SnPeerInfoClient>
 
-	def __init__(self):
-		self.state = STATE_INIT
+class SnPeerInfoServer:
+	serviceName = None				# str
+
+class SnPeerInfoClient:
+	serviceName = None				# str
+	toSystem = None					# boolean
 
 class SnPeerManager(GObject.GObject):
 
@@ -28,25 +36,25 @@ class SnPeerManager(GObject.GObject):
 		self.serverEndPoint = None
 		self.clientEndPoint = None
 
-		# fill info dict
-		self.localInfo = SnPeerInfo()
+		# fill info variables
+		self.localInfo = self.param.serviceManager.getLocalInfo()
 		for hn in self.param.configManager.getHostList():
 			if hn == socket.gethostname():
 				continue
-			self.peerDict[hn] = _SnPeer()
+			self.peerDict[hn] = _SnPeer(hn)
 
 		# create server endpoint
-		self.serverEndPoint = ServerEndPoint(self.param.certFile, self.param.privkeyFile,
-		                                     self.param.caCertFile, self._onSocketConnceted)
+		self.serverEndPoint = ServerEndPoint(self.param.certFile, self.param.privkeyFile, self.param.caCertFile)
+		self.serverEndPoint.setAllowedPeerList(self.peerDict.keys())
+		self.serverEndPoint.setEventFunc("accept", self._onSocketConnceted)
 		self.serverEndPoint.listen(self.param.configManager.getHostInfo("localhost").port)
 
 		# create client endpoint
-		self.clientEndPoint = ClientEndPoint(self.param.certFile, self.param.privkeyFile,
-		                                     self.param.caCertFile, self._onSocketConnceted)
+		self.clientEndPoint = ClientEndPoint(self.param.certFile, self.param.privkeyFile, self.param.caCertFile)
+		self.clientEndPoint.setEventFunc("connect", self._onSocketConnceted)
 
 		# create peer probe timer
-		GObject.timeout_add_seconds(self.param.configManager.getCfgGlobal().peerProbeTimeout * 1000,
-		                            self._onPeerProbe)
+		GObject.timeout_add_seconds(self.param.configManager.getCfgGlobal().peerProbeTimeout * 1000, self._onPeerProbe)
 
 	def release(self):
 		# fixme
@@ -55,30 +63,24 @@ class SnPeerManager(GObject.GObject):
 	def getPeerNameList(self):
 		return self.peerDict.keys()
 
+	def isPeerActive(self, peerName):
+		return (self.peerDict[peerName].peerInfo is not None)
+
 	def getPeerInfo(self, peerName):
 		return self.peerDict[peerName].peerInfo
 
 	def _onSocketConnceted(self, sock):
-		peerName = sock.getPeerName()
-
-		# only accept host belongs to myself
-		if peerName not in self.peerDict:
-			sock.close()
-			return
-
 		# only one connection between a pair of hosts
-		if self.peerDict[peerName].peerSocket is not None:
+		if self.peerDict[sock.getPeerName()].peerSocket is not None:
 			sock.close()
 			return
 
-		self.peerDict[peerName]._onSocketNew(sock)
+		self.peerDict[sock.getPeerName()]._onSocketNew(sock)
 
 	def _onPeerProbe(self):
 		for po in self.peerDict.values():
-			if po.peerSocket is not None:
-				continue
-
-			self.clientEndPoint.connect(po.peerName, self.param.configManager.getHostInfo(po.peerName).port)
+			if po.peerSocket is None:
+				self.clientEndPoint.connect(po.peerName, self.param.configManager.getHostInfo(po.peerName).port)
 
 class _SnPeer:
 
@@ -86,10 +88,11 @@ class _SnPeer:
 	STATE_INFO_SENT = 1
 	STATE_INFO_SYNC = 2
 
-	CHANNEL_INFO = 1
+	CHANNEL_INFO = 0
 
-	def __init__(self, peerManager):
+	def __init__(self, peerManager, peerName):
 		self.m = peerManager
+		self.peerName = peerName
 		self.peerInfo = None
 
 		self.peerSocket = None
@@ -99,8 +102,8 @@ class _SnPeer:
 		assert self.peerSocket is None
 
 		self.peerSocket = sock
-		self.peerSocket.setFunc(
-
+		self.peerSocket.setFunc("recv", self._onSocketRecv)
+		self.peerSocket.setFunc("error", self._onSocketError)
 
 		self.peerSocket.send(CHANNEL_INFO, pickle.dumps(self.m.localInfo))
 		self.state = STATE_INFO_SENT
@@ -117,16 +120,9 @@ class _SnPeer:
 				self.peerInfo = ro
 				self.state = STATE_INFO_SYNC
 
-	def _onSocketClose(self):
-		assert self.peerSocket is not None
-
-		self.state = STATE_NONE
-
 	def _onSocketError(self):
 		assert self.peerSocket is not None
-
-		self.state = STATE_NONE
-
+		self._shutdown()
 
 	def _shutdown(self):
 		self.peerSocket.close()

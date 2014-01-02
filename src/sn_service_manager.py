@@ -41,3 +41,6 @@ class SnServiceManager(GObject.GObject):
 		assert key in self.serviceDict
 		self.serviceDict[key]
 
+	def getLocalInfo(self):
+		return SnPeerInfo()				# fixme
+
