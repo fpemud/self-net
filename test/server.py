@@ -6,15 +6,21 @@ sys.path.append('../src')
 from sn_util import SnUtil
 from sn_util import ServerEndPoint
 
-s = ServerEndPoint("/etc/selfnetd/cert.pem", "/etc/selfnetd/privkey.pem", "/etc/selfnetd/ca-cert.pem")
-s.listen(31500)
-ss = s.accept()
-  
-print 'got connected from', ss.getPeerName()
-  
-ss.send(0, 'byebye')  
-ra = ss.recv(0)
-print ra  
+def onAccept(ss):
+	print 'got connected from', ss.getPeerName()
+	ss.send(0, 'byebye')
 
-ss.close()  
-s.close()  
+def onSend():
+	pass
+
+def onRecv(channel, buf):
+	print "%d, %s"%(channel, buf)
+
+mainloop = GLib.MainLoop()
+
+s = ServerEndPoint("/etc/selfnetd/cert.pem", "/etc/selfnetd/privkey.pem", "/etc/selfnetd/ca-cert.pem", onAccept, onSend, onRecv)
+s.listen(31500)
+
+mainloop.run()
+
+
