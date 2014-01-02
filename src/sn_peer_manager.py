@@ -1,106 +1,135 @@
 #!/usr/bin/python2
 # -*- coding: utf-8; tab-width: 4; indent-tabs-mode: t -*-
 
-import socket
 from gi.repository import GObject
-from gi.repository import GLib
 from sn_util import ServerEndPoint
 from sn_util import ClientEndPoint
 from sn_peer import SnPeer
 
-class SnPeerManager(GObject.GObject):
+class SnPeerInfo:
 
-	__gsignals__ = {
-		'peer_add': (GObject.SIGNAL_RUN_LAST, GObject.TYPE_NONE, ()),
-		'peer_delete': (GObject.SIGNAL_RUN_LAST, GObject.TYPE_NONE, ()),
-	}
+	STATE_INIT = 0
+	STATE_INFO_SENT = 1
+	STATE_INFO_SYNC = 2
+
+	def __init__(self):
+		self.state = STATE_INIT
+
+class SnPeerManager(GObject.GObject):
 
 	def __init__(self, param):
 		GObject.GObject.__init__(self)
 		self.param = param
-		self.peerList = []
-		self.servSocket = None
-		self.coreSocketDict = dict()
 
-	def init(self):
-		self.param.configManager.connect("host_add", self._onCfgPeerAdd)
-		self.param.configManager.connect("host_delete", self._onCfgPeerDelete)
-		self.param.configManager.connect("host_delete", self._onCfgPeerDelete)
+		# define variables
+		self.localInfo = None
+		self.peerDict = dict()		# _SnPeer object contains peerInfo
 
-		# create server socket
-		self.servSocket = ServerEndPoint(self.param.certFile, self.param.privkeyFile,
-		                                 self.param.caCertFile, None, None, None)
-		self.servSocket.listen(self.param.)
+		self.serverEndPoint = None
+		self.clientEndPoint = None
 
-		
-		self._createServerSocket()
+		# fill info dict
+		self.localInfo = SnPeerInfo()
+		for hn in self.param.configManager.getHostList():
+			if hn == socket.gethostname():
+				continue
+			self.peerDict[hn] = _SnPeer()
+
+		# create server endpoint
+		self.serverEndPoint = ServerEndPoint(self.param.certFile, self.param.privkeyFile,
+		                                     self.param.caCertFile, self._onSocketConnceted)
+		self.serverEndPoint.listen(self.param.configManager.getHostInfo("localhost").port)
+
+		# create client endpoint
+		self.clientEndPoint = ClientEndPoint(self.param.certFile, self.param.privkeyFile,
+		                                     self.param.caCertFile, self._onSocketConnceted)
 
 		# create peer probe timer
-		GObject.timeout_add_seconds(self.param.peerProbeTimeout, self._peerProbeTimerProc)
+		GObject.timeout_add_seconds(self.param.configManager.getCfgGlobal().peerProbeTimeout * 1000,
+		                            self._onPeerProbe)
 
-	def getPeerList(self):
-		"""Returns SnPeer object list"""
+	def release(self):
+		# fixme
+		pass
 
-		return self.peerList
+	def getPeerNameList(self):
+		return self.peerDict.keys()
 
-	def getPeer(self, peerName):
-		"""Returns SnPeer object"""
+	def getPeerInfo(self, peerName):
+		return self.peerDict[peerName].peerInfo
 
-		for pobj in self.peerList:
-			if pobj.getName() == peerName:
-				return pobj
-		assert False
+	def _onSocketConnceted(self, sock):
+		peerName = sock.getPeerName()
 
-	def _createServerSocket(self):
-		address = ('0.0.0.0', self.param.configManager.getPort())
-		self.servSocket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-		self.servSocket.bind(address)  
-		self.servSocket.listen(5)  
-		GLib.io_add_watch(self.servSocket, GLib.IO_IN | GLib.IO_PRI | GLib.IO_ERR | GLib.IO_HUP, self._onServerSocketEvent)
-
-	def _onCfgPeerAdd(self, peerObj):
-		po = SnPeer(self.param, peerObj.hostname)
-		self.peerList.append(po)
-
-	def _onCfgPeerDelete(self, peerName):
-		for p in self.peerList:
-			if p.getName() == peerName:
-				print "peer deleted"
-				self.peerList.remove(p)
-				return
-		assert False
-
-	def _onPeerProbeTimeout(self):
-		print "_peerProbeTimerProc"
-		return True
-
-	def _onServerSocketEvent(self, source, cb_condition):
-		assert source == self.servSocket
-
-		if cb_condition & GLib.IO_IN:
-			ss, addr = source.accept()
-			if self._getPeerByAddr() == addr[0]:
-				ss.close()
-
-	def _connectToPeer(self, peerObj):
-		assert peerObj.peerSocket is None
-
-		s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-		try:
-			s.connect(peerObj.getName())
-		except:
-			s.close()
+		# only accept host belongs to myself
+		if peerName not in self.peerDict:
+			sock.close()
 			return
 
-		GLib.io_add_watch(self.servSocket, GLib.IO_IN | GLib.IO_PRI | GLib.IO_ERR | GLib.IO_HUP, self._onServerSocketEvent)
+		# only one connection between a pair of hosts
+		if self.peerDict[peerName].peerSocket is not None:
+			sock.close()
+			return
 
-	def _getPeerByAddr(self, addr):
-		for item in self.peerList:
-			if item.peerSocket is None:
+		self.peerDict[peerName]._onSocketNew(sock)
+
+	def _onPeerProbe(self):
+		for po in self.peerDict.values():
+			if po.peerSocket is not None:
 				continue
-			if item.peerSocket.getpeername()[0] == addr:
-				return item
-		return None
 
-GObject.type_register(SnPeerManager)
+			self.clientEndPoint.connect(po.peerName, self.param.configManager.getHostInfo(po.peerName).port)
+
+class _SnPeer:
+
+	STATE_NONE = 0
+	STATE_INFO_SENT = 1
+	STATE_INFO_SYNC = 2
+
+	CHANNEL_INFO = 1
+
+	def __init__(self, peerManager):
+		self.m = peerManager
+		self.peerInfo = None
+
+		self.peerSocket = None
+		self.state = STATE_NONE
+
+	def _onSocketNew(self, sock):
+		assert self.peerSocket is None
+
+		self.peerSocket = sock
+		self.peerSocket.setFunc(
+
+
+		self.peerSocket.send(CHANNEL_INFO, pickle.dumps(self.m.localInfo))
+		self.state = STATE_INFO_SENT
+
+	def _onSocketRecv(self, channel, buf):
+		assert self.peerSocket is not None
+
+		if self.state == STATE_INFO_SENT and channel == CHANNEL_INFO:
+			ro = pickle.loads(buf)
+			if not isinstance(ro, SnPeerInfo):
+				self._shutdown()
+				return
+			else:
+				self.peerInfo = ro
+				self.state = STATE_INFO_SYNC
+
+	def _onSocketClose(self):
+		assert self.peerSocket is not None
+
+		self.state = STATE_NONE
+
+	def _onSocketError(self):
+		assert self.peerSocket is not None
+
+		self.state = STATE_NONE
+
+
+	def _shutdown(self):
+		self.peerSocket.close()
+		self.peerSocket = None
+		self.state = STATE_NONE
 

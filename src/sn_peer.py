@@ -33,6 +33,18 @@ class SnPeer(GObject.GObject):
 	def getInfo(self):
 		return self.peerInfo
 
+	def _onSocketNew(self):
+		pass
+
+	def _onSocketRecv(self):
+		pass
+
+	def _onSocketClose(self):
+		pass
+
+	def _onSocketError(self):
+		pass
+
 	def getSocket(self, serviceName, connMedia, connIntf):
 		"""connMedia: net, removable-storage
 		   connIntf: socket, bulk"""

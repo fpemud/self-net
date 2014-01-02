@@ -1,18 +1,14 @@
 #!/usr/bin/python2
 # -*- coding: utf-8; tab-width: 4; indent-tabs-mode: t -*-
 
-import os
 import socket
-import pyinotify
-from gi.repository import GObject
+import OpenSSL
 
-class SnCfgService:
-	user = None
-	name = None
+class SnCfgGlobal:
+	peerProbeInterval = None		# int, default is 1s
 
-class SnCfgHost:
-	name = None
-	port = None
+class SnCfgHostInfo:
+	port = None						# int
 
 class SnConfigManager(GObject.GObject):
 	"""/etc/selfnetd
@@ -23,39 +19,28 @@ class SnConfigManager(GObject.GObject):
 	    |----hosts.xml
 	    |----selfnetd.conf"""
 
-	__gsignals__ = {
-		'host_added': (GObject.SIGNAL_RUN_LAST, GObject.TYPE_NONE, ()),
-		'host_changed': (GObject.SIGNAL_RUN_LAST, GObject.TYPE_NONE, ()),
-		'host_deleted': (GObject.SIGNAL_RUN_LAST, GObject.TYPE_NONE, ()),
-		'service_add': (GObject.SIGNAL_RUN_LAST, GObject.TYPE_NONE, ()),
-		'service_delete': (GObject.SIGNAL_RUN_LAST, GObject.TYPE_NONE, ()),
-	}
-
 	def __init__(self, param):
 		GObject.GObject.__init__(self)
 
 		self.param = param
-		self.hostList = []
-		self.serviceDict = dict()
+		self.cfgGlobal = SnCfgGlobal()
+		self.hostDict = dict()
 
-	def init(self):
 		self._checkCertFiles()
-		newHostList = self._parseHostsFile()
-		self._updateHostList(newHostList)
+		self._parseConfFile()
+		self._parseHostsFile()
 
-	def addService(self, userName, serviceName, serviceObj):
-		key = (userName, serviceName)
-		assert key not in self.serviceDict
-		self.serviceDict[key] = serviceObj
+	def getCfgGlobal(self):
+		return self.cfgGlobal
 
-	def removeService(self, userName, serviceName):
-		key = (userName, serviceName)
-		self.serviceDict.remove(key)
+	def getHostNameList(self):
+		return self.hostDict.keys()
 
-	def getService(self, userName, serviceName):
-		key = (userName, serviceName)
-		assert key in self.serviceDict
-		self.serviceDict[key]
+	def getHostInfo(self, hostName):
+		if hostName == "localhost":
+			return self.hostDict[socket.gethostname()]
+		else:
+			return self.hostDict[hostName]
 
 	def _checkCertFiles(self):
 		# check CA certificate
@@ -78,24 +63,63 @@ class SnConfigManager(GObject.GObject):
 		if not foundCommonName:
 			raise Exception("No common name in certificate")
 
+	def _parseConfFile(self):
+		# set default value
+		self.cfgGlobal.peerProbeInterval = 1
+
+		# create parser class
+		class thehandler(xml.sax.handler.ContentHandler):
+			INIT = 0
+			IN_PEER_PROBE_INTERVAL = 1
+
+			def __init__(self, cfgGlobal):
+				self.cfgGlobal = cfgGlobal
+				self.state = INIT
+
+			def startElement(self, name, attrs):
+				if name == "peer-probe-interval" and self.state == INIT:
+					self.state = IN_PEER_PROBE_INTERVAL
+				else:
+					raise Exception("Failed to parse configuration file")
+
+			def endElement(self, name, attrs):
+				if name == "peer-probe-interval" and self.state == IN_PEER_PROBE_INTERVAL:
+					self.state = INIT
+				else:
+					raise Exception("Failed to parse configuration file")
+
+			def characters(self, content):
+				if self.stat == IN_HOST_PORT:
+					self.cfgGlobal.peerProbeInterval = int(content)
+				else:
+					raise Exception("Failed to parse configuration file")
+
+		# parse file
+		h = thehandler()
+		xml.sax.parse(self.param.confFile, h)
+
+		# check parse result
+		if self.cfgGlobal.peerProbeInterval < 1:
+			raise Exception("Invalid cfgGlobal.peerProbeInterval")
+
 	def _parseHostsFile(self):
+		# create parser class
 		class thehandler(xml.sax.handler.ContentHandler):
 			INIT = 0
 			IN_HOST = 1
-			IN_HOST_NAME = 2
-			IN_HOST_PORT = 3
+			IN_HOST_PORT = 2
 
-			def __init__(self):
-				self.hostList = []
-				self.curHost = None
+			def __init__(self, hostDict):
+				self.hostDict = hostDict
+				self.curHostName = None
+				self.curHostInfo = None
 				self.state = INIT
 
 			def startElement(self, name, attrs):
 				if name == "host" and self.state == INIT:
 					self.state = IN_HOST:
-					self.curHost = SnCfgHost()
-				elif name == "name" and self.state == IN_HOST:
-					self.state = IN_HOST_NAME
+					self.curHostName = attrs["name"]
+					self.curHostInfo = SnCfgHostInfo()
 				elif name == "port" and self.state == IN_HOST:
 					self.state = IN_HOST_PORT
 				else:
@@ -103,67 +127,28 @@ class SnConfigManager(GObject.GObject):
 
 			def endElement(self, name, attrs):
 				if name == "host" and self.state == IN_HOST:
-					self.hostList.append(self.curHost)
-					self.curHost = None
+					self.hostDict[self.curHostName] = self.curHostInfo
+					self.curHostName = None
+					self.curHostInfo = None
 					self.state = INIT
-				elif name == "name" and self.state == IN_HOST_NAME:
-					self.state = IN_HOST
 				elif name == "port" and self.state == IN_HOST_PORT:
 					self.state = IN_HOST
 				else:
 					raise Exception("Failed to parse hosts file")
 
 			def characters(self, content):
-				if self.stat == IN_HOST_NAME:
-					self.curHost.name = content
-				elif self.stat == IN_HOST_PORT:
-					self.curHost.port = int(content)
+				if self.stat == IN_HOST_PORT:
+					self.curHostInfo.port = int(content)
 				else:
 					raise Exception("Failed to parse hosts file")
 
+		# parse file
 		h = thehandler()
 		xml.sax.parse(self.param.hostsFile, h)
 
-		found = False
-		for nho in h.hostList:
-			if nho.name == socket.gethostname():
-				found = True
-				break
-		if not found:
-			raise Exception("No localhost in hosts file")
-
-		return h.hostList
-
-	def _updateHostList(self, newHostList):
-		for ho in self.hostList:
-			found = False
-			for nho in newHostList:
-				if nho.name == ho.name:
-					found = True
-					break
-			if not found:
-				pass		# fire deletion event
-
-		# check for modification
-		for ho in self.hostList:
-			for nho in newHostList:
-				if nho.name == ho.name:
-					if nho.port != ho.port:
-						pass		# fire modification event
-
-					break
-
-		# check for addition
-		for nho in newHostList:
-			found = False
-			for ho in self.hostList:
-				if ho.name == nho.name:
-					found = True
-					break
-			if not found:
-				pass		# fire addition event
-
-		self.hostList = newHostList
-
-GObject.type_register(SnConfigManager)
+		# check parse result
+		if "localhost" in self.hostDict:
+			raise Exception("Name \"localhost\" is reserved")
+		if socket.gethostname() not in self.hostDict:
+			raise Exception("No name for localhost in hosts file")
 

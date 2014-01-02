@@ -17,10 +17,8 @@ class SnParam:
 		self.confFile = os.path.join(self.cfgDir, "selfnetd.conf")
 		self.hostsFile = os.path.join(self.cfgDir, "hosts.xml")
 
-		self.peerProbeTimeout = 1000			# 1s
-		self.peerKeepAliveTimeout = 1000		# 1s
-
 		self.mainloop = None
 		self.configManager = None
+		self.serviceManager = None
 		self.peerManager = None
 

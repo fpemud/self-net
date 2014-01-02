@@ -279,7 +279,7 @@ class SnUtil:
 
 class ServerEndPoint:
 
-	def __init__(self, certFile, privkeyFile, caCertFile, acceptFunc, sockSendFunc, sockRecvFunc):
+	def __init__(self, certFile, privkeyFile, caCertFile, acceptFunc):
 		self.certFile = certFile
 		self.privkeyFile = privkeyFile
 		self.caCertFile = caCertFile
@@ -289,11 +289,10 @@ class ServerEndPoint:
 		self.ssl_sock = None
 
 		self.acceptFunc = acceptFunc
-		self.sendFunc = sockSendFunc
-		self.recvFunc = sockRecvFunc
 
 	def listen(self, port):
 		self.port = port
+
 		self.sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
 		self.ssl_sock = ssl.wrap_socket(self.sock, certfile=self.certFile, keyfile=self.privkeyFile,
 		                                cert_reqs=ssl.CERT_REQUIRED, ca_certs=self.caCertFile,
@@ -301,25 +300,19 @@ class ServerEndPoint:
 		self.ssl_sock.bind(('0.0.0.0', self.port))
 		self.ssl_sock.listen(5)
 
-		GLib.io_add_watch(self.sock, GLib.IO_IN | GLib.IO_PRI | GLib.IO_ERR | GLib.IO_HUP, self._onServerSocketEvent)
+		GLib.io_add_watch(self.sock, GLib.IO_IN, self._onAccept)
 
 	def close(self):
 		self.ssl_sock.close()
 		self.ssl_sock = None
 		self.sock = None
 
-	def _onServerSocketEvent(self, source, cb_condition):
-		assert source == self.sock
-
-		if cb_condition & GLib.IO_IN:
-			self._accept()
-
-	def _accept(self):
+	def _onAccept(self, source, cb_condition):
 		new_sock, addr = self.ssl_sock.accept()
 		if not self._checkPeerCert(new_sock):
 			new_sock.close()
 			return
-		self.acceptFunc(Socket(new_sock, self.sendFunc, self.recvFunc))
+		self.acceptFunc(Socket(new_sock))
 
 	def _checkPeerCert(self, new_sock):
 		certDict = new_sock.getpeercert()
@@ -333,13 +326,12 @@ class ServerEndPoint:
 
 class ClientEndPoint:
 
-	def __init__(self, certFile, privkeyFile, caCertFile, sendFunc, recvFunc):
+	def __init__(self, certFile, privkeyFile, caCertFile, connectFunc):
 		self.certFile = certFile
 		self.privkeyFile = privkeyFile
 		self.caCertFile = caCertFile
 
-		self.sendFunc = sendFunc
-		self.recvFunc = recvFunc
+		self.connectFunc = connectFunc
 
 	def connect(self, hostname, port):
 		sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)  
@@ -348,23 +340,27 @@ class ClientEndPoint:
 		                           ssl_version=ssl.PROTOCOL_SSLv3)
 		ssl_sock.connect((hostname, port))
 
-		return Socket(ssl_sock, self.sendFunc, self.recvFunc)
-
 class Socket:
 
-	def __init__(self, ssl_sock, sendFunc, recvFunc):
+	def __init__(self, ssl_sock):
 		self.ssl_sock = ssl_sock
-		self.sendFunc = sendFunc
-		self.recvFunc = recvFunc
-		GLib.io_add_watch(self.sock, GLib.IO_IN | GLib.IO_OUT | GLib.IO_PRI | GLib.IO_ERR | GLib.IO_HUP, self._onSocketEvent)
+		self.peerName = self._getPeerName()
+
+		self.sendFunc = None
+		self.recvFunc = None
+		self.errFunc = None
 
 	def getPeerName(self):
-		"""raise exception when failure"""
+		return self.peerName
 
-		for item in self.ssl_sock.getpeercert()["subject"]:
-			if item[0][0] == "commonName":
-				return item[0][1]
-		assert False
+	def setFunc(sendFunc, recvFunc, errFunc):
+		self.sendFunc = sendFunc
+		self.recvFunc = recvFunc
+		self.errFunc = errFunc
+
+		GLib.io_add_watch(self.sock, GLib.IO_IN, self._onRecv)
+		GLib.io_add_watch(self.sock, GLib.IO_OUT, self._onSend)
+		GLib.io_add_watch(self.sock, GLib.IO_PRI | GLib.IO_ERR | GLib.IO_HUP, self._onError)
 
 	def send(self, channel, buf):
 		"""raise exception when failure"""
@@ -380,13 +376,7 @@ class Socket:
 		self.ssl_sock.close()
 		self.ssl_sock = None
 
-	def _onSocketEvent(self, source, cb_condition):
-		assert source == self.sock
-
-		if cb_condition & GLib.IO_IN:
-			self._recv()
-
-	def _recv(self):
+	def _onRecv(self):
 		# receive packet header
 		headerLen = struct.calcsize("!II")
 		buf = ""
@@ -400,6 +390,18 @@ class Socket:
 			buf += self.ssl_sock.recv(dataLen - len(buf))
 
 		self.recvFunc(0, buf)
+
+	def _onSend(self):
+		pass
+
+	def _onError(self):
+		pass
+
+	def _getPeerName(self):
+		for item in self.ssl_sock.getpeercert()["subject"]:
+			if item[0][0] == "commonName":
+				return item[0][1]
+		assert False
 
 class BulkFile:
 	pass
