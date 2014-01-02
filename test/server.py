@@ -2,25 +2,36 @@
 # -*- coding: utf-8; tab-width: 4; indent-tabs-mode: t -*-
 
 import sys
+from gi.repository import GLib
 sys.path.append('../src')
-from sn_util import SnUtil
-from sn_util import ServerEndPoint
+from sn_conn_intf import ServerEndPoint
 
-def onAccept(ss):
-	print 'got connected from', ss.getPeerName()
-	ss.send(0, 'byebye')
+class Main:
 
-def onSend():
-	pass
+	def __init__(self):
+		self.ss = None
 
-def onRecv(channel, buf):
-	print "%d, %s"%(channel, buf)
+	def onAccept(self, ss):
+		print 'got connected from', ss.getPeerName()
+		self.ss = ss
 
-mainloop = GLib.MainLoop()
+		self.ss.setEventFunc("recv", 0, self.onRecv)
+		self.ss.send(0, 'byebye')
 
-s = ServerEndPoint("/etc/selfnetd/cert.pem", "/etc/selfnetd/privkey.pem", "/etc/selfnetd/ca-cert.pem", onAccept, onSend, onRecv)
-s.listen(31500)
+	def onRecv(self, ss, channel, buf):
+		print "%d %s"%(channel, buf)
 
-mainloop.run()
+	def run(self):
+		mainloop = GLib.MainLoop()
+
+		s = ServerEndPoint("/etc/selfnetd/cert.pem", "/etc/selfnetd/privkey.pem", "/etc/selfnetd/ca-cert.pem")
+		s.setAllowedPeerList(["fpemud-workstation"])
+		s.setEventFunc("accept", self.onAccept)
+		s.listen(31500)
+
+		mainloop.run()
+
+m = Main()
+m.run()
 
 

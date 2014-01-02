@@ -14,7 +14,6 @@ class ServerEndPoint:
 		self.privkeyFile = privkeyFile
 		self.caCertFile = caCertFile
 		self.port = None
-		self.sock = None
 		self.ssl_sock = None
 		self.allowedPeerList = []
 		self.acceptFunc = None
@@ -32,19 +31,18 @@ class ServerEndPoint:
 	def listen(self, port):
 		self.port = port
 
-		self.sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-		self.ssl_sock = ssl.wrap_socket(self.sock, certfile=self.certFile, keyfile=self.privkeyFile,
+		sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+		self.ssl_sock = ssl.wrap_socket(sock, certfile=self.certFile, keyfile=self.privkeyFile,
 		                                cert_reqs=ssl.CERT_REQUIRED, ca_certs=self.caCertFile,
 		                                ssl_version=ssl.PROTOCOL_SSLv3, server_side=True)
 		self.ssl_sock.bind(('0.0.0.0', self.port))
 		self.ssl_sock.listen(5)
 
-		GLib.io_add_watch(self.sock, GLib.IO_IN, self._onAccept)
+		GLib.io_add_watch(self.ssl_sock, GLib.IO_IN, self._onAccept)
 
 	def close(self):
 		self.ssl_sock.close()
 		self.ssl_sock = None
-		self.sock = None
 
 	def _onAccept(self, source, cb_condition):
 		new_sock, addr = self.ssl_sock.accept()
@@ -154,7 +152,7 @@ class Socket:
 		while len(data) < dataLen:
 			data += self.ssl_sock.recv(dataLen - len(data))
 
-		self.recvFuncDict[0](data)
+		self.recvFuncDict[0](self.ssl_sock, 0, data)
 
 	def _onError(self):
 		pass

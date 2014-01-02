@@ -2,18 +2,33 @@
 # -*- coding: utf-8; tab-width: 4; indent-tabs-mode: t -*-
 
 import sys
+from gi.repository import GLib
 sys.path.append('../src')
-from sn_util import SnUtil
-from sn_util import ClientEndPoint
+from sn_conn_intf import ClientEndPoint
 
-c = ClientEndPoint("/etc/selfnetd/cert.pem", "/etc/selfnetd/privkey.pem", "/etc/selfnetd/ca-cert.pem")
-ss = c.connect("127.0.0.1", 31500)
+class Main:
 
-print 'connected to', ss.getPeerName()
+	def __init__(self):
+		self.ss = None
 
-data = ss.recv(0)
-print 'the data received is',data  
+	def onConnect(self, ss):
+		print 'connected to', ss.getPeerName()
+		self.ss = ss
+		self.ss.setEventFunc("recv", 0, self.onRecv)
 
-ss.send(0, "hihi")
-ss.close()
+	def onRecv(self, ss, channel, buf):
+		print 'the data received is',buf  
+		ss.send(0, "hihi")
+		ss.close()
+
+	def run(self):
+		mainloop = GLib.MainLoop()
+
+		c = ClientEndPoint("/etc/selfnetd/cert.pem", "/etc/selfnetd/privkey.pem", "/etc/selfnetd/ca-cert.pem")
+		c.setEventFunc("connected", self.onConnect)
+
+		mainloop.run()
+
+m = Main()
+m.run()
 
