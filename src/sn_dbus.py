@@ -18,7 +18,8 @@ from sn_util import SnUtil
 # Object path           /
 #
 # Methods:
-# array<peerId:int> GetPeerList()									returns peer id list
+# array<peerId:int> GetPeerList()
+# array<peerId:int> GetActivePeerList()
 # peerInfo:st		GetLocalInfo()
 #
 # ==== Network ====
@@ -67,20 +68,26 @@ class DbusMainObject(dbus.service.Object):
 			ret.append(po.peerId)
 		return ret
 
+	@dbus.service.method('org.fpemud.SelfNet', sender_keyword='sender', 
+	                     in_signature='', out_signature='ai')
+	def GetActivePeerList(self, sender=None):
+		ret = []
+		for po in self.peerList:
+			if self.param.peerManager.isPeerActive(self.peerName):
+				ret.append(po.peerId)
+		return ret
+
 	@dbus.service.method('org.fpemud.SelfNet', sender_keyword='sender',
 	                     in_signature='', out_signature='st')
 	def GetLocalInfo(self, sender=None):
-		peerObj = self.param.peerManager.getLocalInfo()
-		po = DbusPeerObject(self.param, peerObj, 0)
-
-		assert False
-		return None
+		peerInfo = self.param.peerManager.getLocalInfo()
+		return DbusPeerInfo.newFromPeerInfo(peerInfo)
 
 class DbusPeerObject(dbus.service.Object):
 
-	def __init__(self, param, peerObj, peerId):
+	def __init__(self, param, peerName, peerId):
 		self.param = param
-		self.peerObj = peerObj
+		self.peerName = peerName
 		self.peerId = peerId
 
 		# register dbus object path
@@ -93,25 +100,26 @@ class DbusPeerObject(dbus.service.Object):
 	@dbus.service.method('org.fpemud.SelfNet.Peer', sender_keyword='sender',
 	                     in_signature='', out_signature='b')
 	def IsActive(self, sender=None):
-		return self.peerObj.isActive()
+		return self.param.peerManager.isPeerActive(self.peerName)
 
 	@dbus.service.method('org.fpemud.SelfNet.Peer', sender_keyword='sender',
-	                     in_signature='')
+	                     in_signature='', out_signature='st')
 	def GetPeerInfo(self, sender=None):
-		pi = self.peerObj.getInfo()
-		if pi is None:
+		peerInfo = self.param.peerManager.getPeerInfo(self.peerName)
+		if peerInfo is None:
 			return None
-
-		ret = DbusPeerInfo()
-		ret.name = pi.name
-		return ret
+		else:
+			return DbusPeerInfo.newFromPeerInfo(peerInfo)
 
 class DbusPeerInfo:
 	name = ""
-	publicKey = ""
 	isActive = False
 	userList = []
 	serviceList = []
+
+	@staticmethod
+	def newFromPeerInfo(peerInfo):
+		pass
 
 class DbusPeerInfoUser:
 	name = ""
@@ -121,10 +129,4 @@ class DbusPeerInfoService:
 	name = ""
 	status = ""
 
-class DbusPeerConn:
-	connSocket = None
-	connBulk = None
-
-def _getDbusPeerInfoFromPeerInfo(peerInfo):
-	pass
 

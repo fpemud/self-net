@@ -4,23 +4,25 @@
 from gi.repository import GObject
 from sn_util import ServerEndPoint
 from sn_util import ClientEndPoint
-from sn_peer import SnPeer
 
 class SnPeerInfo:
 	systemServerList = None			# list<SnPeerInfoServer>
 	systemClientList = None			# list<SnPeerInfoClient>
-	userInfoDict = None				# dict<str, SnPeerInfoUser>
+	userInfoList = None				# list<SnPeerInfoUser>
 
 class SnPeerInfoUser:
 	userId = None					# int
+	userName = None					# str
 	userServerList = None			# list<SnPeerInfoServer>
 	userClientList = None			# list<SnPeerInfoClient>
 
 class SnPeerInfoServer:
 	serviceName = None				# str
+	serviceLabel = None				# int
 
 class SnPeerInfoClient:
 	serviceName = None				# str
+	serviceLabel = None				# int
 	toSystem = None					# boolean
 
 class SnPeerManager(GObject.GObject):
@@ -30,18 +32,16 @@ class SnPeerManager(GObject.GObject):
 		self.param = param
 
 		# define variables
-		self.localInfo = None
 		self.peerDict = dict()		# _SnPeer object contains peerInfo
 
 		self.serverEndPoint = None
 		self.clientEndPoint = None
 
-		# fill info variables
-		self.localInfo = self.param.serviceManager.getLocalInfo()
+		# fill info
 		for hn in self.param.configManager.getHostList():
 			if hn == socket.gethostname():
 				continue
-			self.peerDict[hn] = _SnPeer(hn)
+			self.peerDict[hn] = _SnPeer(self.param, hn)
 
 		# create server endpoint
 		self.serverEndPoint = ServerEndPoint(self.param.certFile, self.param.privkeyFile, self.param.caCertFile)
@@ -84,48 +84,40 @@ class SnPeerManager(GObject.GObject):
 
 class _SnPeer:
 
-	STATE_NONE = 0
-	STATE_INFO_SENT = 1
-	STATE_INFO_SYNC = 2
-
-	CHANNEL_INFO = 0
-
-	def __init__(self, peerManager, peerName):
-		self.m = peerManager
+	def __init__(self, param, peerManager, peerName):
+		self.param = param
+		self.peerManager = peerManager
 		self.peerName = peerName
 		self.peerInfo = None
-
 		self.peerSocket = None
-		self.state = STATE_NONE
 
 	def _onSocketNew(self, sock):
 		assert self.peerSocket is None
 
+		# establish peerSocket
 		self.peerSocket = sock
+		self.peerSocket.setFunc("label_recv", 0, self._onSocketLabelRecvInfo)
 		self.peerSocket.setFunc("recv", self._onSocketRecv)
 		self.peerSocket.setFunc("error", self._onSocketError)
 
-		self.peerSocket.send(CHANNEL_INFO, pickle.dumps(self.m.localInfo))
-		self.state = STATE_INFO_SENT
+		# send localInfo
+		self.peerSocket.send(0, pickle.dumps(self.param.serviceManager.getLocalInfo()))
 
-	def _onSocketRecv(self, channel, buf):
-		assert self.peerSocket is not None
+	def _onSocketLabelRecvInfo(self, sock, label, data):
+		ro = pickle.loads(data)
+		if not isinstance(ro, SnPeerInfo):
+			self._shutdown()
+			return
 
-		if self.state == STATE_INFO_SENT and channel == CHANNEL_INFO:
-			ro = pickle.loads(buf)
-			if not isinstance(ro, SnPeerInfo):
-				self._shutdown()
-				return
-			else:
-				self.peerInfo = ro
-				self.state = STATE_INFO_SYNC
+		self.peerInfo = ro
+
+	def _onSocketRecv(self, sock, label, data):
+		pass
 
 	def _onSocketError(self):
-		assert self.peerSocket is not None
 		self._shutdown()
 
 	def _shutdown(self):
 		self.peerSocket.close()
 		self.peerSocket = None
-		self.state = STATE_NONE
 

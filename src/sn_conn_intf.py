@@ -116,11 +116,11 @@ class Socket:
 
 		def run(self):
 			while not self.stopFlag:
-				pri, channel, data = self.parent.packetQueue.get(True)
+				pri, label, data = self.parent.packetQueue.get(True)
 				if pri == 0xFF:
 					continue
 				try:
-					p = Socket._getPacket(channel, data)
+					p = Socket._getPacket(label, data)
 					self.parent.ssl_sock.sendall(p)
 				except:
 					pass
@@ -134,15 +134,27 @@ class Socket:
 		self.packetQueue = PriorityQueue()
 		self.sendThread = self.sendthread(self)
 
+		self.labelRecvFuncDict = dict()
 		self.recvFunc = None
 		self.errorFunc = None
 
-	def setEventFunc(self, funcName, func):
+	def setEventFunc(self, funcName, *args):
+		if funcName == "label_recv":
+			assert len(args) == 2
+			label = args[0]
+			func = args[1]
+			assert label not in self.labelRecvFuncDict and func is not None
+			self.labelRecvFuncDict[label] = func
+			GLib.io_add_watch(self.ssl_sock, GLib.IO_IN, self._onRecv)
 		if funcName == "recv":
+			assert len(args) == 1
+			func = args[0]
 			assert self.recvFunc is None and func is not None
 			self.recvFunc = func
 			GLib.io_add_watch(self.ssl_sock, GLib.IO_IN, self._onRecv)
 		if funcName == "error":
+			assert len(args) == 1
+			func = args[0]
 			assert self.errorFunc is None and func is not None
 			self.errorFunc = func
 			GLib.io_add_watch(self.ssl_sock, GLib.IO_PRI | GLib.IO_ERR | GLib.IO_HUP, self._onError)
@@ -152,10 +164,10 @@ class Socket:
 	def getPeerName(self):
 		return self.peerName
 
-	def send(self, channel, data):
+	def send(self, label, data):
 		assert len(data) <= 65536
-		pri = Socket._getChannelPriority(channel)
-		self.packetQueue.put((pri, channel, data), True)
+		pri = Socket._getLabelPriority(label)
+		self.packetQueue.put((pri, label, data), True)
 
 	def close(self):
 		self.sendThread.stop()
@@ -170,12 +182,15 @@ class Socket:
 			header += self.ssl_sock.recv(headerLen - len(header))
 
 		# receive packet content
-		channel, dataLen = struct.unpack("!II", header)
+		label, dataLen = struct.unpack("!II", header)
 		data = ""
 		while len(data) < dataLen:
 			data += self.ssl_sock.recv(dataLen - len(data))
 
-		self.recvFunc(self.ssl_sock, 0, data)
+		if label in self.labelRecvFuncDict:
+			self.labelRecvFuncDict[label](self.ssl_sock, label, data)
+		else:
+			self.recvFunc(self.ssl_sock, label, data)
 
 	def _onError(self):
 		self.close()
@@ -190,15 +205,15 @@ class Socket:
 		return None
 
 	@staticmethod
-	def _getChannelPriority(channel):
-		if channel == 0:
+	def _getLabelPriority(label):
+		if label == 0:
 			return 0
 		else:
 			return 1
 
 	@staticmethod
-	def _getPacket(channel, data):
-		header = struct.pack("!II", channel, len(data))
+	def _getPacket(label, data):
+		header = struct.pack("!II", label, len(data))
 		return header + data
 
 class BulkFile:

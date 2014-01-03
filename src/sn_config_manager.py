@@ -5,7 +5,8 @@ import socket
 import OpenSSL
 
 class SnCfgGlobal:
-	peerProbeInterval = None		# int, default is 1s
+	peerProbeInterval = None		# int, default is "1s"
+	userBlackList = None			# list<str>
 
 class SnCfgHostInfo:
 	port = None						# int
@@ -66,11 +67,14 @@ class SnConfigManager(GObject.GObject):
 	def _parseConfFile(self):
 		# set default value
 		self.cfgGlobal.peerProbeInterval = 1
+		self.cfgGlobal.userBlackList = []
 
 		# create parser class
 		class thehandler(xml.sax.handler.ContentHandler):
 			INIT = 0
 			IN_PEER_PROBE_INTERVAL = 1
+			IN_USER_BLACKLIST = 2
+			IN_USER_BLACKLIST_USER = 3
 
 			def __init__(self, cfgGlobal):
 				self.cfgGlobal = cfgGlobal
@@ -79,18 +83,28 @@ class SnConfigManager(GObject.GObject):
 			def startElement(self, name, attrs):
 				if name == "peer-probe-interval" and self.state == INIT:
 					self.state = IN_PEER_PROBE_INTERVAL
+				elif name == "user-blacklist" and self.state == INIT:
+					self.state = IN_USER_BLACKLIST
+				elif name == "user" and self.state == IN_USER_BLACKLIST
+					self.state = IN_USER_BLACKLIST_USER
 				else:
 					raise Exception("Failed to parse configuration file")
 
 			def endElement(self, name, attrs):
 				if name == "peer-probe-interval" and self.state == IN_PEER_PROBE_INTERVAL:
 					self.state = INIT
+				elif name == "user-blacklist" and self.state == IN_USER_BLACKLIST:
+					self.state = INIT
+				elif name == "user" and self.state == IN_USER_BLACKLIST_USER
+					self.state = IN_USER_BLACKLIST
 				else:
 					raise Exception("Failed to parse configuration file")
 
 			def characters(self, content):
-				if self.stat == IN_HOST_PORT:
+				if self.stat == IN_PEER_PROBE_INTERVAL:
 					self.cfgGlobal.peerProbeInterval = int(content)
+				elif self.stat == IN_USER_BLACKLIST_USER:
+					self.cfgGlobal.userBlackList.append(content)
 				else:
 					raise Exception("Failed to parse configuration file")
 
