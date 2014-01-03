@@ -19,25 +19,21 @@ from sn_util import SnUtil
 #
 # Methods:
 # array<peerId:int> GetPeerList()									returns peer id list
-#
-# Signals:
-# PeerListChanged(changeData)
+# peerInfo:st		GetLocalInfo()
 #
 # ==== Network ====
 # Service               org.fpemud.SelfNet
 # Interface             org.fpemud.SelfNet.Peer
-# Object path           /Peer/{peerId:int}
+# Object path           /Peers/{peerId:int}
 #
 # Methods:
 # bool              IsActive()
 # peerInfo:st       GetPeerInfo()
-# connInfo:st		GetPeerConn(userName, serviceName)
 # 
 # Signals:
 # Activated()
 # Inactivated()
 # PeerInfoChanged(changeData)
-# PeerConnChanged(changeData)
 #
 
 class SelfNetException(dbus.DBusException):
@@ -49,14 +45,12 @@ class DbusMainObject(dbus.service.Object):
 		self.param = param
 		self.peerList = []
 
-		# initialize peer list and connect peer event
+		# initialize peer list
 		i = 0
-		for peerObj in self.param.peerManager.getPeerList():
-			po = DbusPeerObject(self.param, peerObj, i)
+		for pn in self.param.peerManager.getPeerNameList():
+			po = DbusPeerObject(self.param, pn, i)
 			self.peerList.append(po)
 			i = i + 1
-		self.param.peerManager.connect("peer_add", self._onPeerAdd)
-		self.param.peerManager.connect("peer_delete", self._onPeerDelete)
 
 		# register dbus object path
 		bus_name = dbus.service.BusName('org.fpemud.SelfNet', bus=dbus.SystemBus())
@@ -73,21 +67,15 @@ class DbusMainObject(dbus.service.Object):
 			ret.append(po.peerId)
 		return ret
 
-	def _onPeerAdd(self, peerObj):
-		i = 0
-		for p in self.peerList:
-			i = max(p.peerId, i)
-		po = DbusPeerObject(self.param, peerObj, i + 1)
-		self.peerList.append(po)
+	@dbus.service.method('org.fpemud.SelfNet', sender_keyword='sender',
+	                     in_signature='', out_signature='st')
+	def GetLocalInfo(self, sender=None):
+		peerObj = self.param.peerManager.getLocalInfo()
+		po = DbusPeerObject(self.param, peerObj, 0)
 
-	def _onPeerDelete(self, peerName):
-		for p in self.peerList:
-			if p.peerObj.getName() == peerName:
-				p.release()
-				self.peerList.remove(p)
-				return
 		assert False
-				
+		return None
+
 class DbusPeerObject(dbus.service.Object):
 
 	def __init__(self, param, peerObj, peerId):
@@ -118,12 +106,6 @@ class DbusPeerObject(dbus.service.Object):
 		ret.name = pi.name
 		return ret
 
-	@dbus.service.method('org.fpemud.SelfNet.Peer', sender_keyword='sender',
-	                     in_signature='ss', out_signature='st')
-	def GetPeerConn(self, userName, serviceName, sender=None):
-		assert False
-		return None
-
 class DbusPeerInfo:
 	name = ""
 	publicKey = ""
@@ -143,5 +125,6 @@ class DbusPeerConn:
 	connSocket = None
 	connBulk = None
 
-
+def _getDbusPeerInfoFromPeerInfo(peerInfo):
+	pass
 
