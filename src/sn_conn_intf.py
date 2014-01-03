@@ -16,11 +16,7 @@ class ServerEndPoint:
 		self.caCertFile = caCertFile
 		self.port = None
 		self.ssl_sock = None
-		self.allowedPeerList = []
 		self.acceptFunc = None
-
-	def setAllowedPeerList(self, peerList):
-		self.allowedPeerList = peerList
 
 	def setEventFunc(self, funcName, func):
 		if funcName == "accept":
@@ -49,36 +45,13 @@ class ServerEndPoint:
 		new_sock, addr = self.ssl_sock.accept()
 	
 		peerName = Socket._getPeerName(new_sock)
-		if peerName is None or peerName not in self.allowedPeerList:
+		if peerName is None:
 			new_sock.close()
 			return
 
 		self.acceptFunc(Socket(new_sock))
 
 class ClientEndPoint:
-
-	class connthread(threading.Thread):
-		def __init__(self, hostname, port):
-			super(connthread, self).__init__()
-			self.hostname = hostname
-			self.port = port
-
-		def run(self):
-			sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)  
-			ssl_sock = ssl.wrap_socket(sock, certfile=self.certFile, keyfile=self.privkeyFile,
-					                   cert_reqs=ssl.CERT_REQUIRED, ca_certs=self.caCertFile,
-					                   ssl_version=ssl.PROTOCOL_SSLv3)
-			ret = ssl_sock.connect_ex((self.hostname, self.port))
-			if ret != 0:
-				ssl_sock.close()
-				return
-
-			peerName = Socket._getPeerName(ssl_sock)
-			if peerName is None or peerName != self.hostname:
-				ssl_sock.close()
-				return
-
-			GLib.idle_add(self._onIdle, ssl_sock)
 
 	def __init__(self, certFile, privkeyFile, caCertFile):
 		self.certFile = certFile
@@ -95,7 +68,7 @@ class ClientEndPoint:
 
 	def connect(self, hostname, port):
 		# run the thread
-		t = self.connthread(hostname, port)
+		t = _ClientEndPointConnThread(hostname, port)
 		t.start()
 
 	def _onIdle(self, ssl_sock):
@@ -104,27 +77,6 @@ class ClientEndPoint:
 
 class Socket:
 
-	class sendthread(threading.Thread):
-		def __init__(self, parent):
-			self.parent = parent
-			self.stopFlag = False
-
-		def stop(self):
-			self.stopFlag = True
-			self.parent.packetQueue.put((0xFF, None, None))		# feed PriorityQueue.get()
-			self.join()
-
-		def run(self):
-			while not self.stopFlag:
-				pri, label, data = self.parent.packetQueue.get(True)
-				if pri == 0xFF:
-					continue
-				try:
-					p = Socket._getPacket(label, data)
-					self.parent.ssl_sock.sendall(p)
-				except:
-					pass
-
 	def __init__(self, ssl_sock):
 		self.ssl_sock = ssl_sock
 
@@ -132,7 +84,7 @@ class Socket:
 		assert self.peerName is not None
 
 		self.packetQueue = PriorityQueue()
-		self.sendThread = self.sendthread(self)
+		self.sendThread = _SocketSendThread(self)
 
 		self.labelRecvFuncDict = dict()
 		self.recvFunc = None
@@ -140,19 +92,25 @@ class Socket:
 
 	def setEventFunc(self, funcName, *args):
 		if funcName == "label_recv":
-			assert len(args) == 2
-			label = args[0]
+			assert len(args) == 2 or len(args) == 3
+			label = int(args[0])
 			func = args[1]
+			keepPacket = False
+			if len(args) == 3:
+				keepPacket = bool(args[2])
 			assert label not in self.labelRecvFuncDict and func is not None
-			self.labelRecvFuncDict[label] = func
+			self.labelRecvFuncDict[label] = _SocketRecvFuncInfo(func, keepPacket)
 			GLib.io_add_watch(self.ssl_sock, GLib.IO_IN, self._onRecv)
-		if funcName == "recv":
-			assert len(args) == 1
+		elif funcName == "recv":
+			assert len(args) == 1 or len(args) == 2
 			func = args[0]
+			keepPacket = False
+			if len(args) == 2:
+				keepPacket = bool(args[1])
 			assert self.recvFunc is None and func is not None
-			self.recvFunc = func
+			self.recvFunc = _SocketRecvFuncInfo(func, keepPacket)
 			GLib.io_add_watch(self.ssl_sock, GLib.IO_IN, self._onRecv)
-		if funcName == "error":
+		elif funcName == "error":
 			assert len(args) == 1
 			func = args[0]
 			assert self.errorFunc is None and func is not None
@@ -187,10 +145,15 @@ class Socket:
 		while len(data) < dataLen:
 			data += self.ssl_sock.recv(dataLen - len(data))
 
+		# call event func
 		if label in self.labelRecvFuncDict:
-			self.labelRecvFuncDict[label](self.ssl_sock, label, data)
+			if self.labelRecvFuncDict[label].keepPacket:
+				data = header + data
+			self.labelRecvFuncDict[label].func(self.ssl_sock, label, data)
 		else:
-			self.recvFunc(self.ssl_sock, label, data)
+			if self.recvFunc.keepPacket:
+				data = header + data
+			self.recvFunc.func(self.ssl_sock, label, data)
 
 	def _onError(self):
 		self.close()
@@ -218,4 +181,56 @@ class Socket:
 
 class BulkFile:
 	pass
+
+class _ClientEndPointConnThread(threading.Thread):
+
+	def __init__(self, hostname, port):
+		super(connthread, self).__init__()
+		self.hostname = hostname
+		self.port = port
+
+	def run(self):
+		sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)  
+		ssl_sock = ssl.wrap_socket(sock, certfile=self.certFile, keyfile=self.privkeyFile,
+				                   cert_reqs=ssl.CERT_REQUIRED, ca_certs=self.caCertFile,
+				                   ssl_version=ssl.PROTOCOL_SSLv3)
+		ret = ssl_sock.connect_ex((self.hostname, self.port))
+		if ret != 0:
+			ssl_sock.close()
+			return
+
+		peerName = Socket._getPeerName(ssl_sock)
+		if peerName is None or peerName != self.hostname:
+			ssl_sock.close()
+			return
+
+		GLib.idle_add(self._onIdle, ssl_sock)
+
+class _SocketSendThread(threading.Thread):
+
+	def __init__(self, parent):
+		self.parent = parent
+		self.stopFlag = False
+
+	def stop(self):
+		self.stopFlag = True
+		self.parent.packetQueue.put((0xFF, None, None))		# feed PriorityQueue.get()
+		self.join()
+
+	def run(self):
+		while not self.stopFlag:
+			pri, label, data = self.parent.packetQueue.get(True)
+			if pri == 0xFF:
+				continue
+			try:
+				p = Socket._getPacket(label, data)
+				self.parent.ssl_sock.sendall(p)
+			except:
+				pass
+
+class _SocketRecvFuncInfo:
+
+	def __init__(self, func, keepPacket):
+		self.func = func
+		self.keepPacket = keepPacket
 

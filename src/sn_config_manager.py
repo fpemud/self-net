@@ -83,7 +83,7 @@ class SnConfigManager(GObject.GObject):
 			def startElement(self, name, attrs):
 				if name == "peer-probe-interval" and self.state == INIT:
 					self.state = IN_PEER_PROBE_INTERVAL
-				elif name == "user-blacklist" and self.state == INIT:
+				elif name == "user-black-list" and self.state == INIT:
 					self.state = IN_USER_BLACKLIST
 				elif name == "user" and self.state == IN_USER_BLACKLIST
 					self.state = IN_USER_BLACKLIST_USER

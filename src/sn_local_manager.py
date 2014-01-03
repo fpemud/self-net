@@ -6,9 +6,19 @@ import socket
 import strict_pgs
 from gi.repository import GObject
 
-class SnCfgService:
-	user = None
-	name = None
+class SnAgentInfo:
+	serviceName = None		# str
+	priviledged = None		# bool
+	forUser = None			# str, null means system
+
+class SnClientInfo:
+	serviceName = None		# str
+	user = None				# str, null means system
+
+class SnServKey:
+	user = None				# str, null means system
+	serviceName = None		# str
+	agentOrclient = None	# bool
 
 class SnLocalManager(GObject.GObject):
 
@@ -34,6 +44,9 @@ class SnLocalManager(GObject.GObject):
 	def getLocalInfo(self):
 		return self.localInfo
 
+	def dataToService(self, key, data):
+		pass
+
 	def _updateLocalInfo(self):
 		oldInfo = self.localInfo
 		newInfo = self._getLocalInfo()
@@ -52,7 +65,7 @@ class SnLocalManager(GObject.GObject):
 
 	def _getLocalInfo(self):
 		ret = SnPeerInfo()
-		ret.systemServerList = []
+		ret.systemAgentList = []
 		ret.systemClientList = []
 		ret.userInfoList = []
 
@@ -64,7 +77,7 @@ class SnLocalManager(GObject.GObject):
 			uo = SnPeerInfoUser()
 			uo.userId = pwd.getpwnam(uname).pw_uid
 			uo.userName = uname
-			uo.userServerList = []
+			uo.userAgentList = []
 			uo.userClientList = []
 
 			ret.userInfoList.append(uo)

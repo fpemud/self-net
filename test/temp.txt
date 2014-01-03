@@ -1,0 +1,61 @@
+
+class _LabelServKeyMap:
+
+	def __init__(self, peerInfo):
+		self.tdict = bidict()
+		for i in peerInfo.systemAgentList:
+			self.tdict[i.label] = self._newServKey(None, i.serviceName, True)
+		for i in peerInfo.systemClientList:
+			self.tdict[i.label] = self._newServKey(None, i.serviceName, False)
+		for u in peerInfo.userList:
+			for i in u.userAgentList:
+				self.tdict[i.label] = self._newServKey(u.userName, i.serviceName, True)
+			for i in u.userClientList:
+				self.tdict[i.label] = self._newServKey(u.userName, i.serviceName, False)
+
+	def getServKey(self, label):
+		return self.tdict[label]
+
+	def getLabel(self, servKey):
+		return self.tdict[:servKey]
+
+	def _newServKey(self, user, serviceName, agentOrClient):
+		ret = SnServKey()
+		ret.user = user
+		ret.serviceName = serviceName
+		ret.agentOrClient = agentOrClient
+		return ret
+
+
+
+	def _getLabelByLocalServKey(self, servKey):
+		localInfo = self.param.serviceManager.getLocalInfo()
+
+		if isinstance(servKey, SnAgentKey):
+			if servKey.forUser is None:
+				for i in localInfo.systemAgentList:
+					if i.serviceName == servKey.serviceName:
+						return i.label
+				return None
+			else:
+				for u in localInfo.userList:
+					if u.userName == servKey.forUser:
+						for i in u.userAgentList:
+							if i.serviceName == servKey.serviceName:
+								return i.label
+				return None
+		elif isinstance(servKey, SnAgentKey):
+			if servKey.forUser is None:
+				for i in localInfo.systemClientList:
+					if i.serviceName == servKey.serviceName:
+						return i.label
+				return None
+			else:
+				for u in localInfo.userList:
+					if u.userName == servKey.forUser:
+						for i in u.userClientList:
+							if i.serviceName == servKey.serviceName:
+								return i.label
+				return None
+		else:
+			assert False
