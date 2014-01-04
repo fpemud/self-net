@@ -12,7 +12,7 @@ class SnCfgHostInfo:
 	port = None						# int
 	wakeSupport = None				# str, ("w-o-lan"|"ws-o-lan"), ("w-o-wlan"|"ws-o-wlan"), ("w-o-wan"|"ws-o-wan")
 
-class SnConfigManager(GObject.GObject):
+class SnConfigManager:
 	"""/etc/selfnetd
 	    |----cert.pem							# mode 644
 		|----privkey.pem						# mode 600
@@ -22,8 +22,6 @@ class SnConfigManager(GObject.GObject):
 	    |----selfnetd.conf"""
 
 	def __init__(self, param):
-		GObject.GObject.__init__(self)
-
 		self.param = param
 		self.cfgGlobal = None
 		self.hostDict = dict()
