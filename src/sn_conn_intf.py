@@ -128,6 +128,15 @@ class Socket:
 		self.packetQueue.put((pri, label, data), True)
 
 	def close(self):
+		"""normal close"""
+	
+		self.sendThread.stop()
+		self.ssl_sock.close()
+		self.ssl_sock = None
+
+	def abort(self):
+		"""exceptional close"""
+
 		self.sendThread.stop()
 		self.ssl_sock.close()
 		self.ssl_sock = None

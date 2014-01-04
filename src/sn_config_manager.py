@@ -10,6 +10,7 @@ class SnCfgGlobal:
 
 class SnCfgHostInfo:
 	port = None						# int
+	wakeSupport = None				# str, ("w-o-lan"|"ws-o-lan"), ("w-o-wlan"|"ws-o-wlan"), ("w-o-wan"|"ws-o-wan")
 
 class SnConfigManager(GObject.GObject):
 	"""/etc/selfnetd
@@ -24,12 +25,12 @@ class SnConfigManager(GObject.GObject):
 		GObject.GObject.__init__(self)
 
 		self.param = param
-		self.cfgGlobal = SnCfgGlobal()
+		self.cfgGlobal = None
 		self.hostDict = dict()
 
 		self._checkCertFiles()
-		self._parseConfFile()
-		self._parseHostsFile()
+		self._parseConfFile()		# fill self.cfgGlobal
+		self._parseHostsFile()		# fill self.hostDict
 
 	def getCfgGlobal(self):
 		return self.cfgGlobal
@@ -66,8 +67,7 @@ class SnConfigManager(GObject.GObject):
 
 	def _parseConfFile(self):
 		# set default value
-		self.cfgGlobal.peerProbeInterval = 1
-		self.cfgGlobal.userBlackList = []
+		self.cfgGlobal = self._newSnCfgGlobal()
 
 		# create parser class
 		class thehandler(xml.sax.handler.ContentHandler):
@@ -122,6 +122,7 @@ class SnConfigManager(GObject.GObject):
 			INIT = 0
 			IN_HOST = 1
 			IN_HOST_PORT = 2
+			IN_HOST_WAKE_SUPPORT = 3
 
 			def __init__(self, hostDict):
 				self.hostDict = hostDict
@@ -133,9 +134,11 @@ class SnConfigManager(GObject.GObject):
 				if name == "host" and self.state == INIT:
 					self.state = IN_HOST:
 					self.curHostName = attrs["name"]
-					self.curHostInfo = SnCfgHostInfo()
+					self.curHostInfo = self._newSnCfgHostInfo()
 				elif name == "port" and self.state == IN_HOST:
 					self.state = IN_HOST_PORT
+				elif name == "wake-support" and self.state == IN_HOST:
+					self.state = IN_HOST_WAKE_SUPPORT
 				else:
 					raise Exception("Failed to parse hosts file")
 
@@ -147,12 +150,16 @@ class SnConfigManager(GObject.GObject):
 					self.state = INIT
 				elif name == "port" and self.state == IN_HOST_PORT:
 					self.state = IN_HOST
+				elif name == "wake-support" and self.state == IN_HOST_WAKE_SUPPORT:
+					self.state = IN_HOST
 				else:
 					raise Exception("Failed to parse hosts file")
 
 			def characters(self, content):
 				if self.stat == IN_HOST_PORT:
 					self.curHostInfo.port = int(content)
+				if self.stat == IN_HOST_WAKE_SUPPORT:
+					self.curHostInfo.wakeSupport = content
 				else:
 					raise Exception("Failed to parse hosts file")
 
@@ -165,4 +172,21 @@ class SnConfigManager(GObject.GObject):
 			raise Exception("Name \"localhost\" is reserved")
 		if socket.gethostname() not in self.hostDict:
 			raise Exception("No name for localhost in hosts file")
+
+	def _newSnCfgGlobal(self):
+		"""create new object, set default values"""
+
+		cfgGlobal = SnCfgGlobal()
+		cfgGlobal.peerProbeInterval = 1
+		cfgGlobal.userBlackList = []
+		return cfgGlobal
+
+	def _newSnCfgHostInfo(self):
+		"""create new object, set default values"""
+
+		curHostInfo = SnCfgHostInfo()
+		curHostInfo.port = 2107
+		curHostInfo.supportWakeOnLan = False
+		curHostInfo.supportWakeOnWlan = False
+		return curHostInfo
 

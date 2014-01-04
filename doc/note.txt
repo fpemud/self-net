@@ -1,0 +1,53 @@
+自带功能：
+1. 比较selfnet的host配置
+2. 电源操作reboot、poweroff、poweron、suspend、hibernate、hybrid-sleep、wakeup
+
+
+
+系统功能：
+1. 对比系统配置
+2. 同步系统目录
+
+
+系统配置对比客户端				system
+系统配置对比服务端				system
+distcc服务端					system
+distcc客户端					system
+远程界面服务端					user-priviledged
+远程界面客户端					user
+ssh服务端					user-priviledged
+ssh客户端					user
+同步home目录服务端				user
+同步home目录客户端				user
+
+
+
+
+
+<host name="fpemud-workstation">
+	<server-parameter>
+	</server-parameter>
+
+	<client>
+		<connection type="lan">
+			<port>2107</port>
+		</connection>
+		<power-operation>
+		</power-operation>
+
+
+		<power-support>power-on</power-support>
+		<power-support>power-off</power-support>
+		<power-support>wake-up</power-support>
+		<power-support>suspend</power-support>
+		<power-support>hibernate</power-support>
+		<power-support>start</power-support>
+	</client>
+	<client>
+		<connection type="wan">
+			<domain-name>fpemud-workstation.fpemud.org</domain-name>
+			<address>1.1.1.1</address>
+			<port>2107</port>
+		</connection>
+	</client>
+</host>
