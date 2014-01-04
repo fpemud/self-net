@@ -1,6 +1,8 @@
 自带功能：
 1. 比较selfnet的host配置
 2. 电源操作reboot、poweroff、poweron、suspend、hibernate、hybrid-sleep、wakeup
+3. peer mode：online、offline、rebooting、poweroff、suspend、hibernate、last-operation(resumable)
+4. rebooting-interval
 
 
 
