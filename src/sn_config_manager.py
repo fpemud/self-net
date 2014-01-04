@@ -10,7 +10,6 @@ class SnCfgGlobal:
 
 class SnCfgHostInfo:
 	port = None						# int
-	wakeSupport = None				# str, ("w-o-lan"|"ws-o-lan"), ("w-o-wlan"|"ws-o-wlan"), ("w-o-wan"|"ws-o-wan")
 
 class SnConfigManager:
 	"""/etc/selfnetd
@@ -120,7 +119,6 @@ class SnConfigManager:
 			INIT = 0
 			IN_HOST = 1
 			IN_HOST_PORT = 2
-			IN_HOST_WAKE_SUPPORT = 3
 
 			def __init__(self, hostDict):
 				self.hostDict = hostDict
@@ -135,8 +133,6 @@ class SnConfigManager:
 					self.curHostInfo = self._newSnCfgHostInfo()
 				elif name == "port" and self.state == IN_HOST:
 					self.state = IN_HOST_PORT
-				elif name == "wake-support" and self.state == IN_HOST:
-					self.state = IN_HOST_WAKE_SUPPORT
 				else:
 					raise Exception("Failed to parse hosts file")
 
@@ -148,16 +144,12 @@ class SnConfigManager:
 					self.state = INIT
 				elif name == "port" and self.state == IN_HOST_PORT:
 					self.state = IN_HOST
-				elif name == "wake-support" and self.state == IN_HOST_WAKE_SUPPORT:
-					self.state = IN_HOST
 				else:
 					raise Exception("Failed to parse hosts file")
 
 			def characters(self, content):
 				if self.stat == IN_HOST_PORT:
 					self.curHostInfo.port = int(content)
-				if self.stat == IN_HOST_WAKE_SUPPORT:
-					self.curHostInfo.wakeSupport = content
 				else:
 					raise Exception("Failed to parse hosts file")
 
