@@ -74,8 +74,8 @@ In this data stream, selfnetd acts as routers, Host1_selfnetd forwards packets t
 Host2, Host2_selfnetd forwards packets to App2.
 
 Packet must bring source and destination address for the forwarding to work out,
-which is a triple:
-  (hostName, userName, appName)
+which is:
+  (hostName, userName, appName, agentOrClient, systemOrUser)
 But it's too large to be contained in every packet. The problem solver is use a 
 interger format address, which we call it "label".
 
@@ -87,30 +87,87 @@ not only the local label binding, but also the label binding of all the online p
 Having this information, plugin/application can generate/decode packets on itself,
 letting selfnetd do pure routing stuff.
 
-Label is defined as a 32bit unsigned integer, detail format is as follows:
+Label is defined as a 64bit unsigned integer, detail format is as follows:
 
-   31        24 23        16 15        0
-  +------------+------------+-----------+
-  |  hostName  |  userName  |  appName  |
-  +------------+------------+-----------+
+   63        56 55        24 23        8 7             7 6            6 5        0
+  +------------+------------+-----------+---------------+--------------+----------+
+  |  hostName  |  userName  |  appName  | agentOrClient | systemOrUser | reserved |
+  +------------+------------+-----------+---------------+--------------+----------+
 
-bit31~bit24: hostName, 0x00 is reserved, so selfnet supports 256 hosts (note!!)
-bit23~bit16: userName, 0x00 is reserved, so selfnet supports 255 users on each host
-bit15~bit0:  appName, 0x00~0x10 is reserved, so selfnet supports 65520 applications on each host
+bit63~bit56:
+hostName, 8bits, 0x00 is reserved, so selfnet supports 256 hosts. hostName is local
+scoped. when generating packet, destination hostName is filled but source hostName
+is empty(0x00); when packet is received by selfnetd daemon, destination hostName is
+cleared and source hostName is filled. Hence, every host can identify 255 peers, so
+the whole net can have 256 hosts.
 
-The next topic is how to transfer label binding data between hosts.
-It's simple. Label binding data will be sent to the other host when the connection
-establishes, and any change will be sent immediately. These packets are sent/received
-by selfnet itself, so they are not routed.
+bit55~bit24:
+userName, 32bits. we use system user id to represent userName. All the modern
+operating systems have 32bit user id.
+
+bit23~bit8:
+appName, 0x00~0x10 is reserved. appName is local scoped, but reversely.
+
+bit7:
+agentOrClient, 1=agent, 0=client.
+
+bit6:
+systemOrUser, 1=system, 0=user. for system application, userName is invalid, 
+should be 0
 
 """
 
-class SnAppAddress:
+"""
+Here we describe some implementation detail of self-net.
+
+Design Graph:
+             +----------------------------------------------------------------------------------------------------------------------------------------------+
+             |selfnetd in Host1                                                                                                                             |
+             |                                                                                                                                              |
+             |  +---------------+      business data (to be forwarded)      +--------------+      business data (to be forwarded)       +----------------+  |
+             |  |               |<----------------------------------------->|              |<------------------------------------------>|                |  |
+  Plugin1 <---->|SnConnSocketApp|                                           |              |                                            |SnConnSocketPeer|<----> selfnetd in Host2
+             |  |               | system data +--------------+              |              |              +---------------+ system data |                |  |
+             |  |               |<----------->|              |              |              |              |               |<----------->|                |  |
+             |  +---------------+             |              | routing info |              | routing info |               |             +----------------+  |
+             |                                | SnAppManager |<------------>| SnConnRouter |<------------>| SnPeerManager |                                 |
+             |  +---------------+ system data |              |              |              |              |               | system data +----------------+  |
+             |  |               |<----------->|              |              |              |              |               |<----------->|                |  |
+             |  |SnConnSocketApp|             +--------------+              |              |              +---------------+             |SnConnSocketPeer|  |
+  Plugin2 <---->|               |                                           |              |                                            |                |<----> selfnetd in Host3
+             |  |               |<----------------------------------------->|              |<------------------------------------------>|                |  |
+             |  +---------------+      business data (to be forwarded)      +--------------+      business data (to be forwarded)       +----------------+  |
+             |                                                                                                                                              |
+             +----------------------------------------------------------------------------------------------------------------------------------------------+
+
+sn_conn_router.py, sn_conn_peer.py, sn_conn_app.py are the core implementation
+of self-net protocol.
+
+sn_conn_router.py:
+Provides addressing, routing, endpoint registering functions.
+
+sn_conn_peer.py:
+Provides socket for communicating with peers, the socket implementation adds
+some new funtions: 1. asynchronous IO; 2. packet splitting
+Provides both server socket and client socket, because selfnetd daemon can be
+server or client when communicating with other selfnetd daemon.
+This socket implementation is based on ssl_socket.
+
+sn_conn_app.py:
+Provides socket for communicating with applications, the socket implementation
+adds the asynchronous IO and packet splitting functions either.
+Provides only server side socket.
+
+"""
+
+class SnConnAddress:
 	hostName = None			# str
 	userName = None			# str
 	appName = None			# str
+	agentOrClient = None	# bool
+	systemOrUser = None		# bool
 
-class SnRouter:
+class SnConnRouter:
 
 	def __init__(self, param):
 		self.param = param

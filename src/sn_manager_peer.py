@@ -5,12 +5,6 @@ from gi.repository import GObject
 from sn_util import ServerEndPoint
 from sn_util import ClientEndPoint
 
-"""
-routing is simple, is done by SnPeerManager.
-one agent maps one client.
-ie, there will be many ssh agent on a host, each agent for one user on the host.
-"""
-
 class SnPeerInfo:
 	systemAgentList = None			# list<SnPeerInfoAgent>
 	systemClientList = None			# list<SnPeerInfoClient>
