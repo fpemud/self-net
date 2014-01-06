@@ -73,9 +73,31 @@ The packet path is as follows when Host1_App1 says something with Host2_App1:
 In this data stream, selfnetd acts as routers, Host1_selfnetd forwards packets to
 Host2, Host2_selfnetd forwards packets to App2.
 
+self-net has a very specialized routing mode.
+Application has the following properties:
+  (hostName, userName, appName, agentOrClient, systemOrUser)
+Application has the following mapping relation:
+  1. agent maps to client
+  2. agent belongs to one user maps client belongs to the same user
+  3. system agent maps to system client
+
+So self-net packet header contains 4 information:
+  (userName, applicationName, systemOrUser, senderIsAgentOrClient)
+Packet format:
+   8 bits      8 bits             32 bits    N bytes  N bytes         1 byte                N bytes
+  +-----------+------------------+----------+--------+---------------+---------------------+---------------+
+  |userNameLen|applicationNameLen|payloadLen|userName|applicationName|senderIsAgentOrClient|payload content|
+  +-----------+------------------+----------+--------+---------------+---------------------+---------------+
+application is system level when userNameLen is 0.
+
+
+
+
+
+
 Packet must bring source and destination address for the forwarding to work out,
 which is:
-  (hostName, userName, appName, agentOrClient, systemOrUser)
+  
 But it's too large to be contained in every packet. The problem solver is use a 
 interger format address, which we call it "label".
 
