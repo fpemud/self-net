@@ -27,11 +27,8 @@ try:
 
 	# create config manager / peer manager
 	param.configManager = SnConfigManager(param)
-	param.peerManager = SnPeerManager(param)
-
-	# init config manager / peer manager
-	param.configManager.init()
-	param.peerManager.init()
+	param.localManager = SnLocalManager(param)
+#	param.peerManager = SnPeerManager(param)
 
 	# create dbus root object
 	dbusMainObject = DbusMainObject(param)

@@ -6,31 +6,23 @@ from sn_util import ServerEndPoint
 from sn_util import ClientEndPoint
 
 class SnPeerInfo:
-	systemAgentList = None			# list<SnPeerInfoAgent>
-	systemClientList = None			# list<SnPeerInfoClient>
+	systemAppList = None			# list<SnPeerInfoApp>
 	userInfoList = None				# list<SnPeerInfoUser>
 
 class SnPeerInfoUser:
-	userId = None					# int
 	userName = None					# str
-	userAgentList = None			# list<SnPeerInfoAgent>
-	userClientList = None			# list<SnPeerInfoClient>
+	userAppList = None				# list<SnPeerInfoApp>
 
-class SnPeerInfoAgent:
-	serviceName = None				# str
-	label = None					# int
-
-class SnPeerInfoClient:
-	serviceName = None				# str
+class SnPeerInfoApplication:
+	userName = None					# str, null means system
+	appName = None					# str
+	agentOrClient = None			# bool
 
 class SnPeerManager(GObject.GObject):
 
 	def __init__(self, param):
 		GObject.GObject.__init__(self)
 		self.param = param
-
-		# create local info
-		self.localInfo = self.param.serviceManager.getLocalInfo()
 
 		# create peer info
 		self.peerInfoDict = dict()
@@ -86,7 +78,7 @@ class SnPeerManager(GObject.GObject):
 		sock.setFunc("error", self._onSocketError)
 
 		# send localInfo
-		sock.send(0, pickle.dumps(self.localInfo))
+		sock.send(0, pickle.dumps(self.param.serviceManager.getLocalInfo()))
 
 		# record sock
 		self.peerSockDict[sock.getPeerName()] = sock

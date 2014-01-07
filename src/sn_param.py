@@ -21,6 +21,6 @@ class SnParam:
 
 		self.mainloop = None
 		self.configManager = None
-		self.serviceManager = None
+		self.localManager = None
 		self.peerManager = None
 
