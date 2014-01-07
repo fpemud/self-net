@@ -1,6 +1,7 @@
 #!/usr/bin/python2
 # -*- coding: utf-8; tab-width: 4; indent-tabs-mode: t -*-
 
+import xml.sax.handler
 import socket
 import OpenSSL
 
@@ -23,7 +24,7 @@ class SnConfigManager:
 	def __init__(self, param):
 		self.param = param
 		self.cfgGlobal = None
-		self.hostDict = dict()
+		self.hostDict = None
 
 		self._checkCertFiles()
 		self._parseConfFile()		# fill self.cfgGlobal
@@ -43,70 +44,33 @@ class SnConfigManager:
 
 	def _checkCertFiles(self):
 		# check CA certificate
-		x509 = OpenSSL.crypto.load_certificate(OpenSSL.crypto.FILETYPE_PEM, self.param.caCertFile)
-		if x509.has_expired():
-			raise Exception("CA certificate has expired")
+		with open(self.param.caCertFile, 'r') as f:
+			x509 = OpenSSL.crypto.load_certificate(OpenSSL.crypto.FILETYPE_PEM, f.read())
+			if x509.has_expired():
+				raise Exception("CA certificate has expired")
 
 		# check certificate
-		x509 = OpenSSL.crypto.load_certificate(OpenSSL.crypto.FILETYPE_PEM, self.param.certFile)
-		if x509.has_expired():
-			raise Exception("Certificate has expired")
+		with open(self.param.certFile, 'r') as f:
+			x509 = OpenSSL.crypto.load_certificate(OpenSSL.crypto.FILETYPE_PEM, f.read())
+			if x509.has_expired():
+				raise Exception("Certificate has expired")
 
-		foundCommonName = False
-		for item in x509.get_subject().get_components():
-			if item[0] == "CN":
-				if item[1] != socket.gethostname():
-					raise Exception("Common name in certificate must equal to hostname")
-				foundCommonName = True
-				break
-		if not foundCommonName:
-			raise Exception("No common name in certificate")
+			foundCommonName = False
+			for item in x509.get_subject().get_components():
+				if item[0] == "CN":
+					if item[1] != socket.gethostname():
+						raise Exception("Common name in certificate must equal to hostname")
+					foundCommonName = True
+					break
+			if not foundCommonName:
+				raise Exception("No common name in certificate")
 
 	def _parseConfFile(self):
 		# set default value
-		self.cfgGlobal = self._newSnCfgGlobal()
-
-		# create parser class
-		class thehandler(xml.sax.handler.ContentHandler):
-			INIT = 0
-			IN_PEER_PROBE_INTERVAL = 1
-			IN_USER_BLACKLIST = 2
-			IN_USER_BLACKLIST_USER = 3
-
-			def __init__(self, cfgGlobal):
-				self.cfgGlobal = cfgGlobal
-				self.state = INIT
-
-			def startElement(self, name, attrs):
-				if name == "peer-probe-interval" and self.state == INIT:
-					self.state = IN_PEER_PROBE_INTERVAL
-				elif name == "user-black-list" and self.state == INIT:
-					self.state = IN_USER_BLACKLIST
-				elif name == "user" and self.state == IN_USER_BLACKLIST
-					self.state = IN_USER_BLACKLIST_USER
-				else:
-					raise Exception("Failed to parse configuration file")
-
-			def endElement(self, name, attrs):
-				if name == "peer-probe-interval" and self.state == IN_PEER_PROBE_INTERVAL:
-					self.state = INIT
-				elif name == "user-blacklist" and self.state == IN_USER_BLACKLIST:
-					self.state = INIT
-				elif name == "user" and self.state == IN_USER_BLACKLIST_USER
-					self.state = IN_USER_BLACKLIST
-				else:
-					raise Exception("Failed to parse configuration file")
-
-			def characters(self, content):
-				if self.stat == IN_PEER_PROBE_INTERVAL:
-					self.cfgGlobal.peerProbeInterval = int(content)
-				elif self.stat == IN_USER_BLACKLIST_USER:
-					self.cfgGlobal.userBlackList.append(content)
-				else:
-					raise Exception("Failed to parse configuration file")
+		self.cfgGlobal = _newSnCfgGlobal()
 
 		# parse file
-		h = thehandler()
+		h = _ConfFileXmlHandler(self.cfgGlobal)
 		xml.sax.parse(self.param.confFile, h)
 
 		# check parse result
@@ -114,47 +78,11 @@ class SnConfigManager:
 			raise Exception("Invalid cfgGlobal.peerProbeInterval")
 
 	def _parseHostsFile(self):
-		# create parser class
-		class thehandler(xml.sax.handler.ContentHandler):
-			INIT = 0
-			IN_HOST = 1
-			IN_HOST_PORT = 2
-
-			def __init__(self, hostDict):
-				self.hostDict = hostDict
-				self.curHostName = None
-				self.curHostInfo = None
-				self.state = INIT
-
-			def startElement(self, name, attrs):
-				if name == "host" and self.state == INIT:
-					self.state = IN_HOST:
-					self.curHostName = attrs["name"]
-					self.curHostInfo = self._newSnCfgHostInfo()
-				elif name == "port" and self.state == IN_HOST:
-					self.state = IN_HOST_PORT
-				else:
-					raise Exception("Failed to parse hosts file")
-
-			def endElement(self, name, attrs):
-				if name == "host" and self.state == IN_HOST:
-					self.hostDict[self.curHostName] = self.curHostInfo
-					self.curHostName = None
-					self.curHostInfo = None
-					self.state = INIT
-				elif name == "port" and self.state == IN_HOST_PORT:
-					self.state = IN_HOST
-				else:
-					raise Exception("Failed to parse hosts file")
-
-			def characters(self, content):
-				if self.stat == IN_HOST_PORT:
-					self.curHostInfo.port = int(content)
-				else:
-					raise Exception("Failed to parse hosts file")
+		# set default value
+		self.hostDict = dict()
 
 		# parse file
-		h = thehandler()
+		h = _HostFileXmlHandler(self.hostDict)
 		xml.sax.parse(self.param.hostsFile, h)
 
 		# check parse result
@@ -163,20 +91,108 @@ class SnConfigManager:
 		if socket.gethostname() not in self.hostDict:
 			raise Exception("No name for localhost in hosts file")
 
-	def _newSnCfgGlobal(self):
-		"""create new object, set default values"""
+class _ConfFileXmlHandler(xml.sax.handler.ContentHandler):
+	INIT = 0
+	IN_ROOT = 1
+	IN_PEER_PROBE_INTERVAL = 2
+	IN_USER_BLACKLIST = 3
+	IN_USER_BLACKLIST_USER = 4
 
-		cfgGlobal = SnCfgGlobal()
-		cfgGlobal.peerProbeInterval = 1
-		cfgGlobal.userBlackList = []
-		return cfgGlobal
+	def __init__(self, cfgGlobal):
+		xml.sax.handler.ContentHandler.__init__(self)
+		self.cfgGlobal = cfgGlobal
+		self.state = self.INIT
 
-	def _newSnCfgHostInfo(self):
-		"""create new object, set default values"""
+	def startElement(self, name, attrs):
+		if name == "root" and self.state == self.INIT:
+			self.state = self.IN_ROOT
+		elif name == "peer-probe-interval" and self.state == self.IN_ROOT:
+			self.state = self.IN_PEER_PROBE_INTERVAL
+		elif name == "user-black-list" and self.state == self.IN_ROOT:
+			self.state = self.IN_USER_BLACKLIST
+		elif name == "user" and self.state == self.IN_USER_BLACKLIST:
+			self.state = self.IN_USER_BLACKLIST_USER
+		else:
+			raise Exception("Failed to parse configuration file")
 
-		curHostInfo = SnCfgHostInfo()
-		curHostInfo.port = 2107
-		curHostInfo.supportWakeOnLan = False
-		curHostInfo.supportWakeOnWlan = False
-		return curHostInfo
+	def endElement(self, name):
+		if name == "root" and self.state == self.IN_ROOT:
+			self.state = self.INIT
+		elif name == "peer-probe-interval" and self.state == self.IN_PEER_PROBE_INTERVAL:
+			self.state = self.IN_ROOT
+		elif name == "user-blacklist" and self.state == self.IN_USER_BLACKLIST:
+			self.state = self.IN_ROOT
+		elif name == "user" and self.state == self.IN_USER_BLACKLIST_USER:
+			self.state = self.IN_USER_BLACKLIST
+		else:
+			raise Exception("Failed to parse configuration file")
+
+	def characters(self, content):
+		if self.state == self.IN_PEER_PROBE_INTERVAL:
+			self.cfgGlobal.peerProbeInterval = int(content)
+		elif self.state == self.IN_USER_BLACKLIST_USER:
+			self.cfgGlobal.userBlackList.append(content)
+		else:
+			pass
+
+class _HostFileXmlHandler(xml.sax.handler.ContentHandler):
+	INIT = 0
+	IN_HOSTS = 1
+	IN_HOST = 2
+	IN_HOST_PORT = 3
+
+	def __init__(self, hostDict):
+		xml.sax.handler.ContentHandler.__init__(self)
+		self.hostDict = hostDict
+		self.curHostName = None
+		self.curHostInfo = None
+		self.state = self.INIT
+
+	def startElement(self, name, attrs):
+		if name == "hosts" and self.state == self.INIT:
+			self.state = self.IN_HOSTS
+		elif name == "host" and self.state == self.IN_HOSTS:
+			self.state = self.IN_HOST
+			self.curHostName = attrs["name"]
+			self.curHostInfo = _newSnCfgHostInfo()
+		elif name == "port" and self.state == self.IN_HOST:
+			self.state = self.IN_HOST_PORT
+		else:
+			raise Exception("Failed to parse hosts file")
+
+	def endElement(self, name):
+		if name == "hosts" and self.state == self.IN_HOSTS:
+			self.state = self.INIT
+		elif name == "host" and self.state == self.IN_HOST:
+			self.hostDict[self.curHostName] = self.curHostInfo
+			self.curHostName = None
+			self.curHostInfo = None
+			self.state = self.IN_HOSTS
+		elif name == "port" and self.state == self.IN_HOST_PORT:
+			self.state = self.IN_HOST
+		else:
+			raise Exception("Failed to parse hosts file")
+
+	def characters(self, content):
+		if self.state == self.IN_HOST_PORT:
+			self.curHostInfo.port = int(content)
+		else:
+			pass
+
+def _newSnCfgGlobal():
+	"""create new object, set default values"""
+
+	cfgGlobal = SnCfgGlobal()
+	cfgGlobal.peerProbeInterval = 1
+	cfgGlobal.userBlackList = []
+	return cfgGlobal
+
+def _newSnCfgHostInfo():
+	"""create new object, set default values"""
+
+	curHostInfo = SnCfgHostInfo()
+	curHostInfo.port = 2107
+	curHostInfo.supportWakeOnLan = False
+	curHostInfo.supportWakeOnWlan = False
+	return curHostInfo
 

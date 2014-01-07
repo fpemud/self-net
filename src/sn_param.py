@@ -1,6 +1,8 @@
 #!/usr/bin/python2
 # -*- coding: utf-8; tab-width: 4; indent-tabs-mode: t -*-
 
+import os
+
 class SnParam:
 
 	def __init__(self):
