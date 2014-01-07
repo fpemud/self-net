@@ -17,9 +17,9 @@ param = SnParam()
 dbusMainObject = None
 
 try:
-	# create temp directory
-	param.tmpDir = "/tmp/selfnetd"
-	os.mkdir(param.tmpDir)
+	# create directory
+	SnUtil.mkDirAndClear(param.runDir)
+	param.tmpDir = tempfile.mkdtemp(prefix="selfnetd-")
 
 	# create main loop
 	DBusGMainLoop(set_as_default=True)

@@ -8,7 +8,7 @@ import threading
 from Queue import PriorityQueue
 from gi.repository import GLib
 
-class SnPluginServer:
+class SnLocalServer:
 
 	def __init__(self):
 		self.serverFile = None
@@ -52,10 +52,10 @@ class SnPluginServer:
 
 	def _onAccept(self, source, cb_condition):
 		new_sock, addr = self.sock.accept()
-		self.acceptFunc(SnPluginSocket(new_sock))
+		self.acceptFunc(SnLocalSocket(new_sock))
 		return True
 
-class SnPluginSocket:
+class SnLocalSocket:
 
 	def __init__(self, sock):
 		self.sock = sock

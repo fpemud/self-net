@@ -10,6 +10,7 @@ class SnParam:
 		self.cfgUserDir = ".config/selfnetd"
 		self.libDir = "/usr/lib/selfnetd"
 		self.dataDir = "/usr/share/selfnetd"
+		self.runDir = "/run/selfnetd"
 		self.tmpDir = None
 
 		self.certFile = os.path.join(self.cfgDir, "cert.pem")
@@ -18,6 +19,7 @@ class SnParam:
 
 		self.confFile = os.path.join(self.cfgDir, "selfnetd.conf")
 		self.hostsFile = os.path.join(self.cfgDir, "hosts.xml")
+		self.localServerFile = 
 
 		self.mainloop = None
 		self.configManager = None
