@@ -89,54 +89,6 @@ Packet format:
   |userNameLen|applicationNameLen|payloadLen|userName|applicationName|senderIsAgentOrClient|payload content|
   +-----------+------------------+----------+--------+---------------+---------------------+---------------+
 application is system level when userNameLen is 0.
-
-
-
-
-
-
-Packet must bring source and destination address for the forwarding to work out,
-which is:
-  
-But it's too large to be contained in every packet. The problem solver is use a 
-interger format address, which we call it "label".
-
-Packet contains source and destincation label, each label binds to a triple.
-Plugin registers itself to selfnetd, selfnetd allocates label for it. For the
-application case, plugin should register application, and selfnetd allocates label
-for each application. selfnetd tells label binding information to plugin/application,
-not only the local label binding, but also the label binding of all the online peers.
-Having this information, plugin/application can generate/decode packets on itself,
-letting selfnetd do pure routing stuff.
-
-Label is defined as a 64bit unsigned integer, detail format is as follows:
-
-   63        56 55        24 23        8 7             7 6            6 5        0
-  +------------+------------+-----------+---------------+--------------+----------+
-  |  hostName  |  userName  |  appName  | agentOrClient | systemOrUser | reserved |
-  +------------+------------+-----------+---------------+--------------+----------+
-
-bit63~bit56:
-hostName, 8bits, 0x00 is reserved, so selfnet supports 256 hosts. hostName is local
-scoped. when generating packet, destination hostName is filled but source hostName
-is empty(0x00); when packet is received by selfnetd daemon, destination hostName is
-cleared and source hostName is filled. Hence, every host can identify 255 peers, so
-the whole net can have 256 hosts.
-
-bit55~bit24:
-userName, 32bits. we use system user id to represent userName. All the modern
-operating systems have 32bit user id.
-
-bit23~bit8:
-appName, 0x00~0x10 is reserved. appName is local scoped, but reversely.
-
-bit7:
-agentOrClient, 1=agent, 0=client.
-
-bit6:
-systemOrUser, 1=system, 0=user. for system application, userName is invalid, 
-should be 0
-
 """
 
 """
