@@ -19,7 +19,7 @@ class SnParam:
 
 		self.confFile = os.path.join(self.cfgDir, "selfnetd.conf")
 		self.hostsFile = os.path.join(self.cfgDir, "hosts.xml")
-		self.localServerFile = 
+		self.localServerFile = "/run/selfnetd/socket"
 
 		self.mainloop = None
 		self.configManager = None

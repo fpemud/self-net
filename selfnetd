@@ -4,13 +4,15 @@
 import os
 import sys
 import shutil
+import tempfile
 from gi.repository import GLib
 from dbus.mainloop.glib import DBusGMainLoop
 sys.path.append('/usr/lib/selfnetd')
 from sn_util import SnUtil
 from sn_param import SnParam
-from sn_config_manager import SnConfigManager
-from sn_peer_manager import SnPeerManager
+from sn_manager_config import SnConfigManager
+from sn_manager_local import SnLocalManager
+from sn_manager_peer import SnPeerManager
 from sn_dbus import DbusMainObject
 
 param = SnParam()
@@ -31,7 +33,7 @@ try:
 #	param.peerManager = SnPeerManager(param)
 
 	# create dbus root object
-	dbusMainObject = DbusMainObject(param)
+#	dbusMainObject = DbusMainObject(param)
 
 	# start main loop
 	param.mainloop.run()

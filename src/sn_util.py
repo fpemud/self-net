@@ -16,7 +16,7 @@ class SnUtil:
 
 	@staticmethod
 	def getSysctl(name):
-		msg = VirtUtil.shell("/sbin/sysctl -n %s"%(name), "stdout")
+		msg = SnUtil.shell("/sbin/sysctl -n %s"%(name), "stdout")
 		return msg.rstrip('\n')
 
 	@staticmethod
@@ -32,7 +32,7 @@ class SnUtil:
 		fdst = os.path.join(dstdir, os.path.basename(srcFilename))
 		shutil.copy(srcFilename, fdst)
 		if mode is not None:
-			VirtUtil.shell("/bin/chmod " + mode + " \"" + fdst + "\"")
+			SnUtil.shell("/bin/chmod " + mode + " \"" + fdst + "\"")
 
 	@staticmethod
 	def copyToFile(srcFilename, dstFilename, mode=None):
@@ -42,7 +42,7 @@ class SnUtil:
 			os.makedirs(os.path.dirname(dstFilename))
 		shutil.copy(srcFilename, dstFilename)
 		if mode is not None:
-			VirtUtil.shell("/bin/chmod " + mode + " \"" + dstFilename + "\"")
+			SnUtil.shell("/bin/chmod " + mode + " \"" + dstFilename + "\"")
 
 	@staticmethod
 	def readFile(filename):
@@ -61,11 +61,11 @@ class SnUtil:
 		f.write(buf)
 		f.close()
 		if mode is not None:
-			VirtUtil.shell("/bin/chmod " + mode + " \"" + filename + "\"")
+			SnUtil.shell("/bin/chmod " + mode + " \"" + filename + "\"")
 
 	@staticmethod
 	def mkDirAndClear(dirname):
-		VirtUtil.forceDelete(dirname)
+		SnUtil.forceDelete(dirname)
 		os.mkdir(dirname)
 
 	@staticmethod
@@ -199,12 +199,12 @@ class SnUtil:
 	def loadKernelModule(modname):
 		"""Loads a kernel module."""
 
-		VirtUtil.shell("/sbin/modprobe %s"%(modname))
+		SnUtil.shell("/sbin/modprobe %s"%(modname))
 
 	@staticmethod
 	def initLog(filename):
-		VirtUtil.forceDelete(filename)
-		VirtUtil.writeFile(filename, "")
+		SnUtil.forceDelete(filename)
+		SnUtil.writeFile(filename, "")
 
 	@staticmethod
 	def printLog(filename, msg):
@@ -235,7 +235,7 @@ class SnUtil:
 	def getPidBySocket(socketInfo):
 		"""need to be run by root. socketInfo is like 0.0.0.0:80"""
 
-		rc, ret = VirtUtil.shell("/bin/netstat -anp | grep \"%s\""%(socketInfo), "retcode+stdout")
+		rc, ret = SnUtil.shell("/bin/netstat -anp | grep \"%s\""%(socketInfo), "retcode+stdout")
 		if rc != 0:
 			return -1
 		print ret
@@ -264,7 +264,7 @@ class SnUtil:
 		inStr = ""
 		inStr += "create %s\n"%(filename)
 		inStr += "quit\n"
-		VirtUtil.shellInteractive("/usr/bin/tdbtool", inStr)
+		SnUtil.shellInteractive("/usr/bin/tdbtool", inStr)
 
 	@staticmethod
 	def tdbFileAddUser(filename, username, password):
@@ -275,7 +275,7 @@ class SnUtil:
 		inStr = ""
 		inStr += "%s\n"%(password)
 		inStr += "%s\n"%(password)
-		VirtUtil.shellInteractive("/usr/bin/pdbedit -b tdbsam:%s -a \"%s\" -t"%(filename, username), inStr)
+		SnUtil.shellInteractive("/usr/bin/pdbedit -b tdbsam:%s -a \"%s\" -t"%(filename, username), inStr)
 
 class Daemon:
 	"""

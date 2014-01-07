@@ -6,6 +6,9 @@ import socket
 import strict_pgs
 from gi.repository import GObject
 from sn_conn_local import SnLocalServer
+from sn_manager_peer import SnPeerInfo
+from sn_manager_peer import SnPeerInfoUser
+from sn_manager_peer import SnPeerInfoApp
 
 class SnAppInfo:
 	userName = None			# str, null means system
@@ -27,12 +30,15 @@ class SnLocalManager(GObject.GObject):
 		self.localInfo = self._getLocalInfo()		# SnPeerInfo
 
 		# create server endpoint
-		self.serverEndPoint = ServerEndPoint(self.param.certFile, self.param.privkeyFile, self.param.caCertFile)
+		self.serverEndPoint = SnLocalServer()
 		self.serverEndPoint.setEventFunc("accept", self._onSocketConnected)
-		self.serverEndPoint.listen(self.param.configManager.getHostInfo("localhost").port)
+		self.serverEndPoint.start(self.param.localServerFile)
 
 	def getLocalInfo(self):
 		return self.localInfo
+
+	def _onSocketConnected(self):
+		pass
 
 	def _updateLocalInfo(self):
 		oldInfo = self.localInfo

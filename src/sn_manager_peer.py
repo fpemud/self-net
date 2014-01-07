@@ -2,8 +2,8 @@
 # -*- coding: utf-8; tab-width: 4; indent-tabs-mode: t -*-
 
 from gi.repository import GObject
-from sn_util import ServerEndPoint
-from sn_util import ClientEndPoint
+from sn_conn_peer import SnPeerServer
+from sn_conn_peer import SnPeerClient
 
 class SnPeerInfo:
 	systemAppList = None			# list<SnPeerInfoApp>
@@ -13,7 +13,7 @@ class SnPeerInfoUser:
 	userName = None					# str
 	userAppList = None				# list<SnPeerInfoApp>
 
-class SnPeerInfoApplication:
+class SnPeerInfoApp:
 	userName = None					# str, null means system
 	appName = None					# str
 	agentOrClient = None			# bool
@@ -36,7 +36,7 @@ class SnPeerManager(GObject.GObject):
 		# create server endpoint
 		self.serverEndPoint = ServerEndPoint(self.param.certFile, self.param.privkeyFile, self.param.caCertFile)
 		self.serverEndPoint.setEventFunc("accept", self._onSocketConnected)
-		self.serverEndPoint.listen(self.param.configManager.getHostInfo("localhost").port)
+		self.serverEndPoint.start(self.param.configManager.getHostInfo("localhost").port)
 
 		# create client endpoint
 		self.clientEndPoint = ClientEndPoint(self.param.certFile, self.param.privkeyFile, self.param.caCertFile)
