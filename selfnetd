@@ -30,7 +30,7 @@ try:
 	# create config manager / peer manager
 	param.configManager = SnConfigManager(param)
 	param.localManager = SnLocalManager(param)
-#	param.peerManager = SnPeerManager(param)
+	param.peerManager = SnPeerManager(param)
 
 	# create dbus root object
 #	dbusMainObject = DbusMainObject(param)

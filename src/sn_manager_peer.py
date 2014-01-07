@@ -1,6 +1,7 @@
 #!/usr/bin/python2
 # -*- coding: utf-8; tab-width: 4; indent-tabs-mode: t -*-
 
+import socket
 from gi.repository import GObject
 from sn_conn_peer import SnPeerServer
 from sn_conn_peer import SnPeerClient
@@ -27,23 +28,23 @@ class SnPeerManager(GObject.GObject):
 		# create peer info
 		self.peerInfoDict = dict()
 		self.peerSockDict = dict()
-		for hn in self.param.configManager.getHostList():
+		for hn in self.param.configManager.getHostNameList():
 			if hn == socket.gethostname():
 				continue
 			self.peerInfoDict[hn] = None
 			self.peerSockDict[hn] = None
 
 		# create server endpoint
-		self.serverEndPoint = ServerEndPoint(self.param.certFile, self.param.privkeyFile, self.param.caCertFile)
+		self.serverEndPoint = SnPeerServer(self.param.certFile, self.param.privkeyFile, self.param.caCertFile)
 		self.serverEndPoint.setEventFunc("accept", self._onSocketConnected)
 		self.serverEndPoint.start(self.param.configManager.getHostInfo("localhost").port)
 
 		# create client endpoint
-		self.clientEndPoint = ClientEndPoint(self.param.certFile, self.param.privkeyFile, self.param.caCertFile)
-		self.clientEndPoint.setEventFunc("connect", self._onSocketConnected)
+		self.clientEndPoint = SnPeerClient(self.param.certFile, self.param.privkeyFile, self.param.caCertFile)
+		self.clientEndPoint.setEventFunc("connected", self._onSocketConnected)
 
 		# create peer probe timer
-		GObject.timeout_add_seconds(self.param.configManager.getCfgGlobal().peerProbeTimeout * 1000, self._onPeerProbe)
+		GObject.timeout_add_seconds(self.param.configManager.getCfgGlobal().peerProbeInterval * 1000, self._onPeerProbe)
 
 	def release(self):
 		# fixme
