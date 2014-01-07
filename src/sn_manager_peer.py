@@ -46,10 +46,6 @@ class SnPeerManager(GObject.GObject):
 		# create peer probe timer
 		GObject.timeout_add_seconds(self.param.configManager.getCfgGlobal().peerProbeInterval * 1000, self._onPeerProbe)
 
-	def release(self):
-		# fixme
-		pass
-
 	def getPeerNameList(self):
 		return self.peerInfoDict.keys()
 

@@ -33,7 +33,7 @@ try:
 	param.peerManager = SnPeerManager(param)
 
 	# create dbus root object
-#	dbusMainObject = DbusMainObject(param)
+	dbusMainObject = DbusMainObject(param)
 
 	# start main loop
 	param.mainloop.run()

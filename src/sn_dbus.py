@@ -37,8 +37,18 @@ from sn_util import SnUtil
 # PeerInfoChanged(changeData)
 #
 
-class SelfNetException(dbus.DBusException):
-    _dbus_error_name = 'org.fpemud.SelfNet.Exception'
+class DbusPeerInfo:
+	peerName = None						# str
+	systemAppList = None				# list<DBusPeerInfoApp>
+	userInfoList = None					# list<DBusPeerInfoUser>
+
+class DbusPeerInfoUser:
+	userName = None						# str
+	userAppList = None					# list<DBusPeerInfoApp>
+
+class DbusPeerInfoApp:
+	appName = None						# str
+	agentOrClient = None				# bool
 
 class DbusMainObject(dbus.service.Object):
 
@@ -73,15 +83,20 @@ class DbusMainObject(dbus.service.Object):
 	def GetActivePeerList(self, sender=None):
 		ret = []
 		for po in self.peerList:
-			if self.param.peerManager.isPeerActive(self.peerName):
+			if self.param.peerManager.isPeerActive(po.peerName):
 				ret.append(po.peerId)
 		return ret
 
 	@dbus.service.method('org.fpemud.SelfNet', sender_keyword='sender',
-	                     in_signature='', out_signature='st')
+	                     in_signature='', out_signature='(s)')
 	def GetLocalInfo(self, sender=None):
-		peerInfo = self.param.peerManager.getLocalInfo()
-		return DbusPeerInfo.newFromPeerInfo(peerInfo)
+		peerInfo = self.param.localManager.getLocalInfo()
+
+		class Abc:
+			abc = "abc"
+
+		return Abc()
+		return _fakeDbusPeerInfo("localhost", peerInfo, "root")
 
 class DbusPeerObject(dbus.service.Object):
 
@@ -103,30 +118,66 @@ class DbusPeerObject(dbus.service.Object):
 		return self.param.peerManager.isPeerActive(self.peerName)
 
 	@dbus.service.method('org.fpemud.SelfNet.Peer', sender_keyword='sender',
-	                     in_signature='', out_signature='st')
+	                     in_signature='', out_signature='(sa(sb)a(sa(sb)))')
 	def GetPeerInfo(self, sender=None):
 		peerInfo = self.param.peerManager.getPeerInfo(self.peerName)
 		if peerInfo is None:
 			return None
 		else:
-			return DbusPeerInfo.newFromPeerInfo(peerInfo)
+			return _newDbusPeerInfo(self.peerName, peerInfo, "root")
 
-class DbusPeerInfo:
-	name = ""
-	isActive = False
-	userList = []
-	serviceList = []
-
-	@staticmethod
-	def newFromPeerInfo(peerInfo):
+def _fakeDbusPeerInfo(a, b, c):
+	class Abc:
 		pass
 
-class DbusPeerInfoUser:
-	name = ""
-	publicKey = ""
+	ret = Abc()
+	ret.peerName = "abc"
 
-class DbusPeerInfoService:
-	name = ""
-	status = ""
+#	ret.systemAppList = []
+#	i2 = DbusPeerInfoApp()
+#	i2.appName = "abc2"
+#	i2.agentOrClient = True
+#	ret.systemAppList.append(i2)
+#
+#	ret.userInfoList = []
+#
+#	i2 = DbusPeerInfoUser()
+#	i2.userName = "user"
+#	i2.userAppList = []
+#
+#	j2 = DbusPeerInfoApp()
+#	j2.appName = "abc3"
+#	j2.agentOrClient = True
+#	i2.userAppList.append(j2)
+#
+#	ret.userInfoList.append(i2)
+#
+	return ret
 
+def _newDbusPeerInfo(peerName, peerInfo, curUser):
+	ret = DbusPeerInfo()
+	ret.peerName = peerName
+
+	ret.systemAppList = []
+	if curUser == "root":
+		for i in peerInfo.systemAppList:
+			i2 = DbusPeerInfoApp()
+			i2.appName = i.appName
+			i2.agentOrClient = i.agentOrClient
+			ret.systemAppList.append(i2)
+
+	ret.userInfoList = []
+	for i in peerInfo.userInfoList:
+		if curUser == "root" or curUser == i.userName:
+			i2 = DbusPeerInfoUser()
+			i2.userName = i.userName
+			i2.userAppList = []
+			for j in i.userAppList:
+				j2 = DbusPeerInfoApp()
+				j2.appName = j.appName
+				j2.agentOrClient = j.agentOrClient
+				i2.userAppList.append(j2)
+			ret.userInfoList.append(i2)
+
+	return ret
 
