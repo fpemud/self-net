@@ -57,17 +57,15 @@ class DbusMainObject(dbus.service.Object):
 	def release(self):
 		self.remove_from_connection()
 
-	@dbus.service.method('org.fpemud.SelfNet', sender_keyword='sender', 
-	                     in_signature='', out_signature='ai')
-	def GetPeerList(self, sender=None):
+	@dbus.service.method('org.fpemud.SelfNet', in_signature='', out_signature='ai')
+	def GetPeerList(self):
 		ret = []
 		for po in self.peerList:
 			ret.append(po.peerId)
 		return ret
 
-	@dbus.service.method('org.fpemud.SelfNet', sender_keyword='sender', 
-	                     in_signature='', out_signature='ai')
-	def GetActivePeerList(self, sender=None):
+	@dbus.service.method('org.fpemud.SelfNet', in_signature='', out_signature='ai')
+	def GetActivePeerList(self):
 		ret = []
 		for po in self.peerList:
 			if self.param.peerManager.isPeerActive(po.peerName):
@@ -77,6 +75,7 @@ class DbusMainObject(dbus.service.Object):
 	@dbus.service.method('org.fpemud.SelfNet', sender_keyword='sender',
 	                     in_signature='', out_signature='(sa(sb)a(sa(sb)))')
 	def GetLocalInfo(self, sender=None):
+		uname = 
 		peerInfo = self.param.localManager.getLocalInfo()
 		return _newDbusPeerInfo("localhost", peerInfo, "root")
 
@@ -110,28 +109,21 @@ class DbusPeerObject(dbus.service.Object):
 
 def _newDbusPeerInfo(peerName, peerInfo, curUser):
 	"""PeerInfo sent through dbus is represented by tuple
+	   dbusPeerInfo: (s:peerName, a:appList)
+	   appList element: (s:appName, b:agentOrClient)"""
 
-	   dbusPeerInfo: (s:peerName, a:systemAppList, a:userInfolist)
-	   systemAppList element: (s:appName, b:agentOrClient)
-	   userInfoList element: (s:userName, a:userAppList)
-	   userAppList element: (s:appName, b:agentOrClient)"""
-
-	systemAppList = []
-	if curUser == "root":
+	appList = []
+	if curUser is None:
 		for i in peerInfo.systemAppList:
 			i2 = (i.appName, i.agentOrClient)
-			systemAppList.append(i2)
+			appList.append(i2)
+	else:
+		for i in peerInfo.userInfoList:
+			if curUser == i.userName:
+				for j in i.userAppList:
+					j2 = (j.appName, j.agentOrClient)
+					appList.append(j2)
 
-	userInfoList = []
-	for i in peerInfo.userInfoList:
-		if curUser == "root" or curUser == i.userName:
-			userAppList = []
-			for j in i.userAppList:
-				j2 = (j.appName, j.agentOrClient)
-				userAppList.append(j2)
-			i2 = (i.userName, userAppList)
-			userInfoList.append(i2)
-
-	ret = (peerName, systemAppList, userInfoList)
+	ret = (peerName, peerState, appList, userInfoList)
 	return ret
 

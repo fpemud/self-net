@@ -7,6 +7,7 @@ from sn_conn_peer import SnPeerServer
 from sn_conn_peer import SnPeerClient
 
 class SnPeerInfo:
+	peerState = None				# enum SnPeerManager.PEER_STATE_*
 	systemAppList = None			# list<SnPeerInfoApp>
 	userInfoList = None				# list<SnPeerInfoUser>
 
@@ -20,6 +21,14 @@ class SnPeerInfoApp:
 	agentOrClient = None			# bool
 
 class SnPeerManager(GObject.GObject):
+
+	PEER_STATE_UNKNOWN = 1
+	PEER_STATE_RUNNING = 2
+	PEER_STATE_POWEROFF = 3
+	PEER_STATE_RESTARTING = 4
+	PEER_STATE_SUSPEND = 5
+	PEER_STATE_HIBERNATE = 6
+	PEER_STATE_HYBRID_SLEEP = 7
 
 	def __init__(self, param):
 		GObject.GObject.__init__(self)
@@ -54,9 +63,6 @@ class SnPeerManager(GObject.GObject):
 
 	def getPeerInfo(self, peerName):
 		return self.peerInfoDict[peerName]
-
-	def dataToPeer(self, peerName, serviceKey, data):
-		pass		
 
 	def _onSocketConnected(self, sock):
 		# only peer in self-net is allowed

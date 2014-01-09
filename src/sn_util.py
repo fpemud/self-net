@@ -245,17 +245,11 @@ class SnUtil:
 		return int(m.group(1))
 
 	@staticmethod
-	def dbusGetUserId(connection, sender):
+	def dbusGetUserName(connection, sender):
 		if sender is None:
-			raise Exception("only accept user access")
-		return connection.get_unix_user(sender)
-
-	@staticmethod
-	def dbusCheckUserId(connection, sender, uid):
-		if sender is None:
-			raise Exception("only accept user access")
-		if connection.get_unix_user(sender) != uid:
-			raise Exception("priviledge violation")
+			return None
+		uid = connection.get_unix_user(sender)
+		return pwd.getpwuid(uid).pw_name
 
 	@staticmethod
 	def tdbFileCreate(filename):
