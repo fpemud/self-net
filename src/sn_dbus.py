@@ -37,19 +37,6 @@ from sn_util import SnUtil
 # PeerInfoChanged(changeData)
 #
 
-class DbusPeerInfo:
-	peerName = None						# str
-	systemAppList = None				# list<DBusPeerInfoApp>
-	userInfoList = None					# list<DBusPeerInfoUser>
-
-class DbusPeerInfoUser:
-	userName = None						# str
-	userAppList = None					# list<DBusPeerInfoApp>
-
-class DbusPeerInfoApp:
-	appName = None						# str
-	agentOrClient = None				# bool
-
 class DbusMainObject(dbus.service.Object):
 
 	def __init__(self, param):
@@ -88,15 +75,10 @@ class DbusMainObject(dbus.service.Object):
 		return ret
 
 	@dbus.service.method('org.fpemud.SelfNet', sender_keyword='sender',
-	                     in_signature='', out_signature='(s)')
+	                     in_signature='', out_signature='(sa(sb)a(sa(sb)))')
 	def GetLocalInfo(self, sender=None):
 		peerInfo = self.param.localManager.getLocalInfo()
-
-		class Abc:
-			abc = "abc"
-
-		return Abc()
-		return _fakeDbusPeerInfo("localhost", peerInfo, "root")
+		return _newDbusPeerInfo("localhost", peerInfo, "root")
 
 class DbusPeerObject(dbus.service.Object):
 
@@ -126,58 +108,30 @@ class DbusPeerObject(dbus.service.Object):
 		else:
 			return _newDbusPeerInfo(self.peerName, peerInfo, "root")
 
-def _fakeDbusPeerInfo(a, b, c):
-	class Abc:
-		pass
-
-	ret = Abc()
-	ret.peerName = "abc"
-
-#	ret.systemAppList = []
-#	i2 = DbusPeerInfoApp()
-#	i2.appName = "abc2"
-#	i2.agentOrClient = True
-#	ret.systemAppList.append(i2)
-#
-#	ret.userInfoList = []
-#
-#	i2 = DbusPeerInfoUser()
-#	i2.userName = "user"
-#	i2.userAppList = []
-#
-#	j2 = DbusPeerInfoApp()
-#	j2.appName = "abc3"
-#	j2.agentOrClient = True
-#	i2.userAppList.append(j2)
-#
-#	ret.userInfoList.append(i2)
-#
-	return ret
-
 def _newDbusPeerInfo(peerName, peerInfo, curUser):
-	ret = DbusPeerInfo()
-	ret.peerName = peerName
+	"""PeerInfo sent through dbus is represented by tuple
 
-	ret.systemAppList = []
+	   dbusPeerInfo: (s:peerName, a:systemAppList, a:userInfolist)
+	   systemAppList element: (s:appName, b:agentOrClient)
+	   userInfoList element: (s:userName, a:userAppList)
+	   userAppList element: (s:appName, b:agentOrClient)"""
+
+	systemAppList = []
 	if curUser == "root":
 		for i in peerInfo.systemAppList:
-			i2 = DbusPeerInfoApp()
-			i2.appName = i.appName
-			i2.agentOrClient = i.agentOrClient
-			ret.systemAppList.append(i2)
+			i2 = (i.appName, i.agentOrClient)
+			systemAppList.append(i2)
 
-	ret.userInfoList = []
+	userInfoList = []
 	for i in peerInfo.userInfoList:
 		if curUser == "root" or curUser == i.userName:
-			i2 = DbusPeerInfoUser()
-			i2.userName = i.userName
-			i2.userAppList = []
+			userAppList = []
 			for j in i.userAppList:
-				j2 = DbusPeerInfoApp()
-				j2.appName = j.appName
-				j2.agentOrClient = j.agentOrClient
-				i2.userAppList.append(j2)
-			ret.userInfoList.append(i2)
+				j2 = (j.appName, j.agentOrClient)
+				userAppList.append(j2)
+			i2 = (i.userName, userAppList)
+			userInfoList.append(i2)
 
+	ret = (peerName, systemAppList, userInfoList)
 	return ret
 
