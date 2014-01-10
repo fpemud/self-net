@@ -22,7 +22,7 @@ from sn_util import SnUtil
 # array<peerId:int> GetActivePeerList()
 # peerInfo:st		GetLocalInfo()
 #
-# ==== Network ====
+# ==== Peer ====
 # Service               org.fpemud.SelfNet
 # Interface             org.fpemud.SelfNet.Peer
 # Object path           /Peers/{peerId:int}
@@ -35,6 +35,29 @@ from sn_util import SnUtil
 # Activated()
 # Inactivated()
 # PeerInfoChanged(changeData)
+#
+#
+################################################################################
+# Some Specification
+################################################################################
+#
+# Every application sees all the peers.
+#
+# Application only sees its conterpart, for example:
+#  1. ssh-client of user abc on host1 can only see ssh-agent of user abc on
+#     host2 and ssh-agent of user abc on host3
+#  2. distcc-agent on host1 can only see distcc-client on host2 and
+#     distcc-client on host3
+#
+# Peer state values:
+#  "unknown"
+#  "running"
+#  "poweroff"
+#  "restarting"
+#  "suspend"
+#  "hibernate"
+#  "hybrid-sleep"
+#
 #
 
 class DbusMainObject(dbus.service.Object):
@@ -77,7 +100,7 @@ class DbusMainObject(dbus.service.Object):
 	def GetLocalInfo(self, sender=None):
 		uname = 
 		peerInfo = self.param.localManager.getLocalInfo()
-		return _newDbusPeerInfo("localhost", peerInfo, "root")
+		return _newDbusPeerInfo("localhost", peerInfo, "unknown", "root")
 
 class DbusPeerObject(dbus.service.Object):
 
@@ -105,11 +128,11 @@ class DbusPeerObject(dbus.service.Object):
 		if peerInfo is None:
 			return None
 		else:
-			return _newDbusPeerInfo(self.peerName, peerInfo, "root")
+			return _newDbusPeerInfo(self.peerName, peerInfo, "unknown", "root")
 
-def _newDbusPeerInfo(peerName, peerInfo, curUser):
+def _newDbusPeerInfo(peerName, peerState, peerInfo, curUser):
 	"""PeerInfo sent through dbus is represented by tuple
-	   dbusPeerInfo: (s:peerName, a:appList)
+	   dbusPeerInfo: (s:peerName, s:peerState, a:appList)
 	   appList element: (s:appName, b:agentOrClient)"""
 
 	appList = []

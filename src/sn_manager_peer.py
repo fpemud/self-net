@@ -7,7 +7,6 @@ from sn_conn_peer import SnPeerServer
 from sn_conn_peer import SnPeerClient
 
 class SnPeerInfo:
-	peerState = None				# enum SnPeerManager.PEER_STATE_*
 	systemAppList = None			# list<SnPeerInfoApp>
 	userInfoList = None				# list<SnPeerInfoUser>
 
@@ -16,19 +15,10 @@ class SnPeerInfoUser:
 	userAppList = None				# list<SnPeerInfoApp>
 
 class SnPeerInfoApp:
-	userName = None					# str, null means system
 	appName = None					# str
 	agentOrClient = None			# bool
 
 class SnPeerManager(GObject.GObject):
-
-	PEER_STATE_UNKNOWN = 1
-	PEER_STATE_RUNNING = 2
-	PEER_STATE_POWEROFF = 3
-	PEER_STATE_RESTARTING = 4
-	PEER_STATE_SUSPEND = 5
-	PEER_STATE_HIBERNATE = 6
-	PEER_STATE_HYBRID_SLEEP = 7
 
 	def __init__(self, param):
 		GObject.GObject.__init__(self)
