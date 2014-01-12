@@ -1,0 +1,25 @@
+self-net is an overlay network for integriting all systems that belongs to one
+entity. self-net is for controlling only, for example, self-net transmits ssh
+keys between hosts so that user can ssh without typing password, but the ssh
+packets won't go through self-net.
+
+
+
+
+
+
+Different between self-net and gnunet
+
+1. gnunet is for computers to commnunicate in a security manner, self net is to integrite all the systems belongs to one user
+
+2. self-net is a network for control.
+
+3. 
+
+
+so self-net has the following feature:
+1. self-net uses only hostname to identify host, no address needed.
+2. self-net uses static host list.
+3. 
+
+
