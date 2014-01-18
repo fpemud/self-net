@@ -1,5 +1,28 @@
 self-net is an overlay network for integriting all systems that belongs to one
-entity. self-net is for controlling only, for example, self-net transmits ssh
+people or small entity. 
+
+self-net can integrite:
+1. host access by hostname.
+2. user/group information. (same as LDAP, but in a fully distributed manner)
+3. user configuration synchronization.
+4. user home directory synchronization.
+
+self-net limitations:
+1. self-net is a mesh network, N hosts lead to N! connections. so it can only
+   be applied to small network.
+2. self-net uses static host list.
+
+self-net applications have three types: agent, client, peer.
+agent can only communicate with client, peer can only communicate with peer.
+applications can communicate with the other half on localhost or remote host.
+system applications can only communicate with system applications.
+applications of user X can only communicate with applications of user X.
+
+
+
+
+
+self-net is for controlling only, for example, self-net transmits ssh
 keys between hosts so that user can ssh without typing password, but the ssh
 packets won't go through self-net.
 

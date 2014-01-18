@@ -138,8 +138,7 @@ class SnConnAddress:
 	hostName = None			# str
 	userName = None			# str
 	appName = None			# str
-	agentOrClient = None	# bool
-	systemOrUser = None		# bool
+	appType = None			# int
 
 class SnConnRouter:
 
