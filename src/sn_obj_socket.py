@@ -2,39 +2,53 @@
 # -*- coding: utf-8; tab-width: 4; indent-tabs-mode: t -*-
 
 class SnObjSocket:
+	"""SnObjSocket has 4 functions:
+	     1. send & receive objects
+	     2. object has priority
+	     3. do sending & receiving in background
+	     4. receive & error callback in main thread
+	"""
 
-	def __init__(self, sock):
+	def __init__(self, sock, recvFunc, errorFunc):
 		self.sock = sock
-
-		self.recvFunc = None
-		self.errorFunc = None
-		self.sendThread = _SendThread(self)
+		self.recvFunc = recvFunc
+		self.errorFunc = errorFunc
 		self.recvThread = _RecvThread(self)
+		self.sendThread = _SendThread(self)
+		self.sendThread.start()
+		self.recvThread.start()
 
-	def setEventFunc(self, funcName, func):
-		if funcName == "receive":
-			assert self.recvFunc is None
-			self.recvFunc = func
-		elif funcName == "error":
-			assert self.errorFunc is None
-			self.errorFunc = func
+	def sendObject(self, *args):
+		if len(args) == 0:
+			raise Exception("argument error")
+		elif len(args) == 1:
+			pri = 0
+			obj = args[0]
 		else:
-			assert False
-
-	def sendObject(self, obj):
-		pass
+			pri = args[0]
+			obj = args[1]
+		self.sendThread.sendObjQueue.put((pri, obj))
 
 	def close(self):
+		self.recvThread.stop()
+		self.sendThread.stop()
 		self.sock.close()
 		self.sock = None
+
+	def _onIdle(self):
+		assert self.sock is not None
+
+		obj = self.recvObjQueue.get(False)
+		if obj is not None:
+			self.recvFunc(obj)
+		return False
 
 class _RecvThread(threading.Thread):
 
 	def __init__(self, parent):
 		super(_RecvThread, self).__init__()
 		self.parent = parent
-		self.sf = self.parent.sock.makefile()
-		self.recvBuffer = ""
+		self.sock = parent.sock
 		self.recvObjQueue = PriorityQueue()
 		self.stopFlag = False
 
@@ -45,30 +59,53 @@ class _RecvThread(threading.Thread):
 
 	def run(self):
 		while not self.stopFlag:
-			pkt = pickle.load(self.sf)
-			self.recvObjQueue.put((pkt.head.priority, pkt.obj))
+			# receive packet header
+			headerLen = struct.calcsize("!II")
+			header = ""
+			while len(header) < headerLen:
+				header += self.sock.recv(headerLen - len(header))
+			dataPri, dataLen = struct.unpack("!II", header)
+
+			# receive packet content
+			data = ""
+			while len(data) < dataLen:
+				data += self.sock.recv(dataLen - len(data))
+
+			# packet -> object
+			obj = pickle.loads(data)
+			self.recvObjQueue.put((dataPri, obj))
+			
+			# register callback
+			GLib.idle_add(self.parent._onIdle)
 
 class _SendThread(threading.Thread):
 
-	def __init__(self, parent):
+	def __init__(self, sock):
 		super(_SendThread, self).__init__()
-		self.parent = parent
+		self.sock = sock
+		self.sendObjQueue = PriorityQueue()
 		self.stopFlag = False
 
 	def stop(self):
 		"""may bring 50ms delay"""
 		self.stopFlag = True
-		self.parent.packetQueue.put((0xFF, None))		# feed PriorityQueue.get()
+		self.sendObjQueue.put((0xFF, None))		# feed PriorityQueue.get()
 		self.join()
 
 	def run(self):
 		while not self.stopFlag:
-			pri, packet = self.parent.packetQueue.get(True)
+			pri, obj = self.sendObjQueue.get(True)
 			if pri == 0xFF:
 				continue
+
+			data = pickle.dumps(obj)
+			header = struct.unpack("!II", pri, len(data))
+			packet = header + data
+
 			sendLen = 0
 			while not self.stopFlag:
-				sendLen += self.parent.ssl_sock.send(packet[sendLen:])
+				sendLen += self.sock.send(packet[sendLen:])
 				if sendLen >= len(packet):
 					break
 				time.sleep(0.05)
+
