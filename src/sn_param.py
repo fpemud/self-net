@@ -10,6 +10,7 @@ class SnParam:
 		self.cfgUserDir = ".config/selfnetd"
 		self.libDir = "/usr/lib/selfnetd"
 		self.dataDir = "/usr/share/selfnetd"
+		self.moduleDir = os.path.join(self.libDir, "modules")
 		self.runDir = "/run/selfnetd"
 		self.tmpDir = None
 
@@ -25,4 +26,5 @@ class SnParam:
 		self.configManager = None
 		self.localManager = None
 		self.peerManager = None
+		self.moduleManager = None
 

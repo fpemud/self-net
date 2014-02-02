@@ -7,16 +7,28 @@ from sn_conn_peer import SnPeerServer
 from sn_conn_peer import SnPeerClient
 
 class SnPeerInfo:
-	systemAppList = None			# list<SnPeerInfoApp>
-	userInfoList = None				# list<SnPeerInfoUser>
+	moduleList = None				# list<SnPeerInfoModule>
+	userList = None					# list<SnPeerInfoUser>
 
 class SnPeerInfoUser:
 	userName = None					# str
-	userAppList = None				# list<SnPeerInfoApp>
 
-class SnPeerInfoApp:
-	appName = None					# str
-	agentOrClient = None			# bool
+class SnPeerInfoModule:
+	moduleName = None				# str
+	userName = None					# str
+
+class SnSysPacket:
+	srcPeerName = None				# str
+	data = None						# object
+
+class SnDataPacket:
+	srcPeerName = None				# str
+	srcUserName = None				# str, can be None
+	srcModuleName = None			# str
+	data = None						# object
+
+class SnDataPacketReject:
+	message = None					# str
 
 class SnPeerManager(GObject.GObject):
 
@@ -126,6 +138,11 @@ class SnPeerManager(GObject.GObject):
 				if i.label in labelList:
 					raise _PeerInfoCheckException("label repeat in peer info")
 				labelList.append(i.label)
+
+	def _notifyPeerStateChange(self, peerName, notifyType):
+		self.param.localManager.
+
+
 
 class _PeerInfoCheckException(Exception):
 	def __init__(self, msg):

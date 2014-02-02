@@ -12,6 +12,12 @@ class SnCfgGlobal:
 class SnCfgHostInfo:
 	port = None						# int
 
+class SnCfgModuleInfo:
+	enable = None					# bool
+	moduleScope = None				# str
+	moduleType = None				# str
+	moduleId = None					# str
+
 class SnConfigManager:
 	"""/etc/selfnetd
 	    |----cert.pem							# mode 644
@@ -19,16 +25,19 @@ class SnConfigManager:
 		|----ca-cert.pem						# mode 644
 		|----ca-privkey.pem						# mode 600, only on the nexus machine
 	    |----hosts.xml
+	    |----modules.xml
 	    |----selfnetd.conf"""
 
 	def __init__(self, param):
 		self.param = param
 		self.cfgGlobal = None
 		self.hostDict = None
+		self.moduleDict = None
 
 		self._checkCertFiles()
 		self._parseConfFile()		# fill self.cfgGlobal
 		self._parseHostsFile()		# fill self.hostDict
+		self._parseModulesFile()	# fill self.moduleDict
 
 	def getCfgGlobal(self):
 		return self.cfgGlobal
@@ -41,6 +50,20 @@ class SnConfigManager:
 			return self.hostDict[socket.gethostname()]
 		else:
 			return self.hostDict[hostName]
+
+	def getModuleNameList(self, moduleScope, moduleType):
+		assert (moduleScope is None and moduleType is None) or (moduleScope is not None and moduleType is not None)
+
+		ret = []
+		for k, v in self.moduleDict.items():
+			if moduleScope is not None:
+				if v.moduleScope != moduleScope or v.moduleType != moduleType:
+					continue
+			ret.append(k)
+		return ret
+
+	def getModuleInfo(self, moduleName):
+		return self.moduleDict[moduleName]
 
 	def _checkCertFiles(self):
 		# check CA certificate
@@ -179,6 +202,50 @@ class _HostFileXmlHandler(xml.sax.handler.ContentHandler):
 		else:
 			pass
 
+class _ModuleFileXmlHandler(xml.sax.handler.ContentHandler):
+	INIT = 0
+	IN_MODULES = 1
+	IN_MODULE = 2
+	IN_MODULE_ENABLE = 3
+
+	def __init__(self, moduleDict):
+		xml.sax.handler.ContentHandler.__init__(self)
+		self.moduleDict = moduleDict
+		self.curModuleName = None
+		self.curModuleInfo = None
+		self.state = self.INIT
+
+	def startElement(self, name, attrs):
+		if name == "modules" and self.state == self.INIT:
+			self.state = self.IN_MODULES
+		elif name == "module" and self.state == self.IN_MODULES:
+			self.state = self.IN_MODULE
+			self.curModuleName = attrs["name"]
+			self.curModuleInfo = _newSnCfgModuleInfo(self.curModuleName)
+		elif name == "enable" and self.state == self.IN_MODULE:
+			self.state = self.IN_MODULE_ENABLE
+		else:
+			raise Exception("Failed to parse modules file")
+
+	def endElement(self, name):
+		if name == "modules" and self.state == self.IN_MODULES:
+			self.state = self.INIT
+		elif name == "module" and self.state == self.IN_MODULE:
+			self.moduleDict[self.curModuleName] = self.curModuleInfo
+			self.curModuleName = None
+			self.curModuleInfo = None
+			self.state = self.IN_MODULES
+		elif name == "enable" and self.state == self.IN_MODULE_ENABLE:
+			self.state = self.IN_MODULE
+		else:
+			raise Exception("Failed to parse modules file")
+
+	def characters(self, content):
+		if self.state == self.IN_MODULE_ENABLE:
+			self.curModuleInfo.enable = bool(content)
+		else:
+			pass
+
 def _newSnCfgGlobal():
 	"""create new object, set default values"""
 
@@ -195,4 +262,17 @@ def _newSnCfgHostInfo():
 	curHostInfo.supportWakeOnLan = False
 	curHostInfo.supportWakeOnWlan = False
 	return curHostInfo
+
+def _newSnCfgModuleInfo(moduleName):
+	"""create new object, set default values"""
+
+	curModuleInfo = SnCfgModuleInfo()
+	curModuleInfo.enable = false
+
+	strList = moduleName.split("-")
+	curModuleInfo.moduleScope = strList[0]
+	curModuleInfo.moduleType = strList[1]
+	curModuleInfo.moduleId = strList[2]
+
+	return curModuleInfo
 
