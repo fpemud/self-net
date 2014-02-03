@@ -92,25 +92,15 @@ class SnPeerSocket:
 		self.sendThread = _SendThread(self)
 		self.isClosing = False
 
-		self.sysDataRecvFunc = None
-		self.rejectFunc = None
 		self.errorFunc = None
 		self.recvFunc = None
 
 	def setEventFunc(self, funcName, *args):
-		if funcName == "system_data_received":
-			assert sysDataRecvFunc is None and func is not None
-			self.sysDataRecvFunc = func
-			GLib.io_add_watch(self.ssl_sock, GLib.IO_IN, self._onRecv)
-		elif funcName == "rejection_received":
-			assert self.rejectFunc is None and func is not None
-			self.rejectFunc = func
-			GLib.io_add_watch(self.ssl_sock, GLib.IO_IN, self._onRecv)
-		elif funcName == "low_level_error":
+		elif funcName == "error":
 			assert self.errorFunc is None and func is not None
 			self.errorFunc = func
 			GLib.io_add_watch(self.ssl_sock, GLib.IO_PRI | GLib.IO_ERR | GLib.IO_HUP, self._onError)
-		elif funcName == "application_packet_received":
+		elif funcName == "recv":
 			assert self.recvFunc is None and func is not None
 			self.recvFunc = func
 			GLib.io_add_watch(self.ssl_sock, GLib.IO_IN, self._onRecv)
@@ -120,27 +110,11 @@ class SnPeerSocket:
 	def getPeerName(self):
 		return self.peerName
 
-	def sendSystemData(self, data):
+	def send(self, dataObj):
 		pri = 1
 		header = struct.pack("!QQI", 0, 0, len(data))
 		packet = header + data
 		self.packetQueue.put((pri, packet), True)
-
-	def sendApplicationPacket(self, packet):
-		pri = 2
-		self.packetQueue.put((pri, packet), True)
-
-	def reject(self, rejectMessage):
-		self.isClosing = True
-		self.sendThread.stop()
-
-		# send reject message, ignore failure
-		header = struct.pack("!QQI", 0, 1, len(data))
-		packet = header + data
-		self.ssl_sock.send(packet)
-
-		self.ssl_sock.close()
-		self.ssl_sock = None
 
 	def close(self):
 		self._doClose()

@@ -29,9 +29,7 @@ class SnModule:
 		self.core._sendToPeer(self.getPeerName(), data)
 
 	def reject(self, rejectMessage):
-		data = SnDataPacketReject()
-		data.message = rejectMessage
-		self.core._sendToPeer(self.getPeerName(), data)
+		self.core._rejectPeer(self.getPeerName(), rejectMessage)
 
 	##### implement by subclass ####
 
@@ -61,5 +59,8 @@ class SnModuleCoreProxy:
 		assert False
 
 	def _sendToPeer(self, peerName, data):
+		pass
+
+	def _rejectPeer(self, peerName, rejectMessage):
 		pass
 

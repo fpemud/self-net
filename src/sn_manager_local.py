@@ -8,8 +8,6 @@ from sn_conn_local import SnLocalServer
 from sn_manager_peer import SnPeerInfo
 from sn_manager_peer import SnPeerInfoUser
 from sn_manager_peer import SnPeerInfoModule
-from sn_manager_peer import SnPacket
-from sn_manager_peer import SnReject
 
 class SnLocalManager:
 
@@ -17,80 +15,64 @@ class SnLocalManager:
 		self.param = param
 		self.localInfo = self._getLocalInfo()		# SnPeerInfo
 		self.coreProxy = None
-		self.moduleObjList = []
+		self.moduleObjDict = dict()
 
 	def getLocalInfo(self):
 		return self.localInfo
 
-	def _onPeerChange(self, peerName, peerInfo):
+	##### event callback ####
+
+	def onPeerChange(self, peerName):
 		"""Called after peer add or peer change"""
 
+		peerInfo = self.param.peerManager.getPeerInfo(peerName)
+
 		# process module removal
-		newList = []
-
-		for mo in self.moduleObjList:
-			if mo.getPeerName() != peerName:
-				newList.append(mo)
-				continue
-
+		for mk, mo in self.moduleObjDict.items():
 			found = False
 			for mio in peerInfo.moduleList:
-				if (mo.getModuleName() == self._getPeerModuleName(mio.moduleName)
-						and mo.getUserName() == mio.userName):
+				if mk == _ModuleKey.newByPeer(peerName, mio.userName, mio.moduleName):
 					found = True
 					break
 			if found:
-				newList.append(mo)
 				continue
 
 			mo.onInactive()
-
-		self.moduleObjList = newList
+			del self.moduleObjDict[mk]
 
 		# process module add
 		for mio in peerInfo.moduleList:
-			found = False
-			for mo in self.moduleObjList:
-				if (mo.getPeerName() == peerName
-						and mo.getUserName() == mio.userName
-						and mo.getModuleName() == self._getPeerModuleName(mio.moduleName)):
-					found = True
-					break
-			if found:
+			newmk = _ModuleKey.newByPeer(peerName, mio.userName, mio.moduleName):
+
+			if newmk in self.moduleObjDict:
+				continue
+			if newmk.moduleName not in self.param.configManager.getModuleNameList():
+				continue
+			if newmk.userName in self.param.configManager.getUserBlackList():
 				continue
 
-			if mio.userName in self.param.configManager.getCfgGlobal().userBlackList:
-				continue
+			eval("from modules.%s import ModuleObject"%(newmk.moduleName)
+			newmo = ModuleObject(self.coreProxy, peerName, newmk.userName)
+			newmo.onActive()
+			self.moduleObjDict[newmk] = newmo
 
-			eval("from modules.%s import ModuleObject"%(self._getPeerModuleName(mio.moduleName)))
-			mo = ModuleObject(self.coreProxy, peerName, mio.userName)
-			mo.onActive()
-			self.moduleObjList.append(mo)
-
-	def _onPeerRemove(self, peerName):
+	def onPeerRemove(self, peerName):
 		"""Called before peer removal"""
 
-		newList = []
-		for mo in self.moduleObjList:
-			if mo.getPeerName() == peerName:
+		for mk, mo in self.moduleObjDict.items():
+			if mk.peerName == peerName:
 				mo.onInactive()
-			else:
-				newList.add(mo)
-		self.moduleObjList = newList
+				del self.moduleObjDict[mk]
 
-	def _onRecv(self, packetObj):
-		"""Called when data packet received from peer"""
+	def onRecv(self, peerName, userName, srcModuleName, data):
+		mk = _ModuleKey.newByPeer(peerName, userName, srcModuleName)
+		self.moduleObjDict[mk]._onRecv(data)
 
-		assert isinstance(packetObj, SnDataPacket)
-		for mo in self.moduleObjList:
-			if (mo.getPeerName() == packetObj.srcPeerName
-					and mo.getUserName() == packetObj.srcUserName
-					and mo.getModuleName() == self._getPeerModuleName(packetObj.srcModuleName)):
-				if isinstance(packetObj.data, SnDataPacketReject):
-					mo._onReject(packetObj.data.message)
-				else:
-					mo._onRecv(packetObj.data)
-				break
+	def onReject(self, peerName, userName, srcModuleName, rejectMessage):
+		mk = _ModuleKey.newByPeer(peerName, userName, srcModuleName)
+		self.moduleObjDict[mk]._onReject(rejectMessage)
+
+	##### implementation ####
 
 	def _getLocalInfo(self):
 		pgs = strict_pgs.PasswdGroupShadow("/")
@@ -109,7 +91,7 @@ class SnLocalManager:
 				ret.moduleList.append(n)
 			elif mInfo.moduleType == "usr":
 				for uname in pgs.getNormalUserList():
-					if uname in self.param.configManager.getCfgGlobal().userBlackList:
+					if uname in self.param.configManager.getUserBlackList():
 						continue
 					n = SnCfgModuleInfo()
 					n.moduleName = mname
@@ -120,7 +102,7 @@ class SnLocalManager:
 
 		ret.userList = []
 		for uname in pgs.getNormalUserList():
-			if uname in self.param.configManager.getCfgGlobal().userBlackList:
+			if uname in self.param.configManager.getUserBlackList():
 				continue
 			n = SnPeerInfoUser()
 			n.userName = uname
@@ -128,7 +110,23 @@ class SnLocalManager:
 
 		return ret
 
-	def _getPeerModuleName(self, moduleName):
+class _ModuleKey:
+
+	peerName = None			# str
+	userName = None			# str
+	moduleName = None		# str
+
+	@staticMethod
+	def newBySelf(peerName, userName, moduleName):
+		self.peerName = peerName
+		self.userName = userName
+		self.moduleName = moduleName
+
+	@staticMethod
+	def newByPeer(peerName, userName, moduleName):
+		self.peerName = peerName
+		self.userName = userName
+
 		strList = moduleName.split("-")
 		assert len(strList) == 3
 
@@ -139,5 +137,15 @@ class SnLocalManager:
 		else:
 			assert False
 
-		return "-".join(strList)
+		self.moduleName = "-".join(strList)
+
+	def __eq__(self, other):
+		return (isinstance(other, self.__class__)
+					and self.peerName == other.peerName
+					and self.userName == other.userName
+					and self.moduleName == other.moduleName)
+	def __ne__(self, other):
+		return not self.__eq__(other)
+	def __hash__(self):
+		return hash(self.peerName) ^ hash(self.userName) ^ hash(self.moduleName)
 

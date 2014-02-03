@@ -5,10 +5,6 @@ import xml.sax.handler
 import socket
 import OpenSSL
 
-class SnCfgGlobal:
-	peerProbeInterval = None		# int, default is "1s"
-	userBlackList = None			# list<str>
-
 class SnCfgHostInfo:
 	port = None						# int
 
@@ -39,8 +35,14 @@ class SnConfigManager:
 		self._parseHostsFile()		# fill self.hostDict
 		self._parseModulesFile()	# fill self.moduleDict
 
-	def getCfgGlobal(self):
-		return self.cfgGlobal
+	def getPeerProbeInterval(self):
+		return self.cfgGlobal.peerProbeInterval
+
+	def getPeerKeepaliveInterval(self):
+		return self.cfgGlobal.peerKeepaliveInterval
+
+	def getUserBlackList(self):
+		return self.cfgGlobal.userBlackList
 
 	def getHostNameList(self):
 		return self.hostDict.keys()
@@ -99,6 +101,8 @@ class SnConfigManager:
 		# check parse result
 		if self.cfgGlobal.peerProbeInterval < 1:
 			raise Exception("Invalid cfgGlobal.peerProbeInterval")
+		if self.cfgGlobal.peerKeepaliveInterval < 1:
+			raise Exception("Invalid cfgGlobal.peerKeepaliveInterval")
 
 	def _parseHostsFile(self):
 		# set default value
@@ -114,12 +118,30 @@ class SnConfigManager:
 		if socket.gethostname() not in self.hostDict:
 			raise Exception("No name for localhost in hosts file")
 
+	def _parseModulesFile(self):
+		# set default value
+		self.moduleDict = dict()
+
+		# parse file
+		h = _ModuleFileXmlHandler(self. moduleDict)
+		xml.sax.parse(self.param.modulesFile, h)
+
+		# check parse result
+		for m in self.moduleDict:
+			eval("from modules.%s import ModuleObject"%(m))
+
+class _SnCfgGlobal:
+	peerProbeInterval = None		# int, default is "1s"
+	peerKeepaliveInterval = None	# int, default is "1s"
+	userBlackList = None			# list<str>
+
 class _ConfFileXmlHandler(xml.sax.handler.ContentHandler):
 	INIT = 0
 	IN_ROOT = 1
 	IN_PEER_PROBE_INTERVAL = 2
-	IN_USER_BLACKLIST = 3
-	IN_USER_BLACKLIST_USER = 4
+	IN_PEER_KEEPALIVE_INTERVAL = 3
+	IN_USER_BLACKLIST = 4
+	IN_USER_BLACKLIST_USER = 5
 
 	def __init__(self, cfgGlobal):
 		xml.sax.handler.ContentHandler.__init__(self)
@@ -131,6 +153,8 @@ class _ConfFileXmlHandler(xml.sax.handler.ContentHandler):
 			self.state = self.IN_ROOT
 		elif name == "peer-probe-interval" and self.state == self.IN_ROOT:
 			self.state = self.IN_PEER_PROBE_INTERVAL
+		elif name == "peer-keepalive-interval" and self.state == self.IN_ROOT:
+			self.state = self.IN_PEER_KEEPALIVE_INTERVAL
 		elif name == "user-black-list" and self.state == self.IN_ROOT:
 			self.state = self.IN_USER_BLACKLIST
 		elif name == "user" and self.state == self.IN_USER_BLACKLIST:
@@ -143,6 +167,8 @@ class _ConfFileXmlHandler(xml.sax.handler.ContentHandler):
 			self.state = self.INIT
 		elif name == "peer-probe-interval" and self.state == self.IN_PEER_PROBE_INTERVAL:
 			self.state = self.IN_ROOT
+		elif name == "peer-keepalive-interval" and self.state == self.IN_PEER_KEEPALIVE_INTERVAL:
+			self.state = self.IN_ROOT
 		elif name == "user-blacklist" and self.state == self.IN_USER_BLACKLIST:
 			self.state = self.IN_ROOT
 		elif name == "user" and self.state == self.IN_USER_BLACKLIST_USER:
@@ -153,6 +179,8 @@ class _ConfFileXmlHandler(xml.sax.handler.ContentHandler):
 	def characters(self, content):
 		if self.state == self.IN_PEER_PROBE_INTERVAL:
 			self.cfgGlobal.peerProbeInterval = int(content)
+		elif self.state == self.IN_PEER_KEEPALIVE_INTERVAL:
+			self.cfgGlobal.peerKeepaliveInterval = int(content)
 		elif self.state == self.IN_USER_BLACKLIST_USER:
 			self.cfgGlobal.userBlackList.append(content)
 		else:
@@ -249,8 +277,9 @@ class _ModuleFileXmlHandler(xml.sax.handler.ContentHandler):
 def _newSnCfgGlobal():
 	"""create new object, set default values"""
 
-	cfgGlobal = SnCfgGlobal()
+	cfgGlobal = _SnCfgGlobal()
 	cfgGlobal.peerProbeInterval = 1
+	cfgGlobal.peerKeepaliveInterval = 1
 	cfgGlobal.userBlackList = []
 	return cfgGlobal
 
@@ -267,7 +296,7 @@ def _newSnCfgModuleInfo(moduleName):
 	"""create new object, set default values"""
 
 	curModuleInfo = SnCfgModuleInfo()
-	curModuleInfo.enable = false
+	curModuleInfo.enable = False
 
 	strList = moduleName.split("-")
 	curModuleInfo.moduleScope = strList[0]
