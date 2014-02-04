@@ -5,10 +5,11 @@ class SnModule:
 
 	##### hidden to subclass ####
 
-	def __init__(self, coreProxy, peerName, userName):
+	def __init__(self, coreProxy, peerName, userName, moduleName):
 		self.core = coreProxy
 		self.peerName = peerName
 		self.userName = userName
+		self.moduleName = moduleName
 
 	##### called by subclass ####
 
@@ -23,7 +24,7 @@ class SnModule:
 		return self.userName
 
 	def getModuleName(self):
-		return self.__module__
+		return self.moduleName
 
 	def send(self, data):
 		self.core._sendToPeer(self.getPeerName(), data)
