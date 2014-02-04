@@ -33,15 +33,10 @@ install:
 	install -d -m 0755 "$(DESTDIR)/etc/dbus-1/system.d"
 	install -m 0644 data/org.fpemud.SelfNet.conf "$(DESTDIR)/etc/dbus-1/system.d"
 
-	install -d -m 0755 "$(DESTDIR)/etc/selfnetd"
-	cp -r cfg/* "$(DESTDIR)/etc/selfnetd"
-	find "$(DESTDIR)/etc/selfnetd" -type f | xargs chmod 644
-	find "$(DESTDIR)/etc/selfnetd" -type d | xargs chmod 755
-
-#	install -d -m 0755 "$(DESTDIR)/etc/xdg/menus"
-#	cp desktop/*.menu "$(DESTDIR)/etc/xdg/menus"
-#	install -d -m 0755 "$(DESTDIR)/$(prefix)/lib/desktop-directories"
-#	cp desktop/*.directory "$(DESTDIR)/$(prefix)/lib/desktop-directories"
+#	install -d -m 0755 "$(DESTDIR)/etc/selfnetd"
+#	cp -r cfg/* "$(DESTDIR)/etc/selfnetd"
+#	find "$(DESTDIR)/etc/selfnetd" -type f | xargs chmod 644
+#	find "$(DESTDIR)/etc/selfnetd" -type d | xargs chmod 755
 
 uninstall:
 	rm -Rf "$(DESTDIR)/$(prefix)/lib/selfnetd"
