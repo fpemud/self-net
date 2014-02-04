@@ -173,7 +173,10 @@ class SnConfigManager:
 
 		# check parse result
 		for m in self.moduleDict:
-			eval("from modules.%s import ModuleObject"%(m))
+			import sys
+			sys.path.append('/usr/lib/selfnetd/modules')
+			from sys_server_distcc import ModuleObject
+			eval("from modules.%s import ModuleObject"%(m.replace("-", "_")))
 
 class _SnCfgGlobal:
 	peerProbeInterval = None		# int, default is "1s"
