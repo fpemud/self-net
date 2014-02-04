@@ -30,6 +30,11 @@ install:
 	find "$(DESTDIR)/$(prefix)/lib/selfnetd" -type f | xargs chmod 644
 	find "$(DESTDIR)/$(prefix)/lib/selfnetd" -type d | xargs chmod 755
 
+	install -d -m 0755 "$(DESTDIR)/$(prefix)/lib/selfnetd/modules"
+	cp -r modules/* "$(DESTDIR)/$(prefix)/lib/selfnetd/modules"
+	find "$(DESTDIR)/$(prefix)/lib/selfnetd/modules" -type f | xargs chmod 644
+	find "$(DESTDIR)/$(prefix)/lib/selfnetd/modules" -type d | xargs chmod 755
+
 	install -d -m 0755 "$(DESTDIR)/etc/dbus-1/system.d"
 	install -m 0644 data/org.fpemud.SelfNet.conf "$(DESTDIR)/etc/dbus-1/system.d"
 
