@@ -1,7 +1,7 @@
 #!/usr/bin/python2
 # -*- coding: utf-8; tab-width: 4; indent-tabs-mode: t -*-
 
-from sn_plugin import SnModule
+from sn_module import SnModule
 
 class ModuleObject(SnModule):
 
