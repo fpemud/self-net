@@ -105,7 +105,7 @@ class SnLocalManager:
 				continue
 			n = SnPeerInfoUser()
 			n.userName = uname
-			ret.userInfoList.append(n)
+			ret.userList.append(n)
 
 		ret.moduleList = []
 		for mname in self.param.configManager.getModuleNameList(None, None):
@@ -113,16 +113,16 @@ class SnLocalManager:
 			if mInfo.enable is not True:
 				continue
 
-			if mInfo.moduleType == "sys":
-				n = SnCfgModuleInfo()
+			if mInfo.moduleScope == "sys":
+				n = SnPeerInfoModule()
 				n.moduleName = mname
 				n.userName = None
 				ret.moduleList.append(n)
-			elif mInfo.moduleType == "usr":
+			elif mInfo.moduleScope == "usr":
 				for uname in pgs.getNormalUserList():
 					if uname in self.param.configManager.getUserBlackList():
 						continue
-					n = SnCfgModuleInfo()
+					n = SnPeerInfoModule()
 					n.moduleName = mname
 					n.userName = uname
 					ret.moduleList.append(n)
