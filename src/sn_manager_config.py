@@ -161,7 +161,7 @@ class SnConfigManager:
 				raise Exception("CA private key file should exist on nexus machine")
 		else:
 			if os.path.exists(self.param.caPrivkeyFile):
-				raise Exception("CA private key file should not exist on nexus machine")
+				raise Exception("CA private key file should not exist on non-nexus machine")
 
 	def _parseModulesFile(self):
 		# set default value
@@ -256,6 +256,7 @@ class _HostFileXmlHandler(xml.sax.handler.ContentHandler):
 			self.state = self.IN_HOST_PORT
 		elif name == "nexus" and self.state == self.IN_HOST:
 			self.state = self.IN_HOST_NEXUS
+			self.curHostInfo.isNexus = True
 		else:
 			raise Exception("Failed to parse hosts file")
 
@@ -277,8 +278,6 @@ class _HostFileXmlHandler(xml.sax.handler.ContentHandler):
 	def characters(self, content):
 		if self.state == self.IN_HOST_PORT:
 			self.curHostInfo.port = int(content)
-		elif self.state == self.IN_HOST_NEXUS:
-			self.curHostInfo.isNexus = True
 		else:
 			pass
 

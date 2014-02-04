@@ -6,7 +6,9 @@ import sys
 import shutil
 import logging
 import tempfile
+import argparse
 from gi.repository import GLib
+
 sys.path.append('/usr/lib/selfnetd')
 import flogging
 from sn_util import SnUtil
@@ -37,7 +39,7 @@ try:
 	param.tmpDir = tempfile.mkdtemp(prefix="selfnetd-")
 
 	# set logging parameter
-	flogging.basicConfig(filename=param.logFile)
+	flogging.init(param.logFile)
 	if parseResult.debug_level is not None:
 		flogging.setLogLevel(parseResult.debug_level.upper())
 

@@ -3,10 +3,12 @@
 
 import logging
 
-def basicConfig(**kwargs):
-	logging.basicConfig(**kwargs)
-	logging.getLogger().setFormatter(_LoggingFormatter())
+def init(logFile):
 	logging.getLogger().setLevel(logging.WARNING)
+
+	fh = logging.FileHandler(logFile)
+	fh.setFormatter(_LoggingFormatter())
+	logging.getLogger().addHandler(fh)
 
 def setLogLevel(levelname):
 	if levelname == "CRITICAL":
