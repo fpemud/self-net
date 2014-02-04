@@ -17,6 +17,7 @@ class SnParam:
 		self.certFile = os.path.join(self.cfgDir, "cert.pem")
 		self.privkeyFile = os.path.join(self.cfgDir, "privkey.pem")
 		self.caCertFile = os.path.join(self.cfgDir, "ca-cert.pem")
+		self.caPrivkeyFile = os.path.join(self.cfgDir, "ca-privkey.pem")
 
 		self.confFile = os.path.join(self.cfgDir, "selfnetd.conf")
 		self.hostsFile = os.path.join(self.cfgDir, "hosts.xml")

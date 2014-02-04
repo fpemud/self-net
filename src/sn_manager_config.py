@@ -1,6 +1,7 @@
 #!/usr/bin/python2
 # -*- coding: utf-8; tab-width: 4; indent-tabs-mode: t -*-
 
+import os
 import xml.sax.handler
 import socket
 import OpenSSL
@@ -28,6 +29,7 @@ class SnCfgSerializationObject:
 
 class SnCfgHostInfo:
 	port = None						# int
+	isNexus = None					# bool
 
 class SnCfgModuleInfo:
 	enable = None					# bool
@@ -147,8 +149,19 @@ class SnConfigManager:
 		# check parse result
 		if "localhost" in self.hostDict:
 			raise Exception("Name \"localhost\" is reserved")
+
 		if socket.gethostname() not in self.hostDict:
 			raise Exception("No name for localhost in hosts file")
+
+		if self.hostDict.values().count(lambda x: x.isNexus) > 1:
+			raise Exception("There should be only zero or one nexus machine")
+
+		if self.hostDict[socket.gethostname()].isNexus:
+			if not os.path.exists(self.param.caPrivkeyFile):
+				raise Exception("CA private key file should exist on nexus machine")
+		else:
+			if os.path.exists(self.param.caPrivkeyFile):
+				raise Exception("CA private key file should not exist on nexus machine")
 
 	def _parseModulesFile(self):
 		# set default value
@@ -223,6 +236,7 @@ class _HostFileXmlHandler(xml.sax.handler.ContentHandler):
 	IN_HOSTS = 1
 	IN_HOST = 2
 	IN_HOST_PORT = 3
+	IN_HOST_NEXUS = 4
 
 	def __init__(self, hostDict):
 		xml.sax.handler.ContentHandler.__init__(self)
@@ -240,6 +254,8 @@ class _HostFileXmlHandler(xml.sax.handler.ContentHandler):
 			self.curHostInfo = _newSnCfgHostInfo()
 		elif name == "port" and self.state == self.IN_HOST:
 			self.state = self.IN_HOST_PORT
+		elif name == "nexus" and self.state == self.IN_HOST:
+			self.state = self.IN_HOST_NEXUS
 		else:
 			raise Exception("Failed to parse hosts file")
 
@@ -253,12 +269,16 @@ class _HostFileXmlHandler(xml.sax.handler.ContentHandler):
 			self.state = self.IN_HOSTS
 		elif name == "port" and self.state == self.IN_HOST_PORT:
 			self.state = self.IN_HOST
+		elif name == "nexus" and self.state == self.IN_HOST_NEXUS:
+			self.state = self.IN_HOST
 		else:
 			raise Exception("Failed to parse hosts file")
 
 	def characters(self, content):
 		if self.state == self.IN_HOST_PORT:
 			self.curHostInfo.port = int(content)
+		elif self.state == self.IN_HOST_NEXUS:
+			self.curHostInfo.isNexus = True
 		else:
 			pass
 
@@ -320,6 +340,7 @@ def _newSnCfgHostInfo():
 
 	curHostInfo = SnCfgHostInfo()
 	curHostInfo.port = 2107
+	curHostInfo.isNexus = False
 	curHostInfo.supportWakeOnLan = False
 	curHostInfo.supportWakeOnWlan = False
 	return curHostInfo
