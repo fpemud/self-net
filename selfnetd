@@ -4,20 +4,42 @@
 import os
 import sys
 import shutil
+import logging
 import tempfile
 from gi.repository import GLib
 sys.path.append('/usr/lib/selfnetd')
+import flogging
 from sn_util import SnUtil
 from sn_param import SnParam
 from sn_manager_config import SnConfigManager
 from sn_manager_local import SnLocalManager
 from sn_manager_peer import SnPeerManager
 
+def parseArgs():
+	argParser = argparse.ArgumentParser()
+
+	argParser.add_argument("-D", dest='daemonize', action="store_false",
+		help="selfnetd will not detach and does not become a daemon when this option is specified")
+
+	argParser.add_argument("-d", "--debug-level", dest='debug_level',
+		choices=['CRITICAL', 'ERROR', 'WARNING', 'INFO', 'DEBUG'], default="WARNING",
+		help="Set output debug message level")
+
+	return argParser.parse_args()
+
+################################################################################
+
+parseResult = parseArgs()
 param = SnParam()
 try:
 	# create directory
 	SnUtil.mkDirAndClear(param.runDir)
 	param.tmpDir = tempfile.mkdtemp(prefix="selfnetd-")
+
+	# set logging parameter
+	flogging.basicConfig(filename=param.logFile)
+	if parseResult.debug_level is not None:
+		flogging.setLogLevel(parseResult.debug_level.upper())
 
 	# create main loop
 	param.mainloop = GLib.MainLoop()
@@ -30,6 +52,7 @@ try:
 	# start main loop
 	param.mainloop.run()
 finally:
+	logging.shutdown()
 	if param.tmpDir is not None and os.path.exists(param.tmpDir):
 		shutil.rmtree(param.tmpDir)
 

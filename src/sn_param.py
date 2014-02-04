@@ -7,12 +7,10 @@ class SnParam:
 
 	def __init__(self):
 		self.cfgDir = "/etc/selfnetd"
-		self.cfgUserDir = ".config/selfnetd"
 		self.libDir = "/usr/lib/selfnetd"
 		self.dataDir = "/usr/share/selfnetd"
 		self.moduleDir = os.path.join(self.libDir, "modules")
 		self.runDir = "/run/selfnetd"
-		self.tmpDir = None
 
 		self.certFile = os.path.join(self.cfgDir, "cert.pem")
 		self.privkeyFile = os.path.join(self.cfgDir, "privkey.pem")
@@ -22,11 +20,16 @@ class SnParam:
 		self.confFile = os.path.join(self.cfgDir, "selfnetd.conf")
 		self.hostsFile = os.path.join(self.cfgDir, "hosts.xml")
 		self.modulesFile = os.path.join(self.cfgDir, "modules.xml") 
-		self.localServerFile = "/run/selfnetd/socket"
 
-		self.mainloop = None
-		self.configManager = None
-		self.localManager = None
-		self.peerManager = None
-		self.moduleManager = None
+		self.pidFile = os.path.join(self.runDir, "selfnetd.pid")
+		self.logFile = os.path.join(self.runDir, "selfnetd.log")
+
+		# to be set
+		self.tmpDir = None				# str
+		self.logLevel = None			# enum
+
+		self.mainloop = None			# obj
+		self.configManager = None		# obj
+		self.localManager = None		# obj
+		self.peerManager = None			# obj
 

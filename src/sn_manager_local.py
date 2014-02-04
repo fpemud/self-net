@@ -4,7 +4,8 @@
 import os
 import socket
 import strict_pgs
-from sn_conn_local import SnLocalServer
+
+import flogging
 from sn_manager_peer import SnPeerInfo
 from sn_manager_peer import SnPeerInfoUser
 from sn_manager_peer import SnPeerInfoModule
@@ -23,7 +24,7 @@ class SnLocalManager:
 	##### event callback ####
 
 	def onPeerChange(self, peerName):
-		"""Called after peer add or peer change"""
+		flogging.functionStart(peerName)
 
 		peerInfo = self.param.peerManager.getPeerInfo(peerName)
 
@@ -37,8 +38,10 @@ class SnLocalManager:
 			if found:
 				continue
 
+			flogging.debug("mo remove start, %s", mk)
 			mo.onInactive()
 			del self.moduleObjDict[mk]
+			flogging.debug("mo remove end")
 
 		# process module add
 		for mio in peerInfo.moduleList:
@@ -53,26 +56,42 @@ class SnLocalManager:
 			if not self.param.configManager.getModuleInfo(newmk.moduleName).enable:
 				continue
 
+			flogging.debug("newmo add start, %s", newmk)
 			eval("from modules.%s import ModuleObject"%(newmk.moduleName))
 			newmo = ModuleObject(self.coreProxy, peerName, newmk.userName)
 			newmo.onActive()
 			self.moduleObjDict[newmk] = newmo
+			flogging.debug("newmo add end")
+
+		flogging.functionEnd()
 
 	def onPeerRemove(self, peerName):
-		"""Called before peer removal"""
+		flogging.functionStart(peerName)
 
 		for mk, mo in self.moduleObjDict.items():
 			if mk.peerName == peerName:
+				flogging.debug("mo remove start, %s", mk)
 				mo.onInactive()
 				del self.moduleObjDict[mk]
+				flogging.debug("mo remove end, %s", mk)
+
+		flogging.functionEnd()
 
 	def onRecv(self, peerName, userName, srcModuleName, data):
+		flogging.functionStart(peerName, userName, srcModuleName)
+
 		mk = _ModuleKey.newByPeer(peerName, userName, srcModuleName)
 		self.moduleObjDict[mk]._onRecv(data)
 
+		flogging.functionEnd()
+
 	def onReject(self, peerName, userName, srcModuleName, rejectMessage):
+		flogging.functionStart(peerName, userName, srcModuleName)
+
 		mk = _ModuleKey.newByPeer(peerName, userName, srcModuleName)
 		self.moduleObjDict[mk]._onReject(rejectMessage)
+
+		flogging.functionEnd()
 
 	##### implementation ####
 
@@ -118,13 +137,13 @@ class _ModuleKey:
 	userName = None			# str
 	moduleName = None		# str
 
-	@staticMethod
+	@staticmethod
 	def newBySelf(peerName, userName, moduleName):
 		self.peerName = peerName
 		self.userName = userName
 		self.moduleName = moduleName
 
-	@staticMethod
+	@staticmethod
 	def newByPeer(peerName, userName, moduleName):
 		self.peerName = peerName
 		self.userName = userName

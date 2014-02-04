@@ -2,7 +2,10 @@
 # -*- coding: utf-8; tab-width: 4; indent-tabs-mode: t -*-
 
 import socket
+from datetime import datetime
 from gi.repository import GObject
+
+import flogging
 from sn_conn_peer import SnPeerServer
 from sn_conn_peer import SnPeerClient
 from sn_manager_config import SnVersion
@@ -130,9 +133,9 @@ class SnPeerManager:
 		self.clientEndPoint = SnPeerClient(self.param.certFile, self.param.privkeyFile, self.param.caCertFile)
 		self.clientEndPoint.setEventFunc("connected", self._onSocketConnected)
 
-		# create peer probe timer
-		GObject.timeout_add_seconds(self.param.configManager.getPeerProbeInterval() * 1000, self._onPeerProbe)
-		GObject.timeout_add_seconds(self.param.configManager.getPeerKeepaliveInterval() * 1000, self._onPeerKeepalive)
+		# create timers
+		self.peerProbeTimer = GObject.timeout_add_seconds(self.param.configManager.getPeerProbeInterval() * 1000, self._onPeerProbe)
+		self.peerKeepaliveTimer = GObject.timeout_add_seconds(self.param.configManager.getPeerKeepaliveInterval() * 1000, self._onPeerKeepalive)
 
 	def getPeerNameList(self):
 		return self.peerInfoDict.keys()
@@ -143,14 +146,18 @@ class SnPeerManager:
 	##### event callback ####
 
 	def _onSocketConnected(self, sock):
+		flogging.functionStart(sock.getPeerName())
+
 		# only peer in self-net is allowed
 		if sock.getPeerName() not in self.peerInfoDict:
 			sock.close()
+			flogging.functionFail("err1")
 			return
 
 		# only one connection between a pair of hosts
 		if self.peerInfoDict[sock.getPeerName()].state != _PeerInfoInternal.STATE_NONE:
 			sock.close()
+			flogging.functionFail("err2")
 			return
 
 		# establish peerSocket
@@ -167,18 +174,27 @@ class SnPeerManager:
 		self.peerInfoDict[sock.getPeerName()].infoObj = None
 		self.peerInfoDict[sock.getPeerName()].sock = sock
 
+		flogging.functionSucc()
+
 	def _onSocketRecv(self, sock, packetObj):
+		flogging.functionStart(sock.getPeerName())
+
 		peerName = sock.getPeerName()
 		if isinstance(packetObj, SnSysPacket):
 			if isinstance(packetObj.data, SnSysPacketKeepalive):
+				flogging.debug("_recvKeepalive, %s", datetime.now())
 				self._recvKeepalive(peerName)
 			elif isinstance(packetObj.data, SnVersion):
+				flogging.debug("_recvVerMatch", packetObj.data.version)
 				self._recvVerMatch(peerName, packetObj.data)
 			elif isinstance(packetObj.data, SnCfgSerializationObject):
+				flogging.debug("_recvCfgMatch")
 				self._recvCfgMatch(peerName, packetObj.data)
 			elif isinstance(packetObj.data, SnPeerInfo):
+				flogging.debug("_recvPeerInfo")
 				self._recvPeerInfo(peerName, packetObj.data)
 			elif isinstance(packetObj.data, SnSysPacketReject):
+				flogging.debug("_recvReject")
 				self._recvReject(peerName, packetObj.data.message)
 			else:
 				self._rejectPeer(peerName, "invalid system packet data format")
@@ -192,21 +208,33 @@ class SnPeerManager:
 		else:
 			self._rejectPeer(peerName, "invalid packet format")
 
+		flogging.functionEnd()
+
 	def _onSocketError(self, sock):
+		flogging.functionStart(sock.getPeerName())
 		self._shutdownPeer(sock.getPeerName())
+		flogging.functionEnd()
 
 	def _onPeerProbe(self):
+		flogging.functionStart(datetime.now())
+
 		for pname, pinfo in self.peerInfoDict.values():
 			if pinfo.state == _PeerInfoInternal.STATE_NONE:
 				self.clientEndPoint.connect(pname, self.param.configManager.getHostInfo(pname).port)
+
+		flogging.functionEnd()
 		return True
 
 	def _onPeerKeepalive(self):
+		flogging.functionStart(datetime.now())
+
 		for pname, pinfo in self.peerInfoDict.values():
 			if pinfo.state not in [_PeerInfoInternal.STATE_NONE, _PeerInfoInternal.STATE_REJECT]:
 				packetObj = SnSysPacket()
 				packetObj.data = SnSysPacketKeepalive()
 				pinfo.sock.send(packetObj)
+
+		flogging.functionEnd()
 		return True
 
 	##### implementation ####
@@ -268,7 +296,7 @@ class SnPeerManager:
 
 	def _recvReject(self, peerName, rejectMessage):
 		# record to log
-		pass
+		flogging.warning("receive reject from peer, %s, %s", peerName, rejectMessage)
 
 		# do notify
 		self.param.localManager.onPeerRemove(peerName)
@@ -281,7 +309,7 @@ class SnPeerManager:
 
 	def _rejectPeer(self, peerName, rejectMessage):
 		# record to log
-		pass
+		flogging.warning("send reject to peer, %s, %s", peerName, rejectMessage)
 
 		# send reject message
 		packetObj = SnSysPacket()
@@ -300,7 +328,7 @@ class SnPeerManager:
 
 	def _shutdownPeer(self, peerName):
 		# record to log
-		pass
+		flogging.warning("shutdown peer, %s", peerName)
 
 		# do notify
 		self.param.localManager.onPeerRemove(peerName)
