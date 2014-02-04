@@ -9,8 +9,6 @@ import grp
 import pwd
 import socket
 import re
-import ssl
-import struct
 
 class SnUtil:
 

@@ -46,9 +46,11 @@ class SnLocalManager:
 
 			if newmk in self.moduleObjDict:
 				continue
+			if newmk.userName in self.param.configManager.getUserBlackList():
+				continue
 			if newmk.moduleName not in self.param.configManager.getModuleNameList():
 				continue
-			if newmk.userName in self.param.configManager.getUserBlackList():
+			if not self.param.configManager.getModuleInfo(newmk.moduleName).enable:
 				continue
 
 			eval("from modules.%s import ModuleObject"%(newmk.moduleName)
@@ -78,6 +80,14 @@ class SnLocalManager:
 		pgs = strict_pgs.PasswdGroupShadow("/")
 		ret = SnPeerInfo()
 
+		ret.userList = []
+		for uname in pgs.getNormalUserList():
+			if uname in self.param.configManager.getUserBlackList():
+				continue
+			n = SnPeerInfoUser()
+			n.userName = uname
+			ret.userInfoList.append(n)
+
 		ret.moduleList = []
 		for mname in self.param.configManager.getModuleNameList(None, None):
 			mInfo = self.param.configManager.getModuleInfo(mname)
@@ -99,14 +109,6 @@ class SnLocalManager:
 					ret.moduleList.append(n)
 			else:
 				assert False
-
-		ret.userList = []
-		for uname in pgs.getNormalUserList():
-			if uname in self.param.configManager.getUserBlackList():
-				continue
-			n = SnPeerInfoUser()
-			n.userName = uname
-			ret.userInfoList.append(n)
 
 		return ret
 

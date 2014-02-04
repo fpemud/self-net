@@ -4,6 +4,27 @@
 import xml.sax.handler
 import socket
 import OpenSSL
+from sn_util import SnUtil
+
+class SnVersion:
+	version = None					# str
+
+	def __eq__(self, other):
+		return isinstance(other, self.__class__) and self.version == other.version
+	def __ne__(self, other):
+		return not self.__eq__(other)
+	def __hash__(self):
+		return hash(self.version)
+
+class SnCfgSerializationObject:
+	strHostsXml = None				# str
+
+	def __eq__(self, other):
+		return isinstance(other, self.__class__) and self.strHostsXml == other.strHostsXml
+	def __ne__(self, other):
+		return not self.__eq__(other)
+	def __hash__(self):
+		return hash(self.strHostsXml)
 
 class SnCfgHostInfo:
 	port = None						# int
@@ -20,9 +41,10 @@ class SnConfigManager:
 		|----privkey.pem						# mode 600
 		|----ca-cert.pem						# mode 644
 		|----ca-privkey.pem						# mode 600, only on the nexus machine
+	    |
+	    |----selfnetd.conf
 	    |----hosts.xml
-	    |----modules.xml
-	    |----selfnetd.conf"""
+	    |----modules.xml"""
 
 	def __init__(self, param):
 		self.param = param
@@ -34,6 +56,16 @@ class SnConfigManager:
 		self._parseConfFile()		# fill self.cfgGlobal
 		self._parseHostsFile()		# fill self.hostDict
 		self._parseModulesFile()	# fill self.moduleDict
+
+	def getVersion(self):
+		ret = SnVersion()
+		ret.version = "1.0.0"
+		return ret
+
+	def getCfgSerializationObject(self):
+		ret = SnCfgSerializationObject()
+		ret.strHostsXml = SnUtil.readFile(self.param.hostsFile)
+		return ret
 
 	def getPeerProbeInterval(self):
 		return self.cfgGlobal.peerProbeInterval
