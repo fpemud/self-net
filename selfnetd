@@ -10,6 +10,7 @@ import argparse
 from gi.repository import GLib
 
 sys.path.append('/usr/lib/selfnetd')
+sys.path.append('/usr/lib/selfnetd/modules')		# fixme
 import flogging
 from sn_util import SnUtil
 from sn_param import SnParam

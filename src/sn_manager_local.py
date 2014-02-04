@@ -57,7 +57,7 @@ class SnLocalManager:
 				continue
 
 			flogging.debug("newmo add start, %s", newmk)
-			eval("from modules.%s import ModuleObject"%(newmk.moduleName.replace("-", "_")))
+			exec("from %s import ModuleObject"%(newmk.moduleName.replace("-", "_")))
 			newmo = ModuleObject(self.coreProxy, peerName, newmk.userName, newmk.moduleName)
 			newmo.onActive()
 			self.moduleObjDict[newmk] = newmo
