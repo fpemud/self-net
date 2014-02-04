@@ -293,7 +293,7 @@ class SnPeerManager:
 		self.param.localManager.onPeerRemove(peerName)
 
 		# remove peer
-		self.peerInfoDict[peerName].sock.close()
+		self.peerInfoDict[peerName].sock.gracefulClose()
 		self.peerInfoDict[peerName].state = _PeerInfoInternal.STATE_REJECT
 		self.peerInfoDict[peerName].infoObj = None
 		self.peerInfoDict[peerName].sock = None

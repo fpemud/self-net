@@ -42,7 +42,7 @@ class SnLocalManager:
 
 		# process module add
 		for mio in peerInfo.moduleList:
-			newmk = _ModuleKey.newByPeer(peerName, mio.userName, mio.moduleName):
+			newmk = _ModuleKey.newByPeer(peerName, mio.userName, mio.moduleName)
 
 			if newmk in self.moduleObjDict:
 				continue
@@ -53,7 +53,7 @@ class SnLocalManager:
 			if not self.param.configManager.getModuleInfo(newmk.moduleName).enable:
 				continue
 
-			eval("from modules.%s import ModuleObject"%(newmk.moduleName)
+			eval("from modules.%s import ModuleObject"%(newmk.moduleName))
 			newmo = ModuleObject(self.coreProxy, peerName, newmk.userName)
 			newmo.onActive()
 			self.moduleObjDict[newmk] = newmo

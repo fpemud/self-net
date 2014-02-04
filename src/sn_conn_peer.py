@@ -1,11 +1,13 @@
 #!/usr/bin/python2
 # -*- coding: utf-8; tab-width: 4; indent-tabs-mode: t -*-
 
-import socket
 import ssl
+import time
+import socket
+import pickle
 import struct
 import threading
-from Queue import PriorityQueue
+from Queue import Queue
 from gi.repository import GLib
 
 class SnPeerServer:
@@ -49,7 +51,7 @@ class SnPeerServer:
 	def _onAccept(self, source, cb_condition):
 		new_sock, addr = self.ssl_sock.accept()
 	
-		peerName = SnPeerSocket._getPeerName(new_sock)
+		peerName = _Util.getPeerName(new_sock)
 		if peerName is None:
 			new_sock.close()
 			return
@@ -73,7 +75,7 @@ class SnPeerClient:
 
 	def connect(self, hostname, port):
 		# run the thread
-		t = _ConnThread(hostname, port)
+		t = _ConnThread(self, hostname, port)
 		t.start()
 
 	def _onIdle(self, ssl_sock):
@@ -85,49 +87,64 @@ class SnPeerSocket:
 	def __init__(self, ssl_sock):
 		self.ssl_sock = ssl_sock
 
-		self.peerName = SnPeerSocket._getPeerName(self.ssl_sock)
+		self.peerName = _Util.getPeerName(self.ssl_sock)
 		assert self.peerName is not None
 
-		self.packetQueue = PriorityQueue()
+		self.packetQueue = Queue()
 		self.sendThread = _SendThread(self)
 		self.isClosing = False
 
-		self.errorFunc = None
 		self.recvFunc = None
+		self.errorFunc = None
 
-	def setEventFunc(self, funcName, *args):
-		elif funcName == "error":
-			assert self.errorFunc is None and func is not None
-			self.errorFunc = func
-			GLib.io_add_watch(self.ssl_sock, GLib.IO_PRI | GLib.IO_ERR | GLib.IO_HUP, self._onError)
-		elif funcName == "recv":
-			assert self.recvFunc is None and func is not None
+	def setEventFunc(self, funcName, func):
+		assert self.ssl_sock is not None and not self.isClosing
+		assert func is not None
+
+		if funcName == "recv":
+			assert self.recvFunc is None
 			self.recvFunc = func
 			GLib.io_add_watch(self.ssl_sock, GLib.IO_IN, self._onRecv)
+		elif funcName == "error":
+			assert self.errorFunc is None
+			self.errorFunc = func
+			GLib.io_add_watch(self.ssl_sock, GLib.IO_PRI | GLib.IO_ERR | GLib.IO_HUP, self._onError)
 		else:
 			assert False
 
 	def getPeerName(self):
+		assert self.ssl_sock is not None and not self.isClosing
 		return self.peerName
 
 	def send(self, dataObj):
-		pri = 1
-		header = struct.pack("!QQI", 0, 0, len(data))
+		assert self.ssl_sock is not None and not self.isClosing
+
+		data = pickle.dumps(dataObj)
+		header = struct.pack("!I", len(data))
 		packet = header + data
-		self.packetQueue.put((pri, packet), True)
+		self.packetQueue.put(packet, True)
+
+	def gracefulClose(self):
+		assert self.ssl_sock is not None and not self.isClosing
+
+		self.isClosing = True
+		self.sendThread.stop(False)
 
 	def close(self):
-		self._doClose()
+		assert self.ssl_sock is not None and not self.isClosing
+
+		self.isClosing = True
+		self.sendThread.stop(True)
 
 	def _onRecv(self):
 		# receive packet header
-		headerLen = struct.calcsize("!QQI")
+		headerLen = struct.calcsize("!I")
 		header = ""
 		while len(header) < headerLen:
 			header += self.ssl_sock.recv(headerLen - len(header))
 
 		# receive packet content
-		srcLabel, dstLabel, dataLen = struct.unpack("!QQI", header)
+		dataLen = struct.unpack("!I", header)
 		data = ""
 		while len(data) < dataLen:
 			data += self.ssl_sock.recv(dataLen - len(data))
@@ -136,42 +153,28 @@ class SnPeerSocket:
 		if self.isClosing:
 			return
 
-		# for system data
-		if dstLabel == 0:
-			self.sysDataRecvFunc(self.ssl_sock, data)
-			return
-
-		# for rejection
-		if dstLabel == 1:
-			self.rejectFunc(self.ssl_sock, data)
-			self._doClose()
-			return
-
-		# for application packet
-		self.recvFunc(self.ssl_sock, srcLabel, dstLabel, header + data)
+		# invoke callback function
+		dataObj = pickle.loads(data)
+		self.recvFunc(self, dataObj)
 
 	def _onError(self):
-		self._doClose()
+		# invoke callback function
+		self.errorFunc(self)
 
-	def _doClose(self):
-		self.isClosing = True
-		self.sendThread.stop()
+	def _onClose(self):
 		self.ssl_sock.close()
 		self.ssl_sock = None
 
+class _Util:
+
 	@staticmethod
-	def _getPeerName(ssl_sock):
+	def getPeerName(ssl_sock):
 		cert = ssl_sock.getpeercert()
 		if cert is not None and "subject" in cert:
 			for item in cert["subject"]:
 				if item[0][0] == "commonName":
 					return item[0][1]
 		return None
-
-	@staticmethod
-	def _getPacket(srcLabel, dstLabel, data):
-		header = struct.pack("!QQI", srcLabel, dstLabel, len(data))
-		return header + data
 
 class _ConnThread(threading.Thread):
 
@@ -183,15 +186,15 @@ class _ConnThread(threading.Thread):
 
 	def run(self):
 		sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)  
-		ssl_sock = ssl.wrap_socket(sock, certfile=self.certFile, keyfile=self.privkeyFile,
-				                   cert_reqs=ssl.CERT_REQUIRED, ca_certs=self.caCertFile,
+		ssl_sock = ssl.wrap_socket(sock, certfile=self.parent.certFile, keyfile=self.parent.privkeyFile,
+				                   cert_reqs=ssl.CERT_REQUIRED, ca_certs=self.parent.caCertFile,
 				                   ssl_version=ssl.PROTOCOL_SSLv3)
 		ret = ssl_sock.connect_ex((self.hostname, self.port))
 		if ret != 0:
 			ssl_sock.close()
 			return
 
-		peerName = SnPeerSocket._getPeerName(ssl_sock)
+		peerName = _Util.getPeerName(ssl_sock)
 		if peerName is None or peerName != self.hostname:
 			ssl_sock.close()
 			return
@@ -204,22 +207,26 @@ class _SendThread(threading.Thread):
 		super(_SendThread, self).__init__()
 		self.parent = parent
 		self.stopFlag = False
+		self.stopImmediateFlag = False
 
-	def stop(self):
+	def stop(self, immediate):
 		"""may bring 50ms delay"""
 		self.stopFlag = True
-		self.parent.packetQueue.put((0xFF, None))		# feed PriorityQueue.get()
-		self.join()
+		self.stopImmediateFlag = immediate
+		self.parent.packetQueue.put(None)		# feed PriorityQueue.get()
 
 	def run(self):
-		while not self.stopFlag:
-			pri, packet = self.parent.packetQueue.get(True)
-			if pri == 0xFF:
-				continue
-			sendLen = 0
+		try:
 			while not self.stopFlag:
-				sendLen += self.parent.ssl_sock.send(packet[sendLen:])
-				if sendLen >= len(packet):
-					break
-				time.sleep(0.05)
+				packet = self.parent.packetQueue.get(True)
+				if packet is None:
+					continue
+				sendLen = 0
+				while not self.stopImmediateFlag:
+					sendLen += self.parent.ssl_sock.send(packet[sendLen:])
+					if sendLen >= len(packet):
+						break
+					time.sleep(0.05)
+		finally:
+			self.parent._onClose()
 
