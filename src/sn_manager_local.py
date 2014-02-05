@@ -102,7 +102,7 @@ class SnLocalManager:
 		ret = SnPeerInfo()
 
 		ret.userList = []
-		for uname in pgs.getNormalUserList():
+		for uname in pgs.getUserList():
 			if uname in self.param.configManager.getUserBlackList():
 				continue
 			n = SnPeerInfoUser()
@@ -121,7 +121,7 @@ class SnLocalManager:
 				n.userName = None
 				ret.moduleList.append(n)
 			elif mInfo.moduleScope == "usr":
-				for uname in pgs.getNormalUserList():
+				for uname in pgs.getUserList():
 					if uname in self.param.configManager.getUserBlackList():
 						continue
 					n = SnPeerInfoModule()
