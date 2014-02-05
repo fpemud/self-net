@@ -21,6 +21,11 @@ class SnLocalManager:
 		logging.debug("SnLocalManager.__init__: End")
 		return
 
+	def dispose(self):
+		logging.debug("SnLocalManager.dispose: Start")
+		logging.debug("SnLocalManager.dispose: End")
+		return
+
 	def getLocalInfo(self):
 		return self.localInfo
 

@@ -68,6 +68,11 @@ class SnConfigManager:
 		logging.debug("SnConfigManager.__init__: End")
 		return
 
+	def dispose(self):
+		logging.debug("SnConfigManager.dispose: Start")
+		logging.debug("SnConfigManager.dispose: End")
+		return
+
 	def getVersion(self):
 		ret = SnVersion()
 		ret.version = "1.0.0"

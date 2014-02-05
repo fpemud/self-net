@@ -11,6 +11,7 @@ class SnParam:
 		self.dataDir = "/usr/share/selfnetd"
 		self.moduleDir = os.path.join(self.libDir, "modules")
 		self.runDir = "/run/selfnetd"
+		self.logDir = "/var/log/selfnetd"
 
 		self.certFile = os.path.join(self.cfgDir, "cert.pem")
 		self.privkeyFile = os.path.join(self.cfgDir, "privkey.pem")
@@ -22,7 +23,7 @@ class SnParam:
 		self.modulesFile = os.path.join(self.cfgDir, "modules.xml") 
 
 		self.pidFile = os.path.join(self.runDir, "selfnetd.pid")
-		self.logFile = os.path.join(self.runDir, "selfnetd.log")
+		self.logFile = os.path.join(self.logDir, "selfnetd.log")
 
 		# to be set
 		self.tmpDir = None				# str

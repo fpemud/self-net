@@ -49,6 +49,9 @@ class SnPeerServer:
 		self.ssl_sock = None
 		self.port = None
 
+	def dispose(self):
+		pass
+
 	def _onAccept(self, source, cb_condition):
 		new_sock, addr = self.ssl_sock.accept()
 	
@@ -66,6 +69,11 @@ class SnPeerClient:
 		self.privkeyFile = privkeyFile
 		self.caCertFile = caCertFile
 		self.connectFunc = None
+		self.threadList = []
+
+	def dispose(self):
+		while len(self.threadList) > 0:
+			time.sleep(0.05)
 
 	def setEventFunc(self, funcName, func):
 		if funcName == "connected":
@@ -75,12 +83,13 @@ class SnPeerClient:
 			assert False
 
 	def connect(self, connectId, hostname, port):
-		# run the thread
 		t = _ConnThread(self, connectId, hostname, port)
+		self.threadList.append(t)			# removes in _ConnThread when error occurs
 		t.start()
 
-	def _onIdle(self, ssl_sock):
+	def _onIdle(self, t, ssl_sock):
 		self.connectFunc(SnPeerSocket(ssl_sock))
+		self.threadList.remove(t)
 		return False
 
 class SnPeerSocket:
@@ -197,14 +206,16 @@ class _ConnThread(threading.Thread):
 		except socket.error, e:
 			logging.debug("connect to peer failed, %d, %s, %s", self.connectId, e.__class__, e)
 			ssl_sock.close()
+			self.parent.threadList.remove(self)
 			return
 
 		peerName = _Util.getPeerName(ssl_sock)
 		if peerName is None or peerName != self.hostname:
 			ssl_sock.close()
+			self.parent.threadList.remove(self)
 			return
 
-		GLib.idle_add(self.parent._onIdle, ssl_sock)
+		GLib.idle_add(self.parent._onIdle, self, ssl_sock)
 
 class _SendThread(threading.Thread):
 

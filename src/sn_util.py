@@ -62,6 +62,12 @@ class SnUtil:
 			SnUtil.shell("/bin/chmod " + mode + " \"" + filename + "\"")
 
 	@staticmethod
+	def mkDir(dirname):
+		if not os.path.isdir(dirname):
+			SnUtil.forceDelete(dirname)
+			os.mkdir(dirname)
+
+	@staticmethod
 	def mkDirAndClear(dirname):
 		SnUtil.forceDelete(dirname)
 		os.mkdir(dirname)

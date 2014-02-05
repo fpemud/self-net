@@ -21,7 +21,7 @@ from sn_manager_peer import SnPeerManager
 def parseArgs():
 	argParser = argparse.ArgumentParser()
 
-	argParser.add_argument("-D", dest='daemonize', action="store_false",
+	argParser.add_argument("-D", dest='daemonize', action="store_false", default=True,
 		help="selfnetd will not detach and does not become a daemon when this option is specified")
 
 	argParser.add_argument("-d", "--debug-level", dest='debug_level',
@@ -33,17 +33,18 @@ def parseArgs():
 ################################################################################
 
 parseResult = parseArgs()
-
-dc = daemon.DaemonContext()
-if parseResult.daemonize:
-	dc.open()
+param = SnParam()
 try:
-	param = SnParam()
-	try:
-		# create directory
-		SnUtil.mkDirAndClear(param.runDir)
-		param.tmpDir = tempfile.mkdtemp(prefix="selfnetd-")
+	# create directory
+	SnUtil.mkDir(param.logDir)
+	SnUtil.mkDirAndClear(param.runDir)
+	param.tmpDir = tempfile.mkdtemp(prefix="selfnetd-")
 
+	# daemonize
+	dc = daemon.DaemonContext(pidfile=param.pidFile)
+	if parseResult.daemonize:
+		dc.open()
+	try:
 		# set logging parameter
 		if parseResult.daemonize:
 			logging.getLogger().addHandler(logging.FileHandler(param.logFile))
@@ -76,8 +77,21 @@ try:
 		# start main loop
 		param.mainloop.run()
 	finally:
+		if param.peerManager is not None:
+			param.peerManager.dispose()
+			param.peerManager = None
+		if param.localManager is not None:
+			param.localManager.dispose()
+			param.localManager = None
+		if param.configManager is not None:
+			param.configManager.dispose()
+			param.configManager = None
 		logging.shutdown()
-		if param.tmpDir is not None and os.path.exists(param.tmpDir):
-			shutil.rmtree(param.tmpDir)
+		dc.close()
 finally:
-	dc.close()
+	# shouldn't remove log directory
+	if param.tmpDir is not None and os.path.exists(param.tmpDir):
+		shutil.rmtree(param.tmpDir)
+	if os.path.exists(param.runDir):
+		shutil.rmtree(param.runDir)
+

@@ -6,6 +6,7 @@ import socket
 import logging
 import time
 from datetime import datetime
+from gi.repository import GLib
 from gi.repository import GObject
 
 from sn_conn_peer import SnPeerServer
@@ -144,6 +145,17 @@ class SnPeerManager:
 		self.peerKeepaliveTimer = GObject.timeout_add_seconds(self.param.configManager.getPeerKeepaliveInterval(), self.onPeerKeepalive)
 
 		logging.debug("SnPeerManager.__init__: End")
+		return
+
+	def dispose(self):
+		logging.debug("SnPeerManager.dispose: Start")
+
+		GLib.source_remove(self.peerKeepaliveTimer)
+		GLib.source_remove(self.peerProbeTimer)
+		self.clientEndPoint.dispose()
+		self.serverEndPoint.dispose()
+
+		logging.debug("SnPeerManager.dispose: End")
 		return
 
 	def getPeerNameList(self):
