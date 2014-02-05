@@ -1,11 +1,9 @@
 #!/usr/bin/python2
 # -*- coding: utf-8; tab-width: 4; indent-tabs-mode: t -*-
 
-import os
-import socket
+import logging
 import strict_pgs
 
-import flogging
 from sn_manager_peer import SnPeerInfo
 from sn_manager_peer import SnPeerInfoUser
 from sn_manager_peer import SnPeerInfoModule
@@ -13,10 +11,15 @@ from sn_manager_peer import SnPeerInfoModule
 class SnLocalManager:
 
 	def __init__(self, param):
+		logging.debug("SnLocalManager.__init__: Start")
+
 		self.param = param
 		self.localInfo = self._getLocalInfo()		# SnPeerInfo
 		self.coreProxy = None
 		self.moduleObjDict = dict()
+
+		logging.debug("SnLocalManager.__init__: End")
+		return
 
 	def getLocalInfo(self):
 		return self.localInfo
@@ -24,7 +27,7 @@ class SnLocalManager:
 	##### event callback ####
 
 	def onPeerChange(self, peerName):
-		flogging.functionStart(peerName)
+		logging.debug("SnLocalManager.onPeerChange: Start, %s", peerName)
 
 		peerInfo = self.param.peerManager.getPeerInfo(peerName)
 
@@ -38,10 +41,10 @@ class SnLocalManager:
 			if found:
 				continue
 
-			flogging.debug("mo remove start, %s", mk)
+			logging.debug("mo remove start, %s", mk)
 			mo.onInactive()
 			del self.moduleObjDict[mk]
-			flogging.debug("mo remove end")
+			logging.debug("mo remove end")
 
 		# process module add
 		for mio in peerInfo.moduleList:
@@ -58,42 +61,46 @@ class SnLocalManager:
 			if not mInfo.enable:
 				continue
 
-			flogging.debug("newmo add start, %s", newmk)
+			logging.debug("newmo add start, %s", newmk)
 			exec("from %s import ModuleInstanceObject"%(newmk.moduleName.replace("-", "_")))
 			newmo = ModuleInstanceObject(self.coreProxy, mInfo.moduleObj, peerName, newmk.userName)
 			newmo.onActive()
 			self.moduleObjDict[newmk] = newmo
-			flogging.debug("newmo add end")
+			logging.debug("newmo add end")
 
-		flogging.functionEnd()
+		logging.debug("SnLocalManager.onPeerChange: End")
+		return
 
 	def onPeerRemove(self, peerName):
-		flogging.functionStart(peerName)
+		logging.debug("SnLocalManager.onPeerRemove: Start, %s", peerName)
 
 		for mk, mo in self.moduleObjDict.items():
 			if mk.peerName == peerName:
-				flogging.debug("mo remove start, %s", mk)
+				logging.debug("mo remove start, %s", mk)
 				mo.onInactive()
 				del self.moduleObjDict[mk]
-				flogging.debug("mo remove end, %s", mk)
+				logging.debug("mo remove end, %s", mk)
 
-		flogging.functionEnd()
+		logging.debug("SnLocalManager.onPeerRemove: End")
+		return
 
 	def onRecv(self, peerName, userName, srcModuleName, data):
-		flogging.functionStart(peerName, userName, srcModuleName)
+		logging.debug("SnLocalManager.onRecv: Start, %s, %s, %s", peerName, userName, srcModuleName)
 
 		mk = _ModuleKey.newByPeer(peerName, userName, srcModuleName)
 		self.moduleObjDict[mk]._onRecv(data)
 
-		flogging.functionEnd()
+		logging.debug("SnLocalManager.onRecv: End")
+		return
 
 	def onReject(self, peerName, userName, srcModuleName, rejectMessage):
-		flogging.functionStart(peerName, userName, srcModuleName)
+		logging.debug("SnLocalManager.onReject: Start, %s, %s, %s", peerName, userName, srcModuleName)
 
 		mk = _ModuleKey.newByPeer(peerName, userName, srcModuleName)
 		self.moduleObjDict[mk]._onReject(rejectMessage)
 
-		flogging.functionEnd()
+		logging.debug("SnLocalManager.onReject: End")
+		return
 
 	##### implementation ####
 

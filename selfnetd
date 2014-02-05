@@ -4,15 +4,14 @@
 import os
 import sys
 import shutil
-import logging
 import tempfile
 import argparse
 import daemon
+import logging
 from gi.repository import GLib
 
 sys.path.append('/usr/lib/selfnetd')
 sys.path.append('/usr/lib/selfnetd/modules')		# fixme
-import flogging
 from sn_util import SnUtil
 from sn_param import SnParam
 from sn_manager_config import SnConfigManager
@@ -33,8 +32,12 @@ def parseArgs():
 
 ################################################################################
 
-with daemon.DaemonContext():
-	parseResult = parseArgs()
+parseResult = parseArgs()
+
+dc = daemon.DaemonContext()
+if parseResult.daemonize:
+	dc.open()
+try:
 	param = SnParam()
 	try:
 		# create directory
@@ -42,14 +45,30 @@ with daemon.DaemonContext():
 		param.tmpDir = tempfile.mkdtemp(prefix="selfnetd-")
 
 		# set logging parameter
-		flogging.init(param.logFile)
+		if parseResult.daemonize:
+			logging.getLogger().addHandler(logging.FileHandler(param.logFile))
+		else:
+			logging.getLogger().addHandler(logging.StreamHandler(sys.stderr))
+
 		if parseResult.debug_level is not None:
-			flogging.setLogLevel(parseResult.debug_level.upper())
+			if parseResult.debug_level == "CRITICAL":
+				logLevel = logging.CRITICAL
+			elif parseResult.debug_level == "ERROR":
+				logLevel = logging.ERROR
+			elif parseResult.debug_level == "WARNING":
+				logLevel = logging.WARNING
+			elif parseResult.debug_level == "INFO":
+				logLevel = logging.INFO
+			elif parseResult.debug_level == "DEBUG":
+				logLevel = logging.DEBUG
+			else:
+				assert False
+			logging.getLogger().setLevel(logLevel)
 
 		# create main loop
 		param.mainloop = GLib.MainLoop()
 
-		# create config manager / peer manager
+		# create managers
 		param.configManager = SnConfigManager(param)
 		param.localManager = SnLocalManager(param)
 		param.peerManager = SnPeerManager(param)
@@ -57,7 +76,8 @@ with daemon.DaemonContext():
 		# start main loop
 		param.mainloop.run()
 	finally:
-		logging.shutdown()
+		flogging.shutdown()
 		if param.tmpDir is not None and os.path.exists(param.tmpDir):
 			shutil.rmtree(param.tmpDir)
-
+finally:
+	dc.close()

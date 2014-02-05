@@ -3,9 +3,11 @@
 
 import os
 import re
+import logging
 import xml.sax.handler
 import socket
 import OpenSSL
+
 from sn_util import SnUtil
 
 class SnVersion:
@@ -51,6 +53,8 @@ class SnConfigManager:
 	    |----modules.xml"""
 
 	def __init__(self, param):
+		logging.debug("SnConfigManager.__init__: Start")
+
 		self.param = param
 		self.cfgGlobal = None
 		self.hostDict = None
@@ -60,6 +64,9 @@ class SnConfigManager:
 		self._parseConfFile()		# fill self.cfgGlobal
 		self._parseHostsFile()		# fill self.hostDict
 		self._parseModulesFile()	# fill self.moduleDict
+
+		logging.debug("SnConfigManager.__init__: End")
+		return
 
 	def getVersion(self):
 		ret = SnVersion()
