@@ -2,6 +2,7 @@
 # -*- coding: utf-8; tab-width: 4; indent-tabs-mode: t -*-
 
 from sn_module import SnModule
+from sn_module import SnModuleInstance
 
 class ModuleObject(SnModule):
 
