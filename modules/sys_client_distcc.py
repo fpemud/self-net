@@ -5,6 +5,16 @@ from sn_module import SnModule
 
 class ModuleObject(SnModule):
 
+	def getModuleName(self):
+		return "sys-client-distcc"
+
+	def getProperty(self, propertyName):
+		if propertyName == "allow-local-peer":
+			return True
+		return None
+
+class ModuleInstanceObject(SnModuleInstance):
+
 	def onActive(self):
 		"""ignore this event"""
 		return

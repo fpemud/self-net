@@ -53,12 +53,14 @@ class SnLocalManager:
 				continue
 			if newmk.moduleName not in self.param.configManager.getModuleNameList():
 				continue
-			if not self.param.configManager.getModuleInfo(newmk.moduleName).enable:
+
+			mInfo = self.param.configManager.getModuleInfo(newmk.moduleName)
+			if not mInfo.enable:
 				continue
 
 			flogging.debug("newmo add start, %s", newmk)
-			exec("from %s import ModuleObject"%(newmk.moduleName.replace("-", "_")))
-			newmo = ModuleObject(self.coreProxy, peerName, newmk.userName, newmk.moduleName)
+			exec("from %s import ModuleInstanceObject"%(newmk.moduleName.replace("-", "_")))
+			newmo = ModuleInstanceObject(self.coreProxy, mInfo.moduleObj, peerName, newmk.userName)
 			newmo.onActive()
 			self.moduleObjDict[newmk] = newmo
 			flogging.debug("newmo add end")

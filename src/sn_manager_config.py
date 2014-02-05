@@ -36,6 +36,7 @@ class SnCfgModuleInfo:
 	moduleScope = None				# str
 	moduleType = None				# str
 	moduleId = None					# str
+	moduleObj = None				# obj, SnModule
 
 class SnConfigManager:
 	"""/etc/selfnetd
@@ -171,9 +172,35 @@ class SnConfigManager:
 		h = _ModuleFileXmlHandler(self. moduleDict)
 		xml.sax.parse(self.param.modulesFile, h)
 
-		# check parse result
+		# post process
 		for m in self.moduleDict:
+			# check parse result
+			strList = m.split("-")
+			if len(strList) < 3:
+				raise Exception("Invalid module name \"%s\""%(m))
+
+			moduleScope = strList[0]
+			moduleType = strList[1]
+			moduleId = "-".join(strList[2:])
+			if curModuleInfo.moduleScope not in ["sys", "usr"]:
+				raise Exception("Invalid module scope for module name \"%s\""%(m))
+			if curModuleInfo.moduleType not in ["server", "client", "peer"]:
+				raise Exception("Invalid module type for module name \"%s\""%(m))
+			if len(curModuleInfo.moduleId) > 32:
+				raise Exception("Module id is too long for module name \"%s\""%(m))
+			if re.match("[A-Za-z0-9_]+", curModuleInfo.moduleId) is None:
+				raise Exception("Invalid module id for module name \"%s\""%(m))
+
 			exec("from %s import ModuleObject"%(m.replace("-", "_")))
+			moduleObj = ModuleObject()
+			if m != curModuleInfo.moduleObj.getModuleName():
+				raise Exception("Module \"%s\" does not exists"%(m))
+
+			# fill SnCfgModuleInfo object
+			self.moduleDict[m].moduleScope = moduleScope
+			self.moduleDict[m].moduleType = moduleType
+			self.moduleDict[m].moduleId = moduleId
+			self.moduleDict[m].moduleObj = moduleObj
 
 class _SnCfgGlobal:
 	peerProbeInterval = None		# int, default is "1s"
@@ -344,16 +371,10 @@ def _newSnCfgHostInfo():
 	curHostInfo.supportWakeOnWlan = False
 	return curHostInfo
 
-def _newSnCfgModuleInfo(moduleName):
+def _newSnCfgModuleInfo():
 	"""create new object, set default values"""
 
 	curModuleInfo = SnCfgModuleInfo()
 	curModuleInfo.enable = False
-
-	strList = moduleName.split("-")
-	curModuleInfo.moduleScope = strList[0]
-	curModuleInfo.moduleType = strList[1]
-	curModuleInfo.moduleId = strList[2]
-
 	return curModuleInfo
 
