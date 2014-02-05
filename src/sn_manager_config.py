@@ -2,6 +2,7 @@
 # -*- coding: utf-8; tab-width: 4; indent-tabs-mode: t -*-
 
 import os
+import re
 import xml.sax.handler
 import socket
 import OpenSSL
@@ -182,18 +183,18 @@ class SnConfigManager:
 			moduleScope = strList[0]
 			moduleType = strList[1]
 			moduleId = "-".join(strList[2:])
-			if curModuleInfo.moduleScope not in ["sys", "usr"]:
+			if moduleScope not in ["sys", "usr"]:
 				raise Exception("Invalid module scope for module name \"%s\""%(m))
-			if curModuleInfo.moduleType not in ["server", "client", "peer"]:
+			if moduleType not in ["server", "client", "peer"]:
 				raise Exception("Invalid module type for module name \"%s\""%(m))
-			if len(curModuleInfo.moduleId) > 32:
+			if len(moduleId) > 32:
 				raise Exception("Module id is too long for module name \"%s\""%(m))
-			if re.match("[A-Za-z0-9_]+", curModuleInfo.moduleId) is None:
+			if re.match("[A-Za-z0-9_]+", moduleId) is None:
 				raise Exception("Invalid module id for module name \"%s\""%(m))
 
 			exec("from %s import ModuleObject"%(m.replace("-", "_")))
 			moduleObj = ModuleObject()
-			if m != curModuleInfo.moduleObj.getModuleName():
+			if m != moduleObj.getModuleName():
 				raise Exception("Module \"%s\" does not exists"%(m))
 
 			# fill SnCfgModuleInfo object
@@ -327,7 +328,7 @@ class _ModuleFileXmlHandler(xml.sax.handler.ContentHandler):
 		elif name == "module" and self.state == self.IN_MODULES:
 			self.state = self.IN_MODULE
 			self.curModuleName = attrs["name"]
-			self.curModuleInfo = _newSnCfgModuleInfo(self.curModuleName)
+			self.curModuleInfo = _newSnCfgModuleInfo()
 		elif name == "enable" and self.state == self.IN_MODULE:
 			self.state = self.IN_MODULE_ENABLE
 		else:

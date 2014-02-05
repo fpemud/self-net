@@ -1,6 +1,7 @@
 #!/usr/bin/python2
 # -*- coding: utf-8; tab-width: 4; indent-tabs-mode: t -*-
 
+import re
 import socket
 from datetime import datetime
 from gi.repository import GObject
@@ -283,9 +284,34 @@ class SnPeerManager:
 		if len(peerInfo.userList) != len(set(peerInfo.userList)):
 			self._rejectPeer(peerName, "duplicate element in peer user list")
 			return
+
 		if len(peerInfo.moduleList) != len(set(peerInfo.moduleList)):
 			self._rejectPeer(peerName, "duplicate element in peer module list")
 			return
+
+		for m in peerInfo.moduleList:
+			strList = m.split("-")
+			if len(strList) < 3:
+				self._rejectPeer(peerName, "invalid module name \"%s\""%(m))
+				return
+
+			moduleScope = strList[0]
+			if moduleScope not in ["sys", "usr"]:
+				self._rejectPeer(peerName, "invalid module scope for module name \"%s\""%(m))
+				return
+
+			moduleType = strList[1]
+			if moduleType not in ["server", "client", "peer"]:
+				self._rejectPeer(peerName, "invalid module type for module name \"%s\""%(m))
+				return
+
+			moduleId = "-".join(strList[2:])
+			if len(moduleId) > 32:
+				self._rejectPeer(peerName, "module id is too long for module name \"%s\""%(m))
+				return
+			if re.match("[A-Za-z0-9_]+", moduleId) is None:
+				self._rejectPeer(peerName, "invalid module id for module name \"%s\""%(m))
+				return
 
 		# do operation
 		self.peerInfoDict[peerName].state = _PeerInfoInternal.STATE_FULL

@@ -141,26 +141,27 @@ class _ModuleKey:
 
 	@staticmethod
 	def newBySelf(peerName, userName, moduleName):
-		self.peerName = peerName
-		self.userName = userName
-		self.moduleName = moduleName
+		ret = _ModuleKey()
+		ret.peerName = peerName
+		ret.userName = userName
+		ret.moduleName = moduleName
+		return ret
 
 	@staticmethod
 	def newByPeer(peerName, userName, moduleName):
-		self.peerName = peerName
-		self.userName = userName
+		ret = _ModuleKey()
+
+		ret.peerName = peerName
+		ret.userName = userName
 
 		strList = moduleName.split("-")
-		assert len(strList) == 3
-
 		if strList[1] == "server":
 			strList[1] = "client"
 		elif strList[1] == "client":
 			strList[1] = "server"
-		else:
-			assert False
+		ret.moduleName = "-".join(strList)
 
-		self.moduleName = "-".join(strList)
+		return ret
 
 	def __eq__(self, other):
 		return (isinstance(other, self.__class__)
