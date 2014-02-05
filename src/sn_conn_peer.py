@@ -7,6 +7,7 @@ import socket
 import pickle
 import struct
 import threading
+import logging
 from Queue import Queue
 from gi.repository import GLib
 
@@ -73,9 +74,9 @@ class SnPeerClient:
 		else:
 			assert False
 
-	def connect(self, hostname, port):
+	def connect(self, connectId, hostname, port):
 		# run the thread
-		t = _ConnThread(self, hostname, port)
+		t = _ConnThread(self, connectId, hostname, port)
 		t.start()
 
 	def _onIdle(self, ssl_sock):
@@ -178,9 +179,10 @@ class _Util:
 
 class _ConnThread(threading.Thread):
 
-	def __init__(self, parent, hostname, port):
+	def __init__(self, parent, connectId, hostname, port):
 		super(_ConnThread, self).__init__()
 		self.parent = parent
+		self.connectId = connectId		# for logging
 		self.hostname = hostname
 		self.port = port
 
@@ -189,8 +191,11 @@ class _ConnThread(threading.Thread):
 		ssl_sock = ssl.wrap_socket(sock, certfile=self.parent.certFile, keyfile=self.parent.privkeyFile,
 				                   cert_reqs=ssl.CERT_REQUIRED, ca_certs=self.parent.caCertFile,
 				                   ssl_version=ssl.PROTOCOL_SSLv3)
-		ret = ssl_sock.connect_ex((self.hostname, self.port))
-		if ret != 0:
+
+		try:
+			ssl_sock.connect((self.hostname, self.port))
+		except socket.error, e:
+			logging.debug("connect to peer failed, %d, %s, %s", self.connectId, e.__class__, e)
 			ssl_sock.close()
 			return
 

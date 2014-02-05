@@ -4,6 +4,7 @@
 import re
 import socket
 import logging
+import time
 from datetime import datetime
 from gi.repository import GObject
 
@@ -227,11 +228,12 @@ class SnPeerManager:
 		return
 
 	def onPeerProbe(self):
-		logging.debug("SnPeerManager.onPeerProbe: Start, %s", datetime.now())
+		connectId = time.time()
+		logging.debug("SnPeerManager.onPeerProbe: Start, %s, %d", datetime.now(), connectId)
 
 		for pname, pinfo in self.peerInfoDict.items():
 			if pinfo.state == _PeerInfoInternal.STATE_NONE:
-				self.clientEndPoint.connect(pname, self.param.configManager.getHostInfo(pname).port)
+				self.clientEndPoint.connect(connectId, pname, self.param.configManager.getHostInfo(pname).port)
 
 		logging.debug("SnPeerManager.onPeerProbe: End")
 		return True

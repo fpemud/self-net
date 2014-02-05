@@ -76,7 +76,7 @@ try:
 		# start main loop
 		param.mainloop.run()
 	finally:
-		flogging.shutdown()
+		logging.shutdown()
 		if param.tmpDir is not None and os.path.exists(param.tmpDir):
 			shutil.rmtree(param.tmpDir)
 finally:
