@@ -204,7 +204,7 @@ class _ConnThread(threading.Thread):
 		try:
 			ssl_sock.connect((self.hostname, self.port))
 		except socket.error, e:
-			logging.debug("connect to peer failed, %d, %s, %s", self.connectId, e.__class__, e)
+			logging.debug("connect to peer failed, %d, %s, %d, %s, %s", self.connectId, self.hostname, self.port, e.__class__, e)
 			ssl_sock.close()
 			self.parent.threadList.remove(self)
 			return
