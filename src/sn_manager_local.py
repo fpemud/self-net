@@ -94,7 +94,7 @@ class SnLocalManager:
 		logging.debug("SnLocalManager.onRecv: Start, %s, %s, %s", peerName, userName, srcModuleName)
 
 		mk = _ModuleKey.newByPeer(peerName, userName, srcModuleName)
-		self.moduleObjDict[mk]._onRecv(data)
+		self.moduleObjDict[mk].onRecv(data)
 
 		logging.debug("SnLocalManager.onRecv: End")
 		return
@@ -103,7 +103,7 @@ class SnLocalManager:
 		logging.debug("SnLocalManager.onReject: Start, %s, %s, %s", peerName, userName, srcModuleName)
 
 		mk = _ModuleKey.newByPeer(peerName, userName, srcModuleName)
-		self.moduleObjDict[mk]._onReject(rejectMessage)
+		self.moduleObjDict[mk].onReject(rejectMessage)
 
 		logging.debug("SnLocalManager.onReject: End")
 		return

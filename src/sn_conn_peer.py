@@ -53,6 +53,8 @@ class SnPeerServer:
 		pass
 
 	def _onAccept(self, source, cb_condition):
+		assert source == self.ssl_sock
+
 		try:
 			new_sock, addr = self.ssl_sock.accept()
 		except (socket.error, ssl.SSLError) as e:
@@ -150,7 +152,9 @@ class SnPeerSocket:
 		self.isClosing = True
 		self.sendThread.stop(True)
 
-	def _onRecv(self):
+	def _onRecv(self, source, cb_condition):
+		assert source == self.ssl_sock
+
 		# receive packet header
 		headerLen = struct.calcsize("!I")
 		header = ""
@@ -171,7 +175,9 @@ class SnPeerSocket:
 		dataObj = pickle.loads(data)
 		self.recvFunc(self, dataObj)
 
-	def _onError(self):
+	def _onError(self, source, cb_condition):
+		assert source == self.ssl_sock
+
 		# invoke callback function
 		self.errorFunc(self)
 
