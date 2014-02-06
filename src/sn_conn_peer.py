@@ -53,8 +53,12 @@ class SnPeerServer:
 		pass
 
 	def _onAccept(self, source, cb_condition):
-		new_sock, addr = self.ssl_sock.accept()
-	
+		try:
+			new_sock, addr = self.ssl_sock.accept()
+		except (socket.error, ssl.SSLError) as e:
+			logging.debug("peer accept failed, %s, %s", e.__class__, e)
+			return
+
 		peerName = _Util.getPeerName(new_sock)
 		if peerName is None:
 			new_sock.close()
@@ -204,7 +208,7 @@ class _ConnThread(threading.Thread):
 		try:
 			ssl_sock.connect((self.hostname, self.port))
 		except (socket.error, ssl.SSLError) as e:
-			logging.debug("connect to peer failed, %d, %s, %d, %s, %s", self.connectId, self.hostname, self.port, e.__class__, e)
+			logging.debug("peer connect failed, %d, %s, %d, %s, %s", self.connectId, self.hostname, self.port, e.__class__, e)
 			ssl_sock.close()
 			self.parent.threadList.remove(self)
 			return

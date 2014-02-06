@@ -16,6 +16,9 @@ class ModuleObject(SnModule):
 
 class ModuleInstanceObject(SnModuleInstance):
 
+	def onInit(self):
+		return
+
 	def onActive(self):
 		"""ignore this event"""
 		return

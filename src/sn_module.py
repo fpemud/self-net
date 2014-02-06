@@ -55,6 +55,10 @@ class SnModuleInstance:
 
 	##### provide to core only ####
 
+	def onInit(self):
+		"""Called after the module instance object is created"""
+		assert False			# implement by subclass
+
 	def onActive(self):
 		"""Called after the peer changes to active state"""
 		assert False			# implement by subclass

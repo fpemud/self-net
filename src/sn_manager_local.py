@@ -69,6 +69,7 @@ class SnLocalManager:
 			logging.debug("newmo add start, %s", newmk)
 			exec("from %s import ModuleInstanceObject"%(newmk.moduleName.replace("-", "_")))
 			newmo = ModuleInstanceObject(self.coreProxy, mInfo.moduleObj, peerName, newmk.userName)
+			newmo.onInit()
 			newmo.onActive()
 			self.moduleObjDict[newmk] = newmo
 			logging.debug("newmo add end")
