@@ -67,6 +67,7 @@ class SnPeerServer:
 			new_sock.close()
 			return
 
+		new_sock.setblocking(0)
 		self.acceptFunc(SnPeerSocket(new_sock))
 
 class SnPeerClient:
@@ -82,8 +83,8 @@ class SnPeerClient:
 		self.sockDict = dict()
 
 	def dispose(self):
-		for ssl_sock in self.sockDict:
-			ssl_sock.close()
+		for sock in self.sockDict:
+			sock.close()
 		self.sockDict.clear()
 		self.connectFunc = None
 
@@ -135,6 +136,7 @@ class SnPeerClient:
 										                     cert_reqs=ssl.CERT_REQUIRED, ca_certs=self.caCertFile,
 										                     do_handshake_on_connect=False, ssl_version=ssl.PROTOCOL_SSLv3)
 			ssl_sock = self.sockDict[source].ssl_sock
+			print "*********** good, %s"%(source.getpeername())
 
 		# do handshake
 		if (((cb_condition & GLib.IO_OUT) != 0 and info.state == _SockConnInfo.HANDSHAKE_WANT_WRITE)
