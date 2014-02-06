@@ -188,7 +188,7 @@ class SnPeerManager:
 		# send localInfo
 		sock.send(self.param.configManager.getVersion())
 		sock.send(self.param.configManager.getCfgSerializationObject())
-		sock.send(self.param.serviceManager.getLocalInfo())
+		sock.send(self.param.localManager.getLocalInfo())
 
 		# record sock
 		self.peerInfoDict[sock.getPeerName()].state = _PeerInfoInternal.STATE_INIT
