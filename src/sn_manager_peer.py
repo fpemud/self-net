@@ -204,19 +204,19 @@ class SnPeerManager:
 		peerName = sock.getPeerName()
 		if isinstance(packetObj, SnSysPacket):
 			if isinstance(packetObj.data, SnSysPacketKeepalive):
-				logging.debug("_recvKeepalive, %s", datetime.now())
+				logging.debug("SnPeerManager.onSocketRecv: _recvKeepalive, %s", datetime.now())
 				self._recvKeepalive(peerName)
 			elif isinstance(packetObj.data, SnVersion):
-				logging.debug("_recvVerMatch", packetObj.data.version)
+				logging.debug("SnPeerManager.onSocketRecv: _recvVerMatch, %s", packetObj.data.version)
 				self._recvVerMatch(peerName, packetObj.data)
 			elif isinstance(packetObj.data, SnCfgSerializationObject):
-				logging.debug("_recvCfgMatch")
+				logging.debug("SnPeerManager.onSocketRecv: _recvCfgMatch")
 				self._recvCfgMatch(peerName, packetObj.data)
 			elif isinstance(packetObj.data, SnPeerInfo):
-				logging.debug("_recvPeerInfo")
+				logging.debug("SnPeerManager.onSocketRecv: _recvPeerInfo")
 				self._recvPeerInfo(peerName, packetObj.data)
 			elif isinstance(packetObj.data, SnSysPacketReject):
-				logging.debug("_recvReject")
+				logging.debug("SnPeerManager.onSocketRecv: _recvReject")
 				self._recvReject(peerName, packetObj.data.message)
 			else:
 				self._rejectPeer(peerName, "invalid system packet data format")

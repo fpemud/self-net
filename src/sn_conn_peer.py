@@ -1,9 +1,10 @@
 #!/usr/bin/python2
 # -*- coding: utf-8; tab-width: 4; indent-tabs-mode: t -*-
 
+import socket
+import errno
 import ssl
 import time
-import socket
 import pickle
 import struct
 import threading
@@ -71,15 +72,20 @@ class SnPeerServer:
 class SnPeerClient:
 
 	def __init__(self, certFile, privkeyFile, caCertFile):
+		self.flagFull = GLib.IO_IN | GLib.IO_OUT | GLib.IO_PRI | GLib.IO_ERR | GLib.IO_HUP | GLib.IO_NVAL
+		self.flagError = GLib.IO_PRI | GLib.IO_ERR | GLib.IO_HUP | GLib.IO_NVAL
+
 		self.certFile = certFile
 		self.privkeyFile = privkeyFile
 		self.caCertFile = caCertFile
 		self.connectFunc = None
-		self.threadList = []
+		self.sockDict = dict()
 
 	def dispose(self):
-		while len(self.threadList) > 0:
-			time.sleep(0.05)
+		for ssl_sock in self.sockDict:
+			ssl_sock.close()
+		self.sockDict.clear()
+		self.connectFunc = None
 
 	def setEventFunc(self, funcName, func):
 		if funcName == "connected":
@@ -89,29 +95,100 @@ class SnPeerClient:
 			assert False
 
 	def connect(self, connectId, hostname, port):
-		t = _ConnThread(self, connectId, hostname, port)
-		self.threadList.append(t)			# removes in _ConnThread when error occurs
-		t.start()
+		sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+		sock.setblocking(0)
 
-	def _onIdle(self, t, ssl_sock):
+		try:
+			# ssl.SSLSocket.connect has bug when socket is non-blocking, so ssl.wrap_socket() must be after socket.connect()
+			sock.connect((hostname, port))
+		except socket.error as e:
+			if e.errno == errno.EAGAIN or e.errno == errno.EINPROGRESS:
+				pass
+			else:
+				logging.debug("peer connect failed, %d, %s, %d, %s, %s", connectId, hostname, port, e.__class__, e)
+				sock.close()
+				return
+
+		info = _SockConnInfo()
+		info.connectId = connectId
+		info.hostname = hostname
+		info.port = port
+		info.state = _SockConnInfo.HANDSHAKE_NONE
+		info.sourceId = GLib.io_add_watch(sock, self.flagFull, self._onEvent)
+		info.ssl_sock = None
+		self.sockDict[sock] = info
+
+	def _onEvent(self, source, cb_condition):
+		info = self.sockDict[source]
+		ssl_sock = self.sockDict[source].ssl_sock
+
+		# check error
+		if (cb_condition & self.flagError) != 0:
+			logging.debug("peer connect failed, %d, %s, %d, 0x%x", info.connectId, info.hostname, info.port, (cb_condition & self.flagError))
+			self._removeSock(source)
+			return
+
+		# wrap socket
+		if (cb_condition & GLib.IO_OUT) != 0 and info.state == _SockConnInfo.HANDSHAKE_NONE:
+			self.sockDict[source].state = _SockConnInfo.HANDSHAKE_WANT_WRITE
+			self.sockDict[source].ssl_sock = ssl.wrap_socket(source, certfile=self.certFile, keyfile=self.privkeyFile,
+										                     cert_reqs=ssl.CERT_REQUIRED, ca_certs=self.caCertFile,
+										                     do_handshake_on_connect=False, ssl_version=ssl.PROTOCOL_SSLv3)
+			ssl_sock = self.sockDict[source].ssl_sock
+
+		# do handshake
+		if (((cb_condition & GLib.IO_OUT) != 0 and info.state == _SockConnInfo.HANDSHAKE_WANT_WRITE)
+				or ((cb_condition & GLib.IO_IN) != 0 and info.state == _SockConnInfo.HANDSHAKE_WANT_READ)):
+			try:
+				ssl_sock.do_handshake()
+				self.sockDict[source].state = _SockConnInfo.HANDSHAKE_COMPLETE
+			except ssl.SSLError as e:
+				if e.args[0] == ssl.SSL_ERROR_WANT_READ:
+					self.sockDict[source].state = _SockConnInfo.HANDSHAKE_WANT_READ
+					return
+				elif e.args[0] == ssl.SSL_ERROR_WANT_WRITE:
+					self.sockDict[source].state = _SockConnInfo.HANDSHAKE_WANT_WRITE
+					return
+				else:
+					logging.debug("peer connect failed, %d, %s, %d, %s, %s", info.connectId, info.hostname, info.port, e.__class__, e)
+					self._removeSock(source)
+					return
+
+		# check peer name
+		peerName = _Util.getPeerName(source)
+		if peerName is None or peerName != info.hostname:
+			logging.debug("peer connect failed, %d, %s, %d, %s", info.connectId, info.hostname, info.port, "inconsistent peer name")
+			self._removeSock(source)
+			return
+
+		# transfer to SnPeerSocket
+		logging.debug("peer connect success, %d, %s, %d", info.connectId, info.hostname, info.port)
+		GLib.source_remove(self.sockDict[source].sourceId)
+		del self.sockDict[source]
 		self.connectFunc(SnPeerSocket(ssl_sock))
-		self.threadList.remove(t)
-		return False
+
+	def _removeSock(self, source):
+		GLib.source_remove(self.sockDict[source].sourceId)
+		del self.sockDict[source]
+		source.close()
 
 class SnPeerSocket:
 
 	def __init__(self, ssl_sock):
+		self.flagFull = GLib.IO_IN | GLib.IO_OUT | GLib.IO_PRI | GLib.IO_ERR | GLib.IO_HUP | GLib.IO_NVAL
+		self.flagError = GLib.IO_PRI | GLib.IO_ERR | GLib.IO_HUP | GLib.IO_NVAL
+
 		self.ssl_sock = ssl_sock
-
 		self.peerName = _Util.getPeerName(self.ssl_sock)
-		assert self.peerName is not None
-
-		self.packetQueue = Queue()
-		self.sendThread = _SendThread(self)
 		self.isClosing = False
-
 		self.recvFunc = None
 		self.errorFunc = None
+
+		self.sendBuffer = ""
+		self.recvBuffer = ""
+		self.sendSourceId = GLib.io_add_watch(self.ssl_sock, GLib.IO_OUT, self._onSend)
+		self.recvSourceId = None
+		self.errorSourceId = None
 
 	def setEventFunc(self, funcName, func):
 		assert self.ssl_sock is not None and not self.isClosing
@@ -120,11 +197,11 @@ class SnPeerSocket:
 		if funcName == "recv":
 			assert self.recvFunc is None
 			self.recvFunc = func
-			GLib.io_add_watch(self.ssl_sock, GLib.IO_IN, self._onRecv)
+			self.recvSourceId = GLib.io_add_watch(self.ssl_sock, GLib.IO_IN, self._onRecv)
 		elif funcName == "error":
 			assert self.errorFunc is None
 			self.errorFunc = func
-			GLib.io_add_watch(self.ssl_sock, GLib.IO_PRI | GLib.IO_ERR | GLib.IO_HUP, self._onError)
+			self.errorSourceId = GLib.io_add_watch(self.ssl_sock, self.flagError, self._onError)
 		else:
 			assert False
 
@@ -138,41 +215,53 @@ class SnPeerSocket:
 		data = pickle.dumps(dataObj)
 		header = struct.pack("!I", len(data))
 		packet = header + data
-		self.packetQueue.put(packet, True)
+		self.sendBuffer += packet
 
 	def gracefulClose(self):
 		assert self.ssl_sock is not None and not self.isClosing
-
 		self.isClosing = True
-		self.sendThread.stop(False)
 
 	def close(self):
 		assert self.ssl_sock is not None and not self.isClosing
+		self._doClose()
 
-		self.isClosing = True
-		self.sendThread.stop(True)
+	def _onSend(self, source, cb_condition):
+		assert source == self.ssl_sock
+		
+		# send data as much as possible
+		sendLen = self.ssl_sock.send(self.sendBuffer)
+		self.sendBuffer = self.sendBuffer[sendLen:]
+
+		# closing, do close after all data is sent
+		if self.isClosing and self.sendBuffer == "":
+			self._doClose()
 
 	def _onRecv(self, source, cb_condition):
 		assert source == self.ssl_sock
 
-		# receive packet header
-		headerLen = struct.calcsize("!I")
-		header = ""
-		while len(header) < headerLen:
-			header += self.ssl_sock.recv(headerLen - len(header))
+		try:
+			# receive packet header
+			headerLen = struct.calcsize("!I")
+			if len(self.recvBuffer) < headerLen:
+				self.recvBuffer += self.ssl_sock.recv(headerLen - len(self.recvBuffer))
 
-		# receive packet content
-		dataLen = struct.unpack("!I", header)
-		data = ""
-		while len(data) < dataLen:
-			data += self.ssl_sock.recv(dataLen - len(data))
+			# receive packet content
+			dataLen = headerLen + struct.unpack("!I", self.recvBuffer)
+			while len(self.recvBuffer) < dataLen:
+				self.recvBuffer += self.ssl_sock.recv(dataLen - len(self.recvBuffer))
+		except socket.error as e:
+			if e.errno == errno.EAGAIN or e.errno == errno.EINPROGRESS:
+				return		# recvBuffer is not filled, need to receive again
+			else:
+				raise
 
 		# closing, consume data, don't do real operation
 		if self.isClosing:
 			return
 
 		# invoke callback function
-		dataObj = pickle.loads(data)
+		dataObj = pickle.loads(self.recvBuffer)
+		self.recvBuffer = ""
 		self.recvFunc(self, dataObj)
 
 	def _onError(self, source, cb_condition):
@@ -181,7 +270,13 @@ class SnPeerSocket:
 		# invoke callback function
 		self.errorFunc(self)
 
-	def _onClose(self):
+	def _doClose(self):
+		if self.errorSourceId is not None:
+			GLib.source_remove(self.errorSourceId)
+		if self.recvSourceId is not None:
+			GLib.source_remove(self.recvSourceId)
+		if self.sendSourceId is not None:
+			GLib.source_remove(self.sendSourceId)
 		self.ssl_sock.close()
 		self.ssl_sock = None
 
@@ -196,63 +291,16 @@ class _Util:
 					return item[0][1]
 		return None
 
-class _ConnThread(threading.Thread):
+class _SockConnInfo:
+	HANDSHAKE_NONE = 0
+	HANDSHAKE_WANT_READ = 1
+	HANDSHAKE_WANT_WRITE = 2
+	HANDSHAKE_COMPLETE = 3
 
-	def __init__(self, parent, connectId, hostname, port):
-		super(_ConnThread, self).__init__()
-		self.parent = parent
-		self.connectId = connectId		# for logging
-		self.hostname = hostname
-		self.port = port
-
-	def run(self):
-		sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)  
-		ssl_sock = ssl.wrap_socket(sock, certfile=self.parent.certFile, keyfile=self.parent.privkeyFile,
-				                   cert_reqs=ssl.CERT_REQUIRED, ca_certs=self.parent.caCertFile,
-				                   ssl_version=ssl.PROTOCOL_SSLv3)
-
-		try:
-			ssl_sock.connect((self.hostname, self.port))
-		except (socket.error, ssl.SSLError) as e:
-			logging.debug("peer connect failed, %d, %s, %d, %s, %s", self.connectId, self.hostname, self.port, e.__class__, e)
-			ssl_sock.close()
-			self.parent.threadList.remove(self)
-			return
-
-		peerName = _Util.getPeerName(ssl_sock)
-		if peerName is None or peerName != self.hostname:
-			ssl_sock.close()
-			self.parent.threadList.remove(self)
-			return
-
-		GLib.idle_add(self.parent._onIdle, self, ssl_sock)
-
-class _SendThread(threading.Thread):
-
-	def __init__(self, parent):
-		super(_SendThread, self).__init__()
-		self.parent = parent
-		self.stopFlag = False
-		self.stopImmediateFlag = False
-
-	def stop(self, immediate):
-		"""may bring 50ms delay"""
-		self.stopFlag = True
-		self.stopImmediateFlag = immediate
-		self.parent.packetQueue.put(None)		# feed PriorityQueue.get()
-
-	def run(self):
-		try:
-			while not self.stopFlag:
-				packet = self.parent.packetQueue.get(True)
-				if packet is None:
-					continue
-				sendLen = 0
-				while not self.stopImmediateFlag:
-					sendLen += self.parent.ssl_sock.send(packet[sendLen:])
-					if sendLen >= len(packet):
-						break
-					time.sleep(0.05)
-		finally:
-			self.parent._onClose()
+	connectId = None			# int
+	hostname = None				# str
+	port = None					# int
+	sourceId = None				# int
+	state = None				# enum
+	ssl_sock = None				# obj
 
