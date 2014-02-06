@@ -173,13 +173,9 @@ class SnConfigManager:
 		if self.hostDict[socket.gethostname()].isNexus:
 			if not os.path.exists(self.param.caPrivkeyFile):
 				raise Exception("CA private key file \"%s\" should exist on nexus machine"%(self.param.caPrivkeyFile))
-			if not os.path.exists(self.param.caSerialFile):
-				raise Exception("CA serial file \"%s\" should exist on nexus machine"%(self.param.caSerialFile))
 		else:
 			if os.path.exists(self.param.caPrivkeyFile):
 				raise Exception("CA private key file \"%s\" should not exist on non-nexus machine"%(self.param.caPrivkeyFile))
-			if os.path.exists(self.param.caSerialFile):
-				raise Exception("CA serial file \"%s\" should not exist on non-nexus machine"%(self.param.caSerialFile))
 
 	def _parseModulesFile(self):
 		# set default value

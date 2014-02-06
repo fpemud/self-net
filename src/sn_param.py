@@ -13,10 +13,9 @@ class SnParam:
 		self.runDir = "/run/selfnetd"
 		self.logDir = "/var/log/selfnetd"
 
-		self.certFile = os.path.join(self.cfgDir, "cert.pem")
-		self.privkeyFile = os.path.join(self.cfgDir, "privkey.pem")
+		self.certFile = os.path.join(self.cfgDir, "my-cert.pem")
+		self.privkeyFile = os.path.join(self.cfgDir, "my-privkey.pem")
 		self.caCertFile = os.path.join(self.cfgDir, "ca-cert.pem")
-		self.caSerialFile = os.path.join(self.cfgDir, "ca-cert.srl")
 		self.caPrivkeyFile = os.path.join(self.cfgDir, "ca-privkey.pem")
 
 		self.confFile = os.path.join(self.cfgDir, "selfnetd.conf")

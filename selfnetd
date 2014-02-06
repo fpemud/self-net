@@ -14,12 +14,15 @@ sys.path.append('/usr/lib/selfnetd')
 sys.path.append('/usr/lib/selfnetd/modules')		# fixme
 from sn_util import SnUtil
 from sn_param import SnParam
+from sn_command_argument import SnCommandArgument
 from sn_manager_config import SnConfigManager
 from sn_manager_local import SnLocalManager
 from sn_manager_peer import SnPeerManager
+from sn_subcmd import SnSubCmdMain
 
 def parseArgs():
 	argParser = argparse.ArgumentParser()
+	subparsers = argParser.add_subparsers()
 
 	argParser.add_argument("-D", dest='daemonize', action="store_false", default=True,
 		help="selfnetd will not detach and does not become a daemon when this option is specified")
@@ -32,8 +35,20 @@ def parseArgs():
 
 ################################################################################
 
-parseResult = parseArgs()
 param = SnParam()
+parseResult = SnCommandArgument()
+
+# some assistant sub command
+if parseResult.subcmd == "generate_ca_cert":
+	SnSubCmdMain(param).generateCaCert()
+	sys.exit(0)
+elif parseResult.subcmd == "generate_cert":
+	SnSubCmdMain(param).generateCert(parseResult.hostname, parseResult.out_dir, parseResult.export)
+	sys.exit(0)
+else:
+	assert parseResult.subcmd == ""
+
+# the main process
 try:
 	# create directory
 	SnUtil.mkDir(param.logDir)
