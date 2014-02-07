@@ -87,7 +87,7 @@ class SnPeerServer:
 			self.sockDict[source].state = _ServerConnInfo.HANDSHAKE_WANT_WRITE
 			self.sockDict[source].sslSock = ssl.wrap_socket(source, certfile=self.certFile, keyfile=self.privkeyFile,
 										                    cert_reqs=ssl.CERT_REQUIRED, ca_certs=self.caCertFile,
-										                    do_handshake_on_connect=False, ssl_version=ssl.PROTOCOL_SSLv3
+										                    do_handshake_on_connect=False, ssl_version=ssl.PROTOCOL_SSLv3,
 										                    server_side=True)
 			sslSock = self.sockDict[source].sslSock
 
@@ -113,7 +113,7 @@ class SnPeerServer:
 		peerName = _getPeerName(source)
 		if peerName is None:
 			logging.debug("peer accept failed, %s, %s", source.getpeername(), "hostname incorrect")
-			new_sock.close()
+			source.close()
 			return
 
 		# transfer to SnPeerSocket
