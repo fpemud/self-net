@@ -58,37 +58,34 @@ class SnPeerServer:
 		self.serverSock = None
 
 	def _onAccept(self, source, cb_condition):
-		logging.debug("SnPeerServer._onAccept: Start")
+		logging.debug("SnPeerServer._onAccept: Start, %s"%(_cb_condition_to_str(cb_condition)))
 
 		assert source == self.serverSock
 
 		try:
 			new_sock, addr = self.serverSock.accept()
 		except (socket.error) as e:
-			if e.errno == errno.EAGAIN or e.errno == errno.EINPROGRESS:
-				logging.debug("SnPeerServer._onAccept: Canceled")
-				return
-			else:
-				logging.debug("SnPeerServer._onAccept: Failed, %s, %s", e.__class__, e)
-				return
+			logging.debug("SnPeerServer._onAccept: Failed, %s, %s", e.__class__, e)
+			return True
 
 		new_sock.setblocking(0)
 		self._addSock(new_sock)
 
 		logging.debug("SnPeerServer._onAccept: End")
-		return
+		return True
 
 	def _onEvent(self, source, cb_condition):
-		logging.debug("SnPeerServer._onEvent: Start")
+		logging.debug("SnPeerServer._onEvent: Start, %s"%(_cb_condition_to_str(cb_condition)))
 
 		info = self.sockDict[source]
 		sslSock = self.sockDict[source].sslSock
+		spname = source.getpeername()
 
 		# check error
 		if (cb_condition & self.flagError) != 0:
 			self._removeSock(source)
-			logging.debug("SnPeerServer._onEvent: Failed, %s, 0x%x", source.getpeername(), (cb_condition & self.flagError))
-			return
+			logging.debug("SnPeerServer._onEvent: Failed, %s, 0x%x", spname, (cb_condition & self.flagError))
+			return True
 
 		# wrap socket
 		if info.state == _ServerConnInfo.HANDSHAKE_NONE:
@@ -108,31 +105,31 @@ class SnPeerServer:
 			except ssl.SSLError as e:
 				if e.args[0] == ssl.SSL_ERROR_WANT_READ:
 					self.sockDict[source].state = _ServerConnInfo.HANDSHAKE_WANT_READ
-					logging.debug("SnPeerServer._onEvent: Handshake want read, %s", source.getpeername())
-					return
+					logging.debug("SnPeerServer._onEvent: Handshake want read, %s", spname)
+					return True
 				elif e.args[0] == ssl.SSL_ERROR_WANT_WRITE:
 					self.sockDict[source].state = _ServerConnInfo.HANDSHAKE_WANT_WRITE
-					logging.debug("SnPeerServer._onEvent: Handshake want write, %s", source.getpeername())
-					return
+					logging.debug("SnPeerServer._onEvent: Handshake want write, %s", spname)
+					return True
 				else:
 					self._removeSock(source)
-					logging.debug("SnPeerServer._onEvent: Failed, %s, %s, %s", source.getpeername(), e.__class__, e)
-					return
+					logging.debug("SnPeerServer._onEvent: Failed, %s, %s, %s", spname, e.__class__, e)
+					return True
 
 		# check peer name
-		peerName = _getPeerName(source)
-		if peerName is None:
-			source.close()
-			logging.debug("SnPeerServer._onEvent: Hostname incorrect, %s", source.getpeername())
-			return
+		peerName = _getPeerName(sslSock)
+		if peerName is None or peerName != spname[0]:
+			self._removeSock(source)
+			logging.debug("SnPeerServer._onEvent: Hostname incorrect, %s, %s", spname, peerName)
+			return True
 
 		# transfer to SnPeerSocket
 		GLib.source_remove(self.sockDict[source].sourceId)
 		del self.sockDict[source]
-		self.acceptFunc(SnPeerSocket(sslSock))
+		self.acceptFunc(SnPeerSocket(sslSock, peerName))
 
-		logging.debug("SnPeerServer._onEvent: End, %s, %s", source.getpeername(), peerName)
-		return
+		logging.debug("SnPeerServer._onEvent: End, %s, %s", spname, peerName)
+		return True
 		
 	def _addSock(self, sock):
 		info = _ServerConnInfo()
@@ -190,23 +187,24 @@ class SnPeerClient:
 		self._addSock(sock, connectId, hostname, port)
 
 	def _onEvent(self, source, cb_condition):
-		logging.debug("SnPeerClient._onEvent: Start")
+		logging.debug("SnPeerClient._onEvent: Start, %s"%(_cb_condition_to_str(cb_condition)))
 
 		info = self.sockDict[source]
 		sslSock = self.sockDict[source].sslSock
+		spname = source.getpeername()
 
 		# check error
 		if (cb_condition & self.flagError) != 0:
 			self._removeSock(source)
 			logging.debug("SnPeerClient._onEvent: Failed, %d, %s, %d, 0x%x", info.connectId, info.hostname, info.port, (cb_condition & self.flagError))
-			return
+			return True
 
 		# wrap socket
 		if info.state == _ClientConnInfo.HANDSHAKE_NONE:
 			self.sockDict[source].state = _ClientConnInfo.HANDSHAKE_WANT_WRITE
 			self.sockDict[source].sslSock = ssl.wrap_socket(source, certfile=self.certFile, keyfile=self.privkeyFile,
-										                     cert_reqs=ssl.CERT_REQUIRED, ca_certs=self.caCertFile,
-										                     do_handshake_on_connect=False, ssl_version=ssl.PROTOCOL_SSLv3)
+										                    cert_reqs=ssl.CERT_REQUIRED, ca_certs=self.caCertFile,
+										                    do_handshake_on_connect=False, ssl_version=ssl.PROTOCOL_SSLv3)
 			sslSock = self.sockDict[source].sslSock
 
 		# do handshake
@@ -218,31 +216,31 @@ class SnPeerClient:
 			except ssl.SSLError as e:
 				if e.args[0] == ssl.SSL_ERROR_WANT_READ:
 					self.sockDict[source].state = _ClientConnInfo.HANDSHAKE_WANT_READ
-					logging.debug("SnPeerClient._onEvent: Handshake want read, %s", source.getpeername())
-					return
+					logging.debug("SnPeerClient._onEvent: Handshake want read, %s", spname)
+					return True
 				elif e.args[0] == ssl.SSL_ERROR_WANT_WRITE:
 					self.sockDict[source].state = _ClientConnInfo.HANDSHAKE_WANT_WRITE
-					logging.debug("SnPeerClient._onEvent: Handshake want write, %s", source.getpeername())
-					return
+					logging.debug("SnPeerClient._onEvent: Handshake want write, %s", spname)
+					return True
 				else:
 					self._removeSock(source)
 					logging.debug("SnPeerClient._onEvent: Failed, %d, %s, %d, %s, %s", info.connectId, info.hostname, info.port, e.__class__, e)
-					return
+					return True
 
 		# check peer name
-		peerName = _getPeerName(source)
-		if peerName is None or peerName != info.hostname:
+		peerName = _getPeerName(sslSock)
+		if peerName is None or peerName != spname[0] or peerName != info.hostname:
 			self._removeSock(source)
-			logging.debug("SnPeerClient._onEvent: Hostname incorrect, %d, %s, %d", info.connectId, info.hostname, info.port)
-			return
+			logging.debug("SnPeerClient._onEvent: Hostname incorrect, %d, %s, %d, %s, %s", info.connectId, info.hostname, info.port, spname, peerName)
+			return True
 
 		# transfer to SnPeerSocket
 		GLib.source_remove(self.sockDict[source].sourceId)
 		del self.sockDict[source]
-		self.connectFunc(SnPeerSocket(sslSock))
+		self.connectFunc(SnPeerSocket(sslSock, peerName))
 
 		logging.debug("SnPeerClient._onEvent: End, %d, %s, %d", info.connectId, info.hostname, info.port)
-		return
+		return True
 
 	def _addSock(self, sock, connectId, hostname, port):
 		info = _ClientConnInfo()
@@ -261,12 +259,12 @@ class SnPeerClient:
 
 class SnPeerSocket:
 
-	def __init__(self, sslSock):
+	def __init__(self, sslSock, peerName):
 		self.flagFull = GLib.IO_IN | GLib.IO_OUT | GLib.IO_PRI | GLib.IO_ERR | GLib.IO_HUP | GLib.IO_NVAL
 		self.flagError = GLib.IO_PRI | GLib.IO_ERR | GLib.IO_HUP | GLib.IO_NVAL
 
 		self.sslSock = sslSock
-		self.peerName = _getPeerName(self.sslSock)
+		self.peerName = peerName
 		self.isClosing = False
 		self.recvFunc = None
 		self.errorFunc = None
@@ -323,6 +321,8 @@ class SnPeerSocket:
 		if self.isClosing and self.sendBuffer == "":
 			self._doClose()
 
+		return True
+
 	def _onRecv(self, source, cb_condition):
 		assert source == self.sslSock
 
@@ -338,24 +338,24 @@ class SnPeerSocket:
 				self.recvBuffer += self.sslSock.recv(dataLen - len(self.recvBuffer))
 		except socket.error as e:
 			if e.errno == errno.EAGAIN or e.errno == errno.EINPROGRESS:
-				return		# recvBuffer is not filled, need to receive again
+				return True		# recvBuffer is not filled, need to receive again
 			else:
 				raise
 
 		# closing, consume data, don't do real operation
 		if self.isClosing:
-			return
+			return True
 
 		# invoke callback function
 		dataObj = pickle.loads(self.recvBuffer)
 		self.recvBuffer = ""
 		self.recvFunc(self, dataObj)
+		return True
 
 	def _onError(self, source, cb_condition):
 		assert source == self.sslSock
-
-		# invoke callback function
 		self.errorFunc(self)
+		return True
 
 	def _doClose(self):
 		if self.errorSourceId is not None:
@@ -374,6 +374,23 @@ def _getPeerName(sslSock):
 			if item[0][0] == "commonName":
 				return item[0][1]
 	return None
+
+def _cb_condition_to_str(cb_condition):
+        ret = ""
+        if cb_condition & GLib.IO_IN:
+                ret += "IN "
+        if cb_condition & GLib.IO_OUT:
+                ret += "OUT "
+        if cb_condition & GLib.IO_PRI:
+                ret += "PRI "
+        if cb_condition & GLib.IO_ERR:
+                ret += "ERR "
+        if cb_condition & GLib.IO_HUP:
+                ret += "HUP "
+        if cb_condition & GLib.IO_NVAL:
+                ret += "NVAL "
+        return ret
+
 
 class _ServerConnInfo:
 	HANDSHAKE_NONE = 0
