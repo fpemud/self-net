@@ -254,10 +254,13 @@ class SnPeerSocket:
 	def _onSend(self, source, cb_condition):
 		assert source == self.sslSock
 
+		logging.debug("SnPeerSocket._onSend: Start, %s, %s", self.peerName, _cb_condition_to_str(cb_condition))
+
 		# check error
 		if cb_condition & _flagError:
 			self.sendBuffer = ""
 			self.sendSourceId = None
+			logging.debug("SnPeerSocket._onSend: Socket error")
 			return False
 		
 		# send data as much as possible
@@ -267,56 +270,63 @@ class SnPeerSocket:
 		if self.sendBuffer != "":
 			# still has data to send
 			self.sendSourceId = GLib.io_add_watch(self.sslSock, GLib.IO_OUT, self._onSend)
+			logging.debug("SnPeerSocket._onSend: Data remains")
 			return False
 		else:
 			# no data to send
 			if self.isClosing:
 				self._doClose()
+			logging.debug("SnPeerSocket._onSend: No data remains")
 			self.sendSourceId = None
 			return False
 
 	def _onRecv(self, source, cb_condition):
 		assert source == self.sslSock
 
+		logging.debug("SnPeerSocket._onRecv: Start, %s, %s", self.peerName, _cb_condition_to_str(cb_condition))
+
 		if cb_condition & _flagError:
 			# do error processing
 			if self.errorFunc is not None:
 				self.errorFunc(self)
-				return self._getRetBySource(self.recvSourceId)
+				ret = self._getRetBySource(self.recvSourceId)
+
+				print "debug: ****** %d"%(ret)
+				logging.debug("SnPeerSocket._onRecv: Socket error")
+				return ret
 			return True
 		elif self.recvFunc is not None:
-			# do packet receiving
-			try:
-				# receive packet header
-				headerLen = struct.calcsize("!I")
-				while len(self.recvBuffer) < headerLen:
-					ret = self.sslSock.recv(headerLen - len(self.recvBuffer))
-					if ret == "":
-						return True
-					self.recvBuffer += ret
-
-				dataLen = headerLen + struct.unpack("!I", self.recvBuffer[:headerLen])[0]
-				while len(self.recvBuffer) < dataLen:
-					ret = self.sslSock.recv(dataLen - len(self.recvBuffer))
-					if ret == "":
-						return True
-					self.recvBuffer += ret
-
-				# closing, consume data, don't do real operation
-				if self.isClosing:
-					self.recvBuffer = ""
+			# receive packet header
+			headerLen = struct.calcsize("!I")
+			while len(self.recvBuffer) < headerLen:
+				ret = self.sslSock.recv(headerLen - len(self.recvBuffer))
+				if ret == "":
+					logging.debug("SnPeerSocket._onRecv: More data needed")
 					return True
+				self.recvBuffer += ret
 
-				# invoke callback function
-				dataObj = pickle.loads(self.recvBuffer)
+			dataLen = headerLen + struct.unpack("!I", self.recvBuffer[:headerLen])[0]
+			while len(self.recvBuffer) < dataLen:
+				ret = self.sslSock.recv(dataLen - len(self.recvBuffer))
+				if ret == "":
+					logging.debug("SnPeerSocket._onRecv: More data needed")
+					return True
+				self.recvBuffer += ret
+
+			# closing, consume data, don't do real operation
+			if self.isClosing:
 				self.recvBuffer = ""
-				self.recvFunc(self, dataObj)
-				return self._getRetBySource(self.recvSourceId)
-			except socket.error as e:
-				if e.errno == errno.EAGAIN or e.errno == errno.EINPROGRESS:
-					return True		# recvBuffer is not filled, need to receive again
-				else:
-					raise
+				logging.debug("SnPeerSocket._onRecv: Closing")
+				return True
+
+			# invoke callback function
+			dataObj = pickle.loads(self.recvBuffer[headerLen:])
+			self.recvBuffer = ""
+			self.recvFunc(self, dataObj)
+			ret = self._getRetBySource(self.recvSourceId)
+
+			logging.debug("SnPeerSocket._onRecv: Data received")
+			return ret
 		else:
 			assert False
 
