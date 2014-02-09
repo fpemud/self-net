@@ -11,6 +11,7 @@ from gi.repository import GObject
 
 from sn_conn_peer import SnPeerServer
 from sn_conn_peer import SnPeerClient
+from sn_conn_peer import SnPeerHandShaker
 from sn_manager_config import SnVersion
 from sn_manager_config import SnCfgSerializationObject
 
@@ -131,14 +132,15 @@ class SnPeerManager:
 			self.peerInfoDict[hn] = _PeerInfoInternal()
 			self.peerInfoDict[hn].state = _PeerInfoInternal.STATE_NONE
 
+		# create handshaker
+		self.handshaker = SnPeerHandShaker(self.param.certFile, self.param.privkeyFile, self.param.caCertFile, self.onSocketConnected)
+
 		# create server endpoint
-		self.serverEndPoint = SnPeerServer(self.param.certFile, self.param.privkeyFile, self.param.caCertFile)
-		self.serverEndPoint.setEventFunc("accept", self.onSocketConnected)
+		self.serverEndPoint = SnPeerServer(self.handshaker)
 		self.serverEndPoint.start(self.param.configManager.getHostInfo("localhost").port)
 
 		# create client endpoint
-		self.clientEndPoint = SnPeerClient(self.param.certFile, self.param.privkeyFile, self.param.caCertFile)
-		self.clientEndPoint.setEventFunc("connected", self.onSocketConnected)
+		self.clientEndPoint = SnPeerClient(self.handshaker)
 
 		# create timers
 		self.peerProbeTimer = GObject.timeout_add_seconds(self.param.configManager.getPeerProbeInterval(), self.onPeerProbe)
@@ -154,6 +156,7 @@ class SnPeerManager:
 		GLib.source_remove(self.peerProbeTimer)
 		self.clientEndPoint.dispose()
 		self.serverEndPoint.dispose()
+		self.handshaker.dispose()
 
 		logging.debug("SnPeerManager.dispose: End")
 		return
