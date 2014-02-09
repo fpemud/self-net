@@ -188,15 +188,15 @@ class SnPeerManager:
 		sock.setEventFunc("recv", self.onSocketRecv)
 		sock.setEventFunc("error", self.onSocketError)
 
-		# send localInfo
-		sock.send(self.param.configManager.getVersion())
-		sock.send(self.param.configManager.getCfgSerializationObject())
-		sock.send(self.param.localManager.getLocalInfo())
-
 		# record sock
 		self.peerInfoDict[sock.getPeerName()].state = _PeerInfoInternal.STATE_INIT
 		self.peerInfoDict[sock.getPeerName()].infoObj = None
 		self.peerInfoDict[sock.getPeerName()].sock = sock
+
+		# send localInfo
+		self._sendObjToPeer(sock.getPeerName(), self.param.configManager.getVersion())
+		self._sendObjToPeer(sock.getPeerName(), self.param.configManager.getCfgSerializationObject())
+		self._sendObjToPeer(sock.getPeerName(), self.param.localManager.getLocalInfo())
 
 		logging.debug("SnPeerManager.onSocketConnected: End")
 		return
@@ -206,26 +206,26 @@ class SnPeerManager:
 
 		
 		peerName = sock.getPeerName()
-		if packetObj.__class__ == SnSysPacket.__class__:				# packetObj is from pickle, isinstance can't be used
-			if packetObj.data.__class__ == SnSysPacketKeepalive.__class__:
+		if self._typeCheck(packetObj, SnSysPacket):
+			if self._typeCheck(packetObj.data, SnSysPacketKeepalive):
 				logging.debug("SnPeerManager.onSocketRecv: _recvKeepalive, %s", datetime.now())
 				self._recvKeepalive(peerName)
-			elif packetObj.data.__class__ == SnVersion.__class__:
+			elif self._typeCheck(packetObj.data, SnVersion):
 				logging.debug("SnPeerManager.onSocketRecv: _recvVerMatch, %s", packetObj.data.version)
 				self._recvVerMatch(peerName, packetObj.data)
-			elif packetObj.data.__class__ == SnCfgSerializationObject.__class__:
+			elif self._typeCheck(packetObj.data, SnCfgSerializationObject):
 				logging.debug("SnPeerManager.onSocketRecv: _recvCfgMatch")
 				self._recvCfgMatch(peerName, packetObj.data)
-			elif packetObj.data.__class__ == SnPeerInfo.__class__:
+			elif self._typeCheck(packetObj.data, SnPeerInfo):
 				logging.debug("SnPeerManager.onSocketRecv: _recvPeerInfo")
 				self._recvPeerInfo(peerName, packetObj.data)
-			elif packetObj.data.__class__ == SnSysPacketReject.__class__:
+			elif self._typeCheck(packetObj.data, SnSysPacketReject):
 				logging.debug("SnPeerManager.onSocketRecv: _recvReject")
 				self._recvReject(peerName, packetObj.data.message)
 			else:
 				self._rejectPeer(peerName, "invalid system packet data format")
-		elif packetObj.__class__ == SnDataPacket.__class__:
-			if packetObj.data.__class__ == SnDataPacketReject.__class__:
+		elif self._typeCheck(packetObj, SnDataPacket):
+			if self._typeCheck(packetObj.data, SnDataPacketReject):
 				self.param.localManager.onReject(peerName, packetObj.srcUserName, 
 						packetObj.srcModuleName, packetObj.data.message)
 			else:
@@ -380,6 +380,12 @@ class SnPeerManager:
 		self.peerInfoDict[peerName].infoObj = None
 		self.peerInfoDict[peerName].sock = None
 
+	def _sendObjToPeer(self, peerName, obj):
+		# send object
+		packetObj = SnSysPacket()
+		packetObj.data = obj
+		self.peerInfoDict[peerName].sock.send(packetObj)
+
 	def _shutdownPeer(self, peerName):
 		# record to log
 		logging.warning("shutdown peer, %s", peerName)
@@ -392,6 +398,9 @@ class SnPeerManager:
 		self.peerInfoDict[peerName].state = _PeerInfoInternal.STATE_NONE
 		self.peerInfoDict[peerName].infoObj = None
 		self.peerInfoDict[peerName].sock = None
+
+	def _typeCheck(self, obj, typeobj):
+		return str(obj.__class__) == str(typeobj)
 
 class _PeerInfoInternal:
 	STATE_NONE = 0
