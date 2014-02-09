@@ -175,13 +175,13 @@ class SnPeerManager:
 		# only peer in self-net is allowed
 		if sock.getPeerName() not in self.peerInfoDict:
 			sock.close()
-			logging.debug("SnPeerManager.onSocketConnected: Fail, %s", "error1")
+			logging.debug("SnPeerManager.onSocketConnected: Fail, error1")
 			return
 
 		# only one connection between a pair of hosts
 		if self.peerInfoDict[sock.getPeerName()].state != _PeerInfoInternal.STATE_NONE:
 			sock.close()
-			logging.debug("SnPeerManager.onSocketConnected: Fail, %s", "error2")
+			logging.debug("SnPeerManager.onSocketConnected: Fail, error2")
 			return
 
 		# establish peerSocket
@@ -204,34 +204,35 @@ class SnPeerManager:
 	def onSocketRecv(self, sock, packetObj):
 		logging.debug("SnPeerManager.onSocketRecv: Start, %s", sock.getPeerName())
 
+		
 		peerName = sock.getPeerName()
-		if isinstance(packetObj, SnSysPacket):
-			if isinstance(packetObj.data, SnSysPacketKeepalive):
+		if packetObj.__class__ == SnSysPacket.__class__:				# packetObj is from pickle, isinstance can't be used
+			if packetObj.data.__class__ == SnSysPacketKeepalive.__class__:
 				logging.debug("SnPeerManager.onSocketRecv: _recvKeepalive, %s", datetime.now())
 				self._recvKeepalive(peerName)
-			elif isinstance(packetObj.data, SnVersion):
+			elif packetObj.data.__class__ == SnVersion.__class__:
 				logging.debug("SnPeerManager.onSocketRecv: _recvVerMatch, %s", packetObj.data.version)
 				self._recvVerMatch(peerName, packetObj.data)
-			elif isinstance(packetObj.data, SnCfgSerializationObject):
+			elif packetObj.data.__class__ == SnCfgSerializationObject.__class__:
 				logging.debug("SnPeerManager.onSocketRecv: _recvCfgMatch")
 				self._recvCfgMatch(peerName, packetObj.data)
-			elif isinstance(packetObj.data, SnPeerInfo):
+			elif packetObj.data.__class__ == SnPeerInfo.__class__:
 				logging.debug("SnPeerManager.onSocketRecv: _recvPeerInfo")
 				self._recvPeerInfo(peerName, packetObj.data)
-			elif isinstance(packetObj.data, SnSysPacketReject):
+			elif packetObj.data.__class__ == SnSysPacketReject.__class__:
 				logging.debug("SnPeerManager.onSocketRecv: _recvReject")
 				self._recvReject(peerName, packetObj.data.message)
 			else:
 				self._rejectPeer(peerName, "invalid system packet data format")
-		elif isinstance(packetObj, SnDataPacket):
-			if isinstance(packetObj.data, SnDataPacketReject):
+		elif packetObj.__class__ == SnDataPacket.__class__:
+			if packetObj.data.__class__ == SnDataPacketReject.__class__:
 				self.param.localManager.onReject(peerName, packetObj.srcUserName, 
 						packetObj.srcModuleName, packetObj.data.message)
 			else:
 				self.param.localManager.onRecv(peerName, packetObj.srcUserName, 
 						packetObj.srcModuleName, packetObj.data)
 		else:
-			self._rejectPeer(peerName, "invalid packet format")
+			self._rejectPeer(peerName, "invalid packet format, %s"%(packetObj.__class__))
 
 		logging.debug("SnPeerManager.onSocketRecv: End")
 		return

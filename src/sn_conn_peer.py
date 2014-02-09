@@ -281,7 +281,10 @@ class SnPeerSocket:
 			return False
 
 	def _onRecv(self, source, cb_condition):
-		assert source == self.sslSock
+		# fixme: weird, It seems that GLib.source_remove has no effect
+		if source != self.sslSock:
+			return False
+		#assert source == self.sslSock
 
 		logging.debug("SnPeerSocket._onRecv: Start, %s, %s", self.peerName, _cb_condition_to_str(cb_condition))
 
@@ -290,8 +293,6 @@ class SnPeerSocket:
 			if self.errorFunc is not None:
 				self.errorFunc(self)
 				ret = self._getRetBySource(self.recvSourceId)
-
-				print "debug: ****** %d"%(ret)
 				logging.debug("SnPeerSocket._onRecv: Socket error")
 				return ret
 			return True
