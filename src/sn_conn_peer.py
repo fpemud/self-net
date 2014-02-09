@@ -295,7 +295,7 @@ class SnPeerSocket:
 						return True
 					self.recvBuffer += ret
 
-				dataLen = headerLen + struct.unpack("!I", self.recvBuffer)[0]
+				dataLen = headerLen + struct.unpack("!I", self.recvBuffer[:headerLen])[0]
 				while len(self.recvBuffer) < dataLen:
 					ret = self.sslSock.recv(dataLen - len(self.recvBuffer))
 					if ret == "":
