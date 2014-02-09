@@ -32,7 +32,9 @@ class SnPeerServer:
 	def stop(self):
 		assert self.serverSock is not None
 
-		GLib.source_remove(self.serverSourceId)
+		ret = GLib.source_remove(self.serverSourceId)
+		assert ret
+
 		self.serverSock.close()
 		self.serverSock = None
 
@@ -164,10 +166,17 @@ class SnPeerHandShaker:
 					if peerName is None or peerName != info.hostname:
 						raise _ConnException("Hostname incorrect, %s, %s"%(_handshake_info_to_str(info), peerName))
 
+				# completion log
+				logging.debug("SnPeerHandShaker._onEvent: %s -> %s", _handshake_state_to_str(oldState),
+						_handshake_state_to_str(info.state))
+
 				# create SnPeerSocket
 				del self.sockDict[source]
 				self.connectFunc(SnPeerSocket(info.sslSock, peerName))
+
+				logging.debug("SnPeerHandShaker._onEvent: End")
 				return False
+
 		except _ConnException as e:
 			del self.sockDict[source]
 			source.close()
@@ -261,9 +270,9 @@ class SnPeerSocket:
 			return False
 		else:
 			# no data to send
-			self.sendSourceId = None
 			if self.isClosing:
 				self._doClose()
+			self.sendSourceId = None
 			return False
 
 	def _onRecv(self, source, cb_condition):
@@ -273,45 +282,68 @@ class SnPeerSocket:
 			# do error processing
 			if self.errorFunc is not None:
 				self.errorFunc(self)
+				return self._getRetBySource(self.recvSourceId)
 			return True
 		elif self.recvFunc is not None:
 			# do packet receiving
 			try:
 				# receive packet header
 				headerLen = struct.calcsize("!I")
-				if len(self.recvBuffer) < headerLen:
-					self.recvBuffer += self.sslSock.recv(headerLen - len(self.recvBuffer))
+				while len(self.recvBuffer) < headerLen:
+					ret = self.sslSock.recv(headerLen - len(self.recvBuffer))
+					if ret == "":
+						return True
+					self.recvBuffer += ret
 
-				# receive packet content
-				dataLen = headerLen + struct.unpack("!I", self.recvBuffer)
+				dataLen = headerLen + struct.unpack("!I", self.recvBuffer)[0]
 				while len(self.recvBuffer) < dataLen:
-					self.recvBuffer += self.sslSock.recv(dataLen - len(self.recvBuffer))
+					ret = self.sslSock.recv(dataLen - len(self.recvBuffer))
+					if ret == "":
+						return True
+					self.recvBuffer += ret
+
+				# closing, consume data, don't do real operation
+				if self.isClosing:
+					self.recvBuffer = ""
+					return True
+
+				# invoke callback function
+				dataObj = pickle.loads(self.recvBuffer)
+				self.recvBuffer = ""
+				self.recvFunc(self, dataObj)
+				return self._getRetBySource(self.recvSourceId)
 			except socket.error as e:
 				if e.errno == errno.EAGAIN or e.errno == errno.EINPROGRESS:
 					return True		# recvBuffer is not filled, need to receive again
 				else:
 					raise
-
-			# closing, consume data, don't do real operation
-			if self.isClosing:
-				self.recvBuffer = ""
-				return True
-
-			# invoke callback function
-			dataObj = pickle.loads(self.recvBuffer)
-			self.recvBuffer = ""
-			self.recvFunc(self, dataObj)
-			return True
 		else:
 			assert False
 
 	def _doClose(self):
 		if self.sendSourceId is not None:
-			GLib.source_remove(self.sendSourceId)
+			ret = GLib.source_remove(self.sendSourceId)
+			assert ret
+			self.sendSourceId = None
+
 		if self.recvSourceId is not None:
-			GLib.source_remove(self.recvSourceId)
+			ret = GLib.source_remove(self.recvSourceId)
+			assert ret
+			self.recvSourceId = None
+
 		self.sslSock.close()
 		self.sslSock = None
+
+	def _getRetBySource(self, sourceId):
+		# I find removing the source handler in callback function has no effect.
+		# It is still depended on the return value.
+		# I can't understand this design.
+		# I write a function here to get the return value by the availability of source handler.
+
+		if sourceId is not None:
+			return True
+		else:
+			return False
 
 class _ConnException(Exception):
 	def __init__(self, message, excObj=None):
