@@ -78,14 +78,15 @@ class SnPeerServer:
 		logging.debug("SnPeerServer._onEvent: Start, %s"%(_cb_condition_to_str(cb_condition)))
 
 		info = self.sockDict[source]
-		sslSock = self.sockDict[source].sslSock
-		spname = source.getpeername()
 
 		# check error
 		if (cb_condition & self.flagError) != 0:
 			self._removeSock(source)
 			logging.debug("SnPeerServer._onEvent: Failed, %s, 0x%x", spname, (cb_condition & self.flagError))
 			return True
+
+		sslSock = self.sockDict[source].sslSock
+		spname = source.getpeername()
 
 		# wrap socket
 		if info.state == _ServerConnInfo.HANDSHAKE_NONE:
@@ -190,14 +191,15 @@ class SnPeerClient:
 		logging.debug("SnPeerClient._onEvent: Start, %s"%(_cb_condition_to_str(cb_condition)))
 
 		info = self.sockDict[source]
-		sslSock = self.sockDict[source].sslSock
-		spname = source.getpeername()
 
 		# check error
 		if (cb_condition & self.flagError) != 0:
 			self._removeSock(source)
 			logging.debug("SnPeerClient._onEvent: Failed, %d, %s, %d, 0x%x", info.connectId, info.hostname, info.port, (cb_condition & self.flagError))
 			return True
+
+		sslSock = self.sockDict[source].sslSock
+		spname = source.getpeername()
 
 		# wrap socket
 		if info.state == _ClientConnInfo.HANDSHAKE_NONE:
