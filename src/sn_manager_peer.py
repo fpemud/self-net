@@ -318,27 +318,27 @@ class SnPeerManager:
 			return
 
 		for m in peerInfo.moduleList:
-			strList = m.split("-")
+			strList = m.moduleName.split("-")
 			if len(strList) < 3:
-				self._rejectPeer(peerName, "invalid module name \"%s\""%(m))
+				self._rejectPeer(peerName, "invalid module name \"%s\""%(m.moduleName))
 				return
 
 			moduleScope = strList[0]
 			if moduleScope not in ["sys", "usr"]:
-				self._rejectPeer(peerName, "invalid module scope for module name \"%s\""%(m))
+				self._rejectPeer(peerName, "invalid module scope for module name \"%s\""%(m.moduleName))
 				return
 
 			moduleType = strList[1]
 			if moduleType not in ["server", "client", "peer"]:
-				self._rejectPeer(peerName, "invalid module type for module name \"%s\""%(m))
+				self._rejectPeer(peerName, "invalid module type for module name \"%s\""%(m.moduleName))
 				return
 
 			moduleId = "-".join(strList[2:])
 			if len(moduleId) > 32:
-				self._rejectPeer(peerName, "module id is too long for module name \"%s\""%(m))
+				self._rejectPeer(peerName, "module id is too long for module name \"%s\""%(m.moduleName))
 				return
 			if re.match("[A-Za-z0-9_]+", moduleId) is None:
-				self._rejectPeer(peerName, "invalid module id for module name \"%s\""%(m))
+				self._rejectPeer(peerName, "invalid module id for module name \"%s\""%(m.moduleName))
 				return
 
 		# do operation

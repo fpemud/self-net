@@ -123,7 +123,7 @@ class SnLocalManager:
 			ret.userList.append(n)
 
 		ret.moduleList = []
-		for mname in self.param.configManager.getModuleNameList(None, None):
+		for mname in self.param.configManager.getModuleNameList():
 			mInfo = self.param.configManager.getModuleInfo(mname)
 			if mInfo.enable is not True:
 				continue

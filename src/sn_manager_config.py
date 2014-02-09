@@ -101,16 +101,8 @@ class SnConfigManager:
 		else:
 			return self.hostDict[hostName]
 
-	def getModuleNameList(self, moduleScope, moduleType):
-		assert (moduleScope is None and moduleType is None) or (moduleScope is not None and moduleType is not None)
-
-		ret = []
-		for k, v in self.moduleDict.items():
-			if moduleScope is not None:
-				if v.moduleScope != moduleScope or v.moduleType != moduleType:
-					continue
-			ret.append(k)
-		return ret
+	def getModuleNameList(self):
+		return self.moduleDict.keys()
 
 	def getModuleInfo(self, moduleName):
 		return self.moduleDict[moduleName]
