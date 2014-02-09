@@ -196,7 +196,8 @@ class SnPeerSocket:
 		self.sslSock = sslSock
 		self.peerName = peerName
 		self.isClosing = False
-		self.eventFunc = None
+		self.recvFunc = None
+		self.errorFunc = None
 
 		self.sendBuffer = ""
 		self.recvBuffer = ""
