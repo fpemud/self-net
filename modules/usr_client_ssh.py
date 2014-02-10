@@ -1,6 +1,8 @@
 #!/usr/bin/python2
 # -*- coding: utf-8; tab-width: 4; indent-tabs-mode: t -*-
 
+import os
+from sn_util import SnUtil
 from sn_module import SnModule
 from sn_module import SnModuleInstance
 
@@ -17,19 +19,33 @@ class ModuleObject(SnModule):
 class ModuleInstanceObject(SnModuleInstance):
 
 	def onInit(self):
-		return
+		self.sshDir = os.path.expanduser("~%s/.ssh"%(self.getUserName()))
+		self.privkeyFile = os.path.join(self.sshDir, "id_rsa")
+		self.pubkeyFile = os.path.join(self.sshDir, "id_rsa.pub")
+
+		# initialize config files
+		if not os.path.exists(self.privkeyFile) or not os.path.exists(self.pubkeyFile):
+			SnUtil.forceDelete(self.privkeyFile)
+			SnUtil.forceDelete(self.pubkeyFile)
+			SnUtil.mkDir(self.sshDir)
+			SnUtil.shell("/bin/ssh-keygen -N \"\" -f %s -q"%(self.privkeyFile), "stdout")
+			assert os.path.exists(self.privkeyFile) and os.path.exists(self.pubkeyFile)
 
 	def onActive(self):
-		# send sys param to client
-		obj = ModuleDistccServerMachineParam()
-		obj.jobNumber = 4
+		obj = ModuleSshClientObject()
+		with open(self.pubkeyFile, "rt") as f:
+			obj.pubkey = f.read()
 		self.send(obj)
 
 	def onInactive(self):
-		"""ignore this event"""
+		return
+
+	def onReject(self, rejectMessage):
 		return
 
 	def onRecv(self, dataObj):
-		self.reject("receive client data")
+		self.reject("receive server data")
 
+class _SshClientObject:
+	pubkey = None				# str
 

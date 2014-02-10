@@ -24,6 +24,10 @@ class SnModule:
 
 class SnModuleInstance:
 
+	STATE_INACTIVE = 0
+	STATE_ACTIVE = 1
+	STATE_REJECT = 2
+	
 	##### hidden to subclass ####
 
 	def __init__(self, coreProxy, classObj, peerName, userName):
@@ -31,6 +35,7 @@ class SnModuleInstance:
 		self.classObj = classObj			# SnModule
 		self.peerName = peerName
 		self.userName = userName
+		self.state = self.STATE_INACTIVE
 
 	##### provide to subclass ####
 
@@ -55,6 +60,12 @@ class SnModuleInstance:
 
 	##### provide to core only ####
 
+	def getState(self):
+		return self.state
+
+	def setState(self, state):
+		self.state = state
+
 	def onInit(self):
 		"""Called after the module instance object is created"""
 		assert False			# implement by subclass
@@ -68,14 +79,17 @@ class SnModuleInstance:
 		assert False			# implement by subclass
 
 	def onReject(self, rejectMessage):
-		"""Called when rejection is received from the peer, peer state changes to inactive after this method call"""
+		"""Called when rejection is received from the peer"""
 		assert False			# implement by subclass
 
 	def onRecv(self, dataObj):
 		"""Called when data is received from the peer"""
 		assert False			# implement by subclass
 
-class SnModuleCoreProxy:
+class SnModuleException(Exception):
+	pass
+
+class _SnModuleCoreProxy:
 
 	def getHostName(self):
 		assert False

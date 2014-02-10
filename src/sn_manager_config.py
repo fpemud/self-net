@@ -36,8 +36,8 @@ class SnCfgHostInfo:
 
 class SnCfgModuleInfo:
 	enable = None					# bool
-	moduleScope = None				# str
-	moduleType = None				# str
+	moduleScope = None				# str, "sys" "usr"
+	moduleType = None				# str, "server" "client" "peer"
 	moduleId = None					# str
 	moduleObj = None				# obj, SnModule
 

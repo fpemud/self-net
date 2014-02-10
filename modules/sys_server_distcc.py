@@ -26,11 +26,9 @@ class ModuleInstanceObject(SnModuleInstance):
 		self.send(obj)
 
 	def onInactive(self):
-		"""ignore this event"""
 		return
 
 	def onReject(self, rejectMessage):
-		"""ignore this event"""
 		return
 
 	def onRecv(self, dataObj):

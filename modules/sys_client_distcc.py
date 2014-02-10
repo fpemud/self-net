@@ -20,7 +20,6 @@ class ModuleInstanceObject(SnModuleInstance):
 		return
 
 	def onActive(self):
-		"""ignore this event"""
 		return
 
 	def onInactive(self):
@@ -28,14 +27,11 @@ class ModuleInstanceObject(SnModuleInstance):
 			return
 
 		# remove peer from distcc configuration file
-		self.removePeer(self.getPeerName())
+		cfgFile = ConfigFile("/etc/distcc/hosts")
+		cfgFile.removeHost(peerName)
 
 	def onReject(self, rejectMessage):
-		if self.getPeerName() == self.core.getHostName():
-			return
-
-		# remove peer from distcc configuration file
-		self.removePeer(self.getPeerName())
+		return
 
 	def onRecv(self, dataObj):
 		if self.getPeerName() == self.core.getHostName():
@@ -46,19 +42,8 @@ class ModuleInstanceObject(SnModuleInstance):
 			return
 
 		# add peer to distcc configuration file
-		self._addPeer(self.getPeerName(), dataObj.jobNumber)
-
-	def _addPeer(self, peerName, jobNumber):
 		cfgFile = ConfigFile("/etc/distcc/hosts")
-		cfgFile.load()
 		cfgFile.addHost(ConfigFile.Host(self.getPeerName(), dataObj.jobNumber))
-		cfgFile.save()
-
-	def _removePeer(self, peerName):
-		cfgFile = ConfigFile("/etc/distcc/hosts")
-		cfgFile.load()
-		cfgFile.removeHost(peerName)
-		cfgFile.save()
 
 class MachineParam:
 	jobNumber = None				# int
@@ -74,7 +59,23 @@ class ConfigFile:
 		self.filename = filename
 		self.hostList = []
 
-	def load(self):
+	def addHost(self, hostObj):
+		assert isinstance(hostObj, ConfigFile.Host)
+		self._open()
+		self.hostList.append(hostObj)
+		self._close()
+
+	def removeHost(self, hostName):
+		self._open()
+		newList = []
+		for i in self.hostList:
+			if i.name == hostName:
+				continue
+			newList.append(i)
+		self.hostList = newList
+		self._close()
+
+	def _open(self):
 		self.hostList = []
 
 		f = open(self.filename, 'r')
@@ -87,7 +88,7 @@ class ConfigFile:
 			if len(parts) == 2:
 				self.hostList.append(ConfigFile.Host(parts[0], parts[1]))
 
-	def save(self):
+	def _close(self):
 		buf = ""
 		for i in self.hostList:
 			buf += "%s/%d "%(i.name, i.jobNumber)
@@ -95,16 +96,4 @@ class ConfigFile:
 		f = open(self.filename, 'w')
 		f.write(buf)
 		f.close()
-
-	def addHost(self, hostObj):
-		assert isinstance(hostObj, ConfigFile.Host)
-		self.hostList.append(hostObj)
-
-	def removeHost(self, hostName):
-		newList = []
-		for i in self.hostList:
-			if i.name == hostName:
-				continue
-			newList.append(i)
-		self.hostList = newList
 

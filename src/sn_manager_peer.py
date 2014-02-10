@@ -44,7 +44,7 @@ Peer FSM specification:
 """
 
 """
-Peer FSM graph:
+Peer FSM trigger table:
 
   STATE_NONE is the initial state.
 
@@ -62,6 +62,15 @@ Peer FSM graph:
   STATE_VER_MATCH -> STATE_NONE      : socket error occured
   STATE_CFG_MATCH -> STATE_NONE      : socket error occured
   STATE_FULL      -> STATE_NONE      : socket error occured
+"""
+
+"""
+Peer FSM callback table:
+
+  STATE_CFG_MATCH -> STATE_FULL      : call onPeerChange
+  STATE_FULL                         : call onPeerChange when SnPeerInfo is received
+  STATE_FULL      -> STATE_REJECT    : call onPeerRemove
+  STATE_FULL      -> STATE_NONE      : call onPeerRemove
 """
 
 """
@@ -154,9 +163,13 @@ class SnPeerManager:
 
 		GLib.source_remove(self.peerKeepaliveTimer)
 		GLib.source_remove(self.peerProbeTimer)
+
 		self.clientEndPoint.dispose()
 		self.serverEndPoint.dispose()
 		self.handshaker.dispose()
+
+		for peerName in self.peerInfoDict:
+			self._shutdownPeer(peerName)
 
 		logging.debug("SnPeerManager.dispose: End")
 		return
@@ -353,7 +366,8 @@ class SnPeerManager:
 		logging.warning("receive reject from peer, %s, %s", peerName, rejectMessage)
 
 		# do notify
-		self.param.localManager.onPeerRemove(peerName)
+		if self.peerInfoDict[peerName].state == _PeerInfoInternal.STATE_FULL:
+			self.param.localManager.onPeerRemove(peerName)
 
 		# remove peer
 		self.peerInfoDict[peerName].sock.close()
@@ -372,7 +386,8 @@ class SnPeerManager:
 		self.peerInfoDict[peerName].sock.send(packetObj)
 
 		# do notify
-		self.param.localManager.onPeerRemove(peerName)
+		if self.peerInfoDict[peerName].state == _PeerInfoInternal.STATE_FULL:
+			self.param.localManager.onPeerRemove(peerName)
 
 		# remove peer
 		self.peerInfoDict[peerName].sock.gracefulClose()
@@ -391,10 +406,12 @@ class SnPeerManager:
 		logging.warning("shutdown peer, %s", peerName)
 
 		# do notify
-		self.param.localManager.onPeerRemove(peerName)
+		if self.peerInfoDict[peerName].state == _PeerInfoInternal.STATE_FULL:
+			self.param.localManager.onPeerRemove(peerName)
 
 		# remove peer
-		self.peerInfoDict[peerName].sock.close()
+		if self.peerInfoDict[peerName].sock is not None:		# _shutdownPeer can be called by dispose(), so add this check
+			self.peerInfoDict[peerName].sock.close()
 		self.peerInfoDict[peerName].state = _PeerInfoInternal.STATE_NONE
 		self.peerInfoDict[peerName].infoObj = None
 		self.peerInfoDict[peerName].sock = None
