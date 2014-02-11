@@ -118,14 +118,6 @@ class SnSysPacketReject:
 class SnSysPacketKeepalive:
 	pass
 
-class SnDataPacket:
-	srcUserName = None				# str, can be None
-	srcModuleName = None			# str
-	data = None						# object
-
-class SnDataPacketReject:
-	message = None					# str
-
 class SnPeerManager:
 
 	def __init__(self, param):
@@ -237,7 +229,7 @@ class SnPeerManager:
 				self._recvReject(peerName, packetObj.data.message)
 			else:
 				self._sendReject(peerName, "invalid system packet data format")
-		elif self._typeCheck(packetObj, SnDataPacket):
+		elif self._typeCheck(packetObj, sn_manager_local.SnDataPacket):
 			self.param.localManager.onPacketRecv(peerName, packetObj.srcUserName, 
 						packetObj.srcModuleName, packetObj.data)
 		else:

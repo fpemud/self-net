@@ -8,10 +8,17 @@ from gi.repository import GLib
 from sn_manager_peer import SnPeerInfo
 from sn_manager_peer import SnPeerInfoUser
 from sn_manager_peer import SnPeerInfoModule
-from sn_manager_peer import SnDataPacketReject
 from sn_module import SnModuleInstance
 
 # fixme: needs to consider user change
+
+class SnDataPacket:
+	srcUserName = None				# str, can be None
+	srcModuleName = None			# str
+	data = None						# object
+
+class SnDataPacketReject:
+	message = None					# str
 
 class SnLocalManager:
 
@@ -110,7 +117,7 @@ class SnLocalManager:
 		for mo in self.moduleObjDict[peerName]:
 			if mo.getUserName() == userName and mo.getModuleName() == moduleName:
 				if self._typeCheck(data, SnDataPacketReject):
-					mo.onReject(data.rejectMessage)
+					mo.onReject(data.message)
 					mo.onInactive()
 					mo.setState(SnModuleInstance.STATE_REJECT)
 				else:

@@ -52,10 +52,13 @@ class ModuleInstanceObject(SnModuleInstance):
 	def _checkPubKey(self, pubkey):
 		strList = pubkey.split()
 		if len(strList) != 3:
+			print "******* debug1"
 			return False
 		if strList[0] != "ssh-rsa":
+			print "******* debug2"
 			return False
 		if strList[2] != "%s@%s"%(self.getUserName(), self.getPeerName()):
+			print "******* debug3, %s, %s"%(self.getUserName(), self.getPeerName())
 			return False
 
 	def _cleanup(self):
