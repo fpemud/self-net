@@ -3,6 +3,7 @@
 
 import os
 import re
+import pwd
 import logging
 import xml.sax.handler
 import socket
@@ -106,6 +107,10 @@ class SnConfigManager:
 
 	def getModuleInfo(self, moduleName):
 		return self.moduleDict[moduleName]
+
+	def getUserGroupId(self, userName):
+		i = pwd.getpwnam(userName)
+		return (i.pw_uid, i.pw_gid)
 
 	def _checkCertFiles(self):
 		# check CA certificate
