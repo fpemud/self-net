@@ -269,9 +269,12 @@ class SnPeerSocket:
 		# set state
 		self.gcState = self._GC_STATE_PENDING
 		if self.sendBuffer == "":
-			GLib.add_idle(self._gcCompleteIdleFunc)
+			# for consistency sake, gcCompleteFunc should be called in event
+			# context, so we use idle callback here
+			GLib.idle_add(self._gcCompleteIdleFunc)
 		else:
-			assert self.sendSourceId is not None	# assure socket is sending data
+			# assure socket is sending data
+			assert self.sendSourceId is not None
 
 	def close(self):
 		assert self.sslSock is not None
