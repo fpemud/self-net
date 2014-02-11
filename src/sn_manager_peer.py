@@ -14,6 +14,10 @@ from sn_conn_peer import SnPeerClient
 from sn_conn_peer import SnPeerHandShaker
 from sn_manager_config import SnVersion
 from sn_manager_config import SnCfgSerializationObject
+from sn_manager_local import SnPeerInfo
+from sn_manager_local import SnPeerInfoUser
+from sn_manager_local import SnPeerInfoModule
+from sn_manager_local import SnDataPacket
 
 """
 Peer FSM specification:
@@ -82,32 +86,6 @@ only when one end restarts the connection can be back on again. There's only one
 exception: one end enters STATE_REJECT, the other end enters STATE_NONE. Then
 the conenction will be reestablished by the STATE_NONE end.
 """
-
-
-class SnPeerInfo:
-	userList = None					# list<SnPeerInfoUser>
-	moduleList = None				# list<SnPeerInfoModule>
-
-class SnPeerInfoUser:
-	userName = None					# str
-
-	def __eq__(self, other):
-		return isinstance(other, self.__class__) and self.userName == other.userName
-	def __ne__(self, other):
-		return not self.__eq__(other)
-	def __hash__(self):
-		return hash(self.userName)
-
-class SnPeerInfoModule:
-	moduleName = None				# str
-	userName = None					# str
-
-	def __eq__(self, other):
-		return isinstance(other, self.__class__) and self.moduleName == other.moduleName and self.userName == other.userName
-	def __ne__(self, other):
-		return not self.__eq__(other)
-	def __hash__(self):
-		return hash(self.moduleName) ^ hash(self.userName)
 
 class SnSysPacket:
 	data = None						# object
@@ -229,7 +207,7 @@ class SnPeerManager:
 				self._recvReject(peerName, packetObj.data.message)
 			else:
 				self._sendReject(peerName, "invalid system packet data format")
-		elif self._typeCheck(packetObj, sn_manager_local.SnDataPacket):
+		elif self._typeCheck(packetObj, SnDataPacket):
 			self.param.localManager.onPacketRecv(peerName, packetObj.srcUserName, 
 						packetObj.srcModuleName, packetObj.data)
 		else:

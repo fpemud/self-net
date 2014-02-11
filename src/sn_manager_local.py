@@ -5,12 +5,34 @@ import logging
 import strict_pgs
 from gi.repository import GLib
 
-from sn_manager_peer import SnPeerInfo
-from sn_manager_peer import SnPeerInfoUser
-from sn_manager_peer import SnPeerInfoModule
 from sn_module import SnModuleInstance
 
 # fixme: needs to consider user change
+
+class SnPeerInfo:
+	userList = None					# list<SnPeerInfoUser>
+	moduleList = None				# list<SnPeerInfoModule>
+
+class SnPeerInfoUser:
+	userName = None					# str
+
+	def __eq__(self, other):
+		return isinstance(other, self.__class__) and self.userName == other.userName
+	def __ne__(self, other):
+		return not self.__eq__(other)
+	def __hash__(self):
+		return hash(self.userName)
+
+class SnPeerInfoModule:
+	moduleName = None				# str
+	userName = None					# str
+
+	def __eq__(self, other):
+		return isinstance(other, self.__class__) and self.moduleName == other.moduleName and self.userName == other.userName
+	def __ne__(self, other):
+		return not self.__eq__(other)
+	def __hash__(self):
+		return hash(self.moduleName) ^ hash(self.userName)
 
 class SnDataPacket:
 	srcUserName = None				# str, can be None
