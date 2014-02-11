@@ -131,9 +131,6 @@ class SnLocalManager:
 		ret.moduleList = []
 		for mname in self.param.configManager.getModuleNameList():
 			mInfo = self.param.configManager.getModuleInfo(mname)
-			if mInfo.enable is not True:
-				continue
-
 			if mInfo.moduleScope == "sys":
 				n = SnPeerInfoModule()
 				n.moduleName = mname
@@ -158,15 +155,17 @@ class SnLocalManager:
 		pgs = strict_pgs.PasswdGroupShadow("/")
 		ret = dict()
 
+		# invoke SnModule.onInit
+		for mname in self.param.configManager.getModuleNameList():
+			minfo = self.param.configManager.getModuleInfo(mname)
+			minfo.moduleObj.onInit()
+
+		# create self.moduleObjDict, invoke SnModuleInstance.onInit
 		for pname in self.param.configManager.getHostNameList():
 			moduleObjList = []
 			for mname in self.param.configManager.getModuleNameList():
 				minfo = self.param.configManager.getModuleInfo(mname)
-				if not minfo.enable:
-					continue
-
 				exec("from %s import ModuleInstanceObject"%(mname.replace("-", "_")))
-
 				if minfo.moduleScope == "sys":
 					mo = ModuleInstanceObject(self.coreProxy, minfo.moduleObj, pname, None)
 					mo.onInit()

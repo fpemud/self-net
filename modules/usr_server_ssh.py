@@ -16,6 +16,9 @@ class ModuleObject(SnModule):
 			return True
 		return None
 
+	def onInit(self):
+		return
+
 class ModuleInstanceObject(SnModuleInstance):
 
 	def onInit(self):

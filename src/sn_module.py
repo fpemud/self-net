@@ -22,6 +22,10 @@ class SnModule:
 		   Returns None for unknown property name"""
 		assert False			# implement by subclass
 
+	def onInit(self):
+		"""Called after the module object is created"""
+		assert False			# implement by subclass
+
 class SnModuleInstance:
 
 	STATE_INACTIVE = 0

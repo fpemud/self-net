@@ -35,7 +35,6 @@ class SnCfgHostInfo:
 	isNexus = None					# bool
 
 class SnCfgModuleInfo:
-	enable = None					# bool
 	moduleScope = None				# str, "sys" "usr"
 	moduleType = None				# str, "server" "client" "peer"
 	moduleId = None					# str
@@ -321,7 +320,6 @@ class _ModuleFileXmlHandler(xml.sax.handler.ContentHandler):
 	INIT = 0
 	IN_MODULES = 1
 	IN_MODULE = 2
-	IN_MODULE_ENABLE = 3
 
 	def __init__(self, moduleDict):
 		xml.sax.handler.ContentHandler.__init__(self)
@@ -337,8 +335,6 @@ class _ModuleFileXmlHandler(xml.sax.handler.ContentHandler):
 			self.state = self.IN_MODULE
 			self.curModuleName = attrs["name"]
 			self.curModuleInfo = _newSnCfgModuleInfo()
-		elif name == "enable" and self.state == self.IN_MODULE:
-			self.state = self.IN_MODULE_ENABLE
 		else:
 			raise Exception("Failed to parse modules file")
 
@@ -350,16 +346,11 @@ class _ModuleFileXmlHandler(xml.sax.handler.ContentHandler):
 			self.curModuleName = None
 			self.curModuleInfo = None
 			self.state = self.IN_MODULES
-		elif name == "enable" and self.state == self.IN_MODULE_ENABLE:
-			self.state = self.IN_MODULE
 		else:
 			raise Exception("Failed to parse modules file")
 
 	def characters(self, content):
-		if self.state == self.IN_MODULE_ENABLE:
-			self.curModuleInfo.enable = bool(content)
-		else:
-			pass
+		pass
 
 def _newSnCfgGlobal():
 	"""create new object, set default values"""
@@ -384,6 +375,5 @@ def _newSnCfgModuleInfo():
 	"""create new object, set default values"""
 
 	curModuleInfo = SnCfgModuleInfo()
-	curModuleInfo.enable = False
 	return curModuleInfo
 
