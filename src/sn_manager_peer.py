@@ -53,10 +53,10 @@ Peer FSM trigger table:
   STATE_VER_MATCH -> STATE_CFG_MATCH : object SnCfgSerializationObject recevied
   STATE_CFG_MATCH -> STATE_FULL      : object SnPeerInfo recevied
 
-  STATE_INIT      -> STATE_REJECT    : protocol error occured
-  STATE_VER_MATCH -> STATE_REJECT    : protocol error occured
-  STATE_CFG_MATCH -> STATE_REJECT    : protocol error occured
-  STATE_FULL      -> STATE_REJECT    : protocol error occured
+  STATE_INIT      -> STATE_REJECT    : reject sent, reject received
+  STATE_VER_MATCH -> STATE_REJECT    : reject sent, reject received
+  STATE_CFG_MATCH -> STATE_REJECT    : reject sent, reject received
+  STATE_FULL      -> STATE_REJECT    : reject sent, reject received
 
   STATE_INIT      -> STATE_NONE      : socket error occured
   STATE_VER_MATCH -> STATE_NONE      : socket error occured
@@ -207,16 +207,15 @@ class SnPeerManager:
 		self.peerInfoDict[sock.getPeerName()].sock = sock
 
 		# send localInfo
-		self._sendObjToPeer(sock.getPeerName(), self.param.configManager.getVersion())
-		self._sendObjToPeer(sock.getPeerName(), self.param.configManager.getCfgSerializationObject())
-		self._sendObjToPeer(sock.getPeerName(), self.param.localManager.getLocalInfo())
+		self._sendObject(sock.getPeerName(), self.param.configManager.getVersion())
+		self._sendObject(sock.getPeerName(), self.param.configManager.getCfgSerializationObject())
+		self._sendObject(sock.getPeerName(), self.param.localManager.getLocalInfo())
 
 		logging.debug("SnPeerManager.onSocketConnected: End")
 		return
 
 	def onSocketRecv(self, sock, packetObj):
 		logging.debug("SnPeerManager.onSocketRecv: Start, %s", sock.getPeerName())
-
 		
 		peerName = sock.getPeerName()
 		if self._typeCheck(packetObj, SnSysPacket):
@@ -236,16 +235,12 @@ class SnPeerManager:
 				logging.debug("SnPeerManager.onSocketRecv: _recvReject")
 				self._recvReject(peerName, packetObj.data.message)
 			else:
-				self._rejectPeer(peerName, "invalid system packet data format")
+				self._sendReject(peerName, "invalid system packet data format")
 		elif self._typeCheck(packetObj, SnDataPacket):
-			if self._typeCheck(packetObj.data, SnDataPacketReject):
-				self.param.localManager.onReject(peerName, packetObj.srcUserName, 
-						packetObj.srcModuleName, packetObj.data.message)
-			else:
-				self.param.localManager.onRecv(peerName, packetObj.srcUserName, 
+			self.param.localManager.onPacketRecv(peerName, packetObj.srcUserName, 
 						packetObj.srcModuleName, packetObj.data)
 		else:
-			self._rejectPeer(peerName, "invalid packet format, %s"%(packetObj.__class__))
+			self._sendReject(peerName, "invalid packet format, %s"%(packetObj.__class__))
 
 		logging.debug("SnPeerManager.onSocketRecv: End")
 		return
@@ -255,6 +250,25 @@ class SnPeerManager:
 		self._shutdownPeer(sock.getPeerName())
 		logging.debug("SnPeerManager.onSocketError: End")
 		return
+
+	def onSocketGracefulCloseComplete(self, sock):
+		logging.debug("SnPeerManager.onSocketGracefulCloseComplete: Start, %s", sock.getPeerName())
+
+		peerName = sock.getPeerName()
+		logging.warning("graceful close complete, %s", peerName)
+
+		# do notify
+		if self.peerInfoDict[peerName].state == _PeerInfoInternal.STATE_FULL:
+			self.param.localManager.onPeerRemove(peerName)
+
+		# remove peer
+		self.peerInfoDict[peerName].sock.close()
+		self.peerInfoDict[peerName].state = _PeerInfoInternal.STATE_REJECT
+		self.peerInfoDict[peerName].infoObj = None
+		self.peerInfoDict[peerName].sock = None
+
+		logging.debug("SnPeerManager.onSocketGracefulCloseComplete: End")
+		pass
 
 	def onPeerProbe(self):
 		connectId = time.time()
@@ -284,18 +298,18 @@ class SnPeerManager:
 	def _recvKeepalive(self, peerName):
 		# check state
 		if self.peerInfoDict[peerName].state != _PeerInfoInternal.STATE_FULL:
-			self._rejectPeer(peerName, "keep-alive packet received in state other than state-full")
+			self._sendReject(peerName, "keep-alive packet received in state other than state-full")
 			return
 
 	def _recvVerMatch(self, peerName, peerVersion):
 		# check state
 		if self.peerInfoDict[peerName].state != _PeerInfoInternal.STATE_INIT:
-			self._rejectPeer(peerName, "ver-match packet received in state other than state-init")
+			self._sendReject(peerName, "ver-match packet received in state other than state-init")
 			return
 
 		# check matching
 		if peerVersion != self.param.configManager.getVersion():
-			self._rejectPeer(peerName, "peer version not match")
+			self._sendReject(peerName, "peer version not match")
 			return
 
 		# do operation
@@ -304,12 +318,12 @@ class SnPeerManager:
 	def _recvCfgMatch(self, peerName, peerCfgSerializationObject):
 		# check state
 		if self.peerInfoDict[peerName].state != _PeerInfoInternal.STATE_VER_MATCH:
-			self._rejectPeer(peerName, "cfg-match packet received in state other than state-ver-match")
+			self._sendReject(peerName, "cfg-match packet received in state other than state-ver-match")
 			return
 
 		# check matching
 		if peerCfgSerializationObject != self.param.configManager.getCfgSerializationObject():
-			self._rejectPeer(peerName, "peer configuration not match")
+			self._sendReject(peerName, "peer configuration not match")
 			return
 
 		# do operation
@@ -318,40 +332,40 @@ class SnPeerManager:
 	def _recvPeerInfo(self, peerName, peerInfo):
 		# check state
 		if self.peerInfoDict[peerName].state != _PeerInfoInternal.STATE_CFG_MATCH:
-			self._rejectPeer(peerName, "peer-info packet received in state other than state-cfg-match")
+			self._sendReject(peerName, "peer-info packet received in state other than state-cfg-match")
 			return
 
 		# check peer info
 		if len(peerInfo.userList) != len(set(peerInfo.userList)):
-			self._rejectPeer(peerName, "duplicate element in peer user list")
+			self._sendReject(peerName, "duplicate element in peer user list")
 			return
 
 		if len(peerInfo.moduleList) != len(set(peerInfo.moduleList)):
-			self._rejectPeer(peerName, "duplicate element in peer module list")
+			self._sendReject(peerName, "duplicate element in peer module list")
 			return
 
 		for m in peerInfo.moduleList:
 			strList = m.moduleName.split("-")
 			if len(strList) < 3:
-				self._rejectPeer(peerName, "invalid module name \"%s\""%(m.moduleName))
+				self._sendReject(peerName, "invalid module name \"%s\""%(m.moduleName))
 				return
 
 			moduleScope = strList[0]
 			if moduleScope not in ["sys", "usr"]:
-				self._rejectPeer(peerName, "invalid module scope for module name \"%s\""%(m.moduleName))
+				self._sendReject(peerName, "invalid module scope for module name \"%s\""%(m.moduleName))
 				return
 
 			moduleType = strList[1]
 			if moduleType not in ["server", "client", "peer"]:
-				self._rejectPeer(peerName, "invalid module type for module name \"%s\""%(m.moduleName))
+				self._sendReject(peerName, "invalid module type for module name \"%s\""%(m.moduleName))
 				return
 
 			moduleId = "-".join(strList[2:])
 			if len(moduleId) > 32:
-				self._rejectPeer(peerName, "module id is too long for module name \"%s\""%(m.moduleName))
+				self._sendReject(peerName, "module id is too long for module name \"%s\""%(m.moduleName))
 				return
 			if re.match("[A-Za-z0-9_]+", moduleId) is None:
-				self._rejectPeer(peerName, "invalid module id for module name \"%s\""%(m.moduleName))
+				self._sendReject(peerName, "invalid module id for module name \"%s\""%(m.moduleName))
 				return
 
 		# do operation
@@ -375,29 +389,28 @@ class SnPeerManager:
 		self.peerInfoDict[peerName].infoObj = None
 		self.peerInfoDict[peerName].sock = None
 
-	def _rejectPeer(self, peerName, rejectMessage):
+	def _sendObject(self, peerName, obj):
+		packetObj = SnSysPacket()
+		packetObj.data = obj
+		self.peerInfoDict[peerName].sock.send(packetObj)
+
+	def _sendReject(self, peerName, rejectMessage):
 		# record to log
-		logging.warning("send reject to peer, %s, %s", peerName, rejectMessage)
+		logging.warning("send reject to peer, closing gracefully, %s, %s", peerName, rejectMessage)
 
 		# send reject message
 		packetObj = SnSysPacket()
-		packetObj.data = SnDataPacketReject()
+		packetObj.data = SnSysPacketReject()
 		packetObj.data.message = rejectMessage
 		self.peerInfoDict[peerName].sock.send(packetObj)
 
-		# do notify
-		if self.peerInfoDict[peerName].state == _PeerInfoInternal.STATE_FULL:
-			self.param.localManager.onPeerRemove(peerName)
-
-		# remove peer
+		# graceful close, wait reject message to be sent
 		self.peerInfoDict[peerName].sock.gracefulClose()
-		self.peerInfoDict[peerName].state = _PeerInfoInternal.STATE_REJECT
-		self.peerInfoDict[peerName].infoObj = None
-		self.peerInfoDict[peerName].sock = None
 
-	def _sendObjToPeer(self, peerName, obj):
-		# send object
-		packetObj = SnSysPacket()
+	def _sendDataObject(self, peerName, srcUserName, srcModuleName, obj):
+		packetObj = SnDataPacket()
+		packetObj.srcUserName = srcUserName
+		packetObj.srcModuleName = srcModuleName
 		packetObj.data = obj
 		self.peerInfoDict[peerName].sock.send(packetObj)
 

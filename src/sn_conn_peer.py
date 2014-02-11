@@ -201,12 +201,17 @@ class SnPeerHandShaker:
 
 class SnPeerSocket:
 
+	_GC_STATE_NONE = 0
+	_GC_STATE_PENDING = 1
+	_GC_STATE_COMPLETE = 2
+
 	def __init__(self, sslSock, peerName):
 		self.sslSock = sslSock
 		self.peerName = peerName
-		self.isClosing = False
+		self.gcState = self._GC_STATE_NONE
 		self.recvFunc = None
 		self.errorFunc = None
+		self.gcCompleteFunc = None
 
 		self.sendBuffer = ""
 		self.recvBuffer = ""
@@ -214,26 +219,31 @@ class SnPeerSocket:
 		self.sendSourceId = None
 
 	def setEventFunc(self, funcName, func):
-		assert self.sslSock is not None and not self.isClosing
+		assert self._checkValid()
 		assert func is not None
 
 		if funcName == "recv":
 			assert self.recvFunc is None
 			self.recvFunc = func
+			if self.recvSourceId is None:
+				self.recvSourceId = GLib.io_add_watch(self.sslSock, GLib.IO_IN | _flagError, self._onRecv)
 		elif funcName == "error":
 			assert self.errorFunc is None
 			self.errorFunc = func
+			if self.recvSourceId is None:
+				self.recvSourceId = GLib.io_add_watch(self.sslSock, GLib.IO_IN | _flagError, self._onRecv)
+		elif funcName == "gracefulCloseComplete":
+			assert self.gcCompleteFunc is None
+			self.gcCompleteFunc = func
 		else:
 			assert False
 
-		self.recvSourceId = GLib.io_add_watch(self.sslSock, GLib.IO_IN | _flagError, self._onRecv)
-
 	def getPeerName(self):
-		assert self.sslSock is not None and not self.isClosing
+		assert self._checkValid()
 		return self.peerName
 
 	def send(self, dataObj):
-		assert self.sslSock is not None and not self.isClosing
+		assert self._checkValid()
 
 		data = pickle.dumps(dataObj)
 		header = struct.pack("!I", len(data))
@@ -244,12 +254,40 @@ class SnPeerSocket:
 			self.sendSourceId = GLib.io_add_watch(self.sslSock, GLib.IO_OUT, self._onSend)
 
 	def gracefulClose(self):
-		assert self.sslSock is not None and not self.isClosing
-		self.isClosing = True
+		"""This function does not close the socket, the socket must be closed
+		   by graceful close complete callback funtion"""
+
+		assert self._checkValid()
+		assert self.gcCompleteFunc is not None
+
+		# no receiving in graceful closing
+		if self.recvSourceId is not None:
+			ret = GLib.source_remove(self.recvSourceId)
+			assert ret
+			self.recvSourceId = None
+
+		# set state
+		self.gcState = self._GC_STATE_PENDING
+		if self.sendBuffer == "":
+			GLib.add_idle(self._gcCompleteIdleFunc)
+		else:
+			assert self.sendSourceId is not None	# assure socket is sending data
 
 	def close(self):
-		assert self.sslSock is not None and not self.isClosing
-		self._doClose()
+		assert self.sslSock is not None
+
+		if self.sendSourceId is not None:
+			ret = GLib.source_remove(self.sendSourceId)
+			assert ret
+			self.sendSourceId = None
+
+		if self.recvSourceId is not None:
+			ret = GLib.source_remove(self.recvSourceId)
+			assert ret
+			self.recvSourceId = None
+
+		self.sslSock.close()
+		self.sslSock = None
 
 	def _onSend(self, source, cb_condition):
 		assert source == self.sslSock
@@ -258,33 +296,49 @@ class SnPeerSocket:
 
 		# check error
 		if cb_condition & _flagError:
-			self.sendBuffer = ""
-			self.sendSourceId = None
-			logging.debug("SnPeerSocket._onSend: Socket error")
+			if self.gcState == self._GC_STATE_NONE:
+				logging.debug("SnPeerSocket._onSend: Socket error")
+				self.sendBuffer = ""
+				self.sendSourceId = None
+			elif self.gcState == self._GC_STATE_PENDING:
+				logging.debug("SnPeerSocket._onSend: Socket error, graceful close complete")
+				self.sendBuffer = ""
+				self.gcState = self._GC_STATE_COMPLETE
+				self.gcCompleteFunc(self)
+				assert self.sslSock is None		# gcCompleteFunc should close the socket
+			else:
+				assert False
 			return False
 		
 		# send data as much as possible
 		sendLen = self.sslSock.send(self.sendBuffer)
 		self.sendBuffer = self.sendBuffer[sendLen:]
 
+		# still has data to send
 		if self.sendBuffer != "":
-			# still has data to send
 			self.sendSourceId = GLib.io_add_watch(self.sslSock, GLib.IO_OUT, self._onSend)
 			logging.debug("SnPeerSocket._onSend: Data remains")
 			return False
-		else:
-			# no data to send
-			if self.isClosing:
-				self._doClose()
+
+		# no data to send
+		if self.gcState == self._GC_STATE_NONE:
 			logging.debug("SnPeerSocket._onSend: No data remains")
 			self.sendSourceId = None
-			return False
+		elif self.gcState == self._GC_STATE_PENDING:
+			logging.debug("SnPeerSocket._onSend: No data remains, graceful close complete")
+			self.gcState = self._GC_STATE_COMPLETE
+			self.gcCompleteFunc(self)
+			assert self.sslSock is None			# gcCompleteFunc should close the socket
+		else:
+			assert False
+		return False
 
 	def _onRecv(self, source, cb_condition):
 		# fixme: weird, It seems that GLib.source_remove has no effect
 		if source != self.sslSock:
 			return False
 		#assert source == self.sslSock
+		assert self.gcState == self._GC_STATE_NONE
 
 		logging.debug("SnPeerSocket._onRecv: Start, %s, %s", self.peerName, _cb_condition_to_str(cb_condition))
 
@@ -306,6 +360,7 @@ class SnPeerSocket:
 					return True
 				self.recvBuffer += ret
 
+			# receive packet data
 			dataLen = headerLen + struct.unpack("!I", self.recvBuffer[:headerLen])[0]
 			while len(self.recvBuffer) < dataLen:
 				ret = self.sslSock.recv(dataLen - len(self.recvBuffer))
@@ -313,12 +368,6 @@ class SnPeerSocket:
 					logging.debug("SnPeerSocket._onRecv: More data needed")
 					return True
 				self.recvBuffer += ret
-
-			# closing, consume data, don't do real operation
-			if self.isClosing:
-				self.recvBuffer = ""
-				logging.debug("SnPeerSocket._onRecv: Closing")
-				return True
 
 			# invoke callback function
 			dataObj = pickle.loads(self.recvBuffer[headerLen:])
@@ -331,19 +380,13 @@ class SnPeerSocket:
 		else:
 			assert False
 
-	def _doClose(self):
-		if self.sendSourceId is not None:
-			ret = GLib.source_remove(self.sendSourceId)
-			assert ret
-			self.sendSourceId = None
+	def _gcCompleteIdleFunc(self):
+		self.gcState = self._GC_STATE_COMPLETE
+		self.gcCompleteFunc(self)
+		assert self.sslSock is None			# gcCompleteFunc should close the socket
 
-		if self.recvSourceId is not None:
-			ret = GLib.source_remove(self.recvSourceId)
-			assert ret
-			self.recvSourceId = None
-
-		self.sslSock.close()
-		self.sslSock = None
+	def _checkValid(self):
+		return self.sslSock is not None and self.gcState == self._GC_STATE_NONE
 
 	def _getRetBySource(self, sourceId):
 		# I find removing the source handler in callback function has no effect.

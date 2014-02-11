@@ -7,6 +7,7 @@ import strict_pgs
 from sn_manager_peer import SnPeerInfo
 from sn_manager_peer import SnPeerInfoUser
 from sn_manager_peer import SnPeerInfoModule
+from sn_manager_peer import SnDataPacketReject
 from sn_module import SnModuleInstance
 
 # fixme: needs to consider user change
@@ -18,7 +19,6 @@ class SnLocalManager:
 
 		self.param = param
 		self.localInfo = self._getLocalInfo()			# SnPeerInfo
-		self.coreProxy = None
 		self.moduleObjDict = self._getModuleObjDict()
 
 		logging.debug("SnLocalManager.__init__: End")
@@ -46,31 +46,37 @@ class SnLocalManager:
 
 		# process module inactive
 		for mo in self.moduleObjDict[peerName]:
-			if self._matchPeerModuleList(peerInfo, mo):
-				continue
-			if mo.getState() == SnModuleInstance.STATE_ACTIVE:
-				logging.debug("SnLocalManager.onPeerChange: mo active -> inactive start, %s, %s, %s", peerName, mo.getUserName(), mo.getModuleName())
-				mo.onInactive()
-				mo.setState(SnModuleInstance.STATE_INACTIVE)
-				logging.debug("SnLocalManager.onPeerChange: mo active -> inactive end")
-				continue
-			if mo.getState() == SnModuleInstance.STATE_REJECT:
-				logging.debug("SnLocalManager.onPeerChange: mo reject -> inactive start, %s, %s, %s", peerName, mo.getUserName(), mo.getModuleName())
-				mo.setState(SnModuleInstance.STATE_INACTIVE)
-				logging.debug("SnLocalManager.onPeerChange: mo reject -> inactive end")
-				continue
+			if not self._matchPeerModuleList(peerInfo, mo):
+				if mo.getState() == SnModuleInstance.STATE_ACTIVE:
+					logging.debug("SnLocalManager.onPeerChange: mo active -> inactive start, %s, %s, %s", peerName, mo.getUserName(), mo.getModuleName())
+					mo.onInactive()
+					mo.setState(SnModuleInstance.STATE_INACTIVE)
+					logging.debug("SnLocalManager.onPeerChange: mo active -> inactive end")
+				elif mo.getState() == SnModuleInstance.STATE_INACTIVE:
+					pass
+				elif mo.getState() == SnModuleInstance.STATE_REJECT:
+					logging.debug("SnLocalManager.onPeerChange: mo reject -> inactive start, %s, %s, %s", peerName, mo.getUserName(), mo.getModuleName())
+					mo.setState(SnModuleInstance.STATE_INACTIVE)
+					logging.debug("SnLocalManager.onPeerChange: mo reject -> inactive end")
+				else:
+					assert False
+			
 
 		# process module active
 		for mio in peerInfo.moduleList:
 			mo = self._findModuleList(self.moduleObjDict[peerName], mio)
-			if mo is None:
-				continue
-			if mo.getState() == SnModuleInstance.STATE_INACTIVE:
-				logging.debug("SnLocalManager.onPeerChange: mo inactive -> active start, %s, %s, %s", peerName, mo.getUserName(), mo.getModuleName())
-				mo.onActive()
-				mo.setState(SnModuleInstance.STATE_ACTIVE)
-				logging.debug("SnLocalManager.onPeerChange: mo inactive -> active end")
-				continue
+			if mo is not None:
+				if mo.getState() == SnModuleInstance.STATE_ACTIVE:
+					pass
+				elif mo.getState() == SnModuleInstance.STATE_INACTIVE:
+					logging.debug("SnLocalManager.onPeerChange: mo inactive -> active start, %s, %s, %s", peerName, mo.getUserName(), mo.getModuleName())
+					mo.onActive()
+					mo.setState(SnModuleInstance.STATE_ACTIVE)
+					logging.debug("SnLocalManager.onPeerChange: mo inactive -> active end")
+				elif mo.getState() == SnModuleInstance.STATE_REJECT:
+					pass
+				else:
+					assert False
 
 		logging.debug("SnLocalManager.onPeerChange: End")
 		return
@@ -84,37 +90,57 @@ class SnLocalManager:
 				mo.onInactive()
 				mo.setState(SnModuleInstance.STATE_INACTIVE)
 				logging.debug("SnLocalManager.onPeerRemove: mo active -> inactive end")
+			elif mo.getState() == SnModuleInstance.STATE_INACTIVE:
+				pass
+			elif mo.getState() == SnModuleInstance.STATE_REJECT:
+				logging.debug("SnLocalManager.onPeerRemove: mo reject -> inactive start, %s, %s, %s", peerName, mo.getUserName(), mo.getModuleName())
+				mo.setState(SnModuleInstance.STATE_INACTIVE)
+				logging.debug("SnLocalManager.onPeerRemove: mo reject -> inactive end")
+			else:
+				assert False
 
 		logging.debug("SnLocalManager.onPeerRemove: End")
 		return
 
-	def onRecv(self, peerName, userName, srcModuleName, data):
-		logging.debug("SnLocalManager.onRecv: Start, %s, %s, %s", peerName, userName, srcModuleName)
+	def onPacketRecv(self, peerName, userName, srcModuleName, data):
+		logging.debug("SnLocalManager.onPacketRecv: Start, %s, %s, %s", peerName, userName, srcModuleName)
 
 		moduleName = self._getModuleNameByPeerModuleName(srcModuleName)
 		for mo in self.moduleObjDict[peerName]:
 			if mo.getUserName() == userName and mo.getModuleName() == moduleName:
-				mo.onRecv(data)
-				logging.debug("SnLocalManager.onRecv: End")
+				if self._typeCheck(data, SnDataPacketReject):
+					mo.onReject(data.rejectMessage)
+					mo.onInactive()
+					mo.setState(SnModuleInstance.STATE_REJECT)
+				else:
+					mo.onRecv(data)
+				logging.debug("SnLocalManager.onPacketRecv: End")
 				return
-
-		assert False
-
-	def onReject(self, peerName, userName, srcModuleName, rejectMessage):
-		logging.debug("SnLocalManager.onReject: Start, %s, %s, %s", peerName, userName, srcModuleName)
-
-		moduleName = self._getModuleNameByPeerModuleName(srcModuleName)
-		for mo in self.moduleObjDict[peerName]:
-			if mo.getUserName() == userName and mo.getModuleName() == moduleName:
-				mo.onReject(rejectMessage)
-				mo.onInactive()
-				mo.setState(SnModuleInstance.STATE_REJECT)
-				logging.debug("SnLocalManager.onReject: End")
-				return
-
 		assert False
 
 	##### implementation ####
+
+	def _sendObject(self, peerName, userName, moduleName, obj):
+		self.param.peerManager._sendDataObject(peerName, userName, moduleName, obj)
+
+	def _sendReject(self, peerName, userName, moduleName, rejectMessage):
+		# record to log
+		logging.warning("send reject to peer module, %s, %s, %s, %s", peerName, userName, moduleName, rejectMessage)
+
+		# send reject message
+		rejectObj = SnDataPacketReject()
+		rejectObj.message = rejectMessage
+		self.param.peerManager._sendDataObject(peerName, userName, moduleName, rejectObj)
+
+		# change state
+		found = False
+		for mo in self.moduleObjDict[peerName]:
+			if mo.getUserName() == userName and mo.getModuleName() == moduleName:
+				mo.onInactive()
+				mo.setState(SnModuleInstance.STATE_REJECT)
+				found = True
+				break
+		assert found
 
 	def _getLocalInfo(self):
 		pgs = strict_pgs.PasswdGroupShadow("/")
@@ -162,15 +188,17 @@ class SnLocalManager:
 				minfo = self.param.configManager.getModuleInfo(mname)
 				exec("from %s import ModuleInstanceObject"%(mname.replace("-", "_")))
 				if minfo.moduleScope == "sys":
-					mo = ModuleInstanceObject(self.coreProxy, minfo.moduleObj, minfo.moduleParamDict, pname, None)
+					mo = ModuleInstanceObject(self, minfo.moduleObj, minfo.moduleParamDict, pname, None)
 					mo.onInit()
+					mo.setState(SnModuleInstance.STATE_INACTIVE)
 					moduleObjList.append(mo)
 				elif minfo.moduleScope == "usr":
 					for uname in pgs.getUserList():
 						if uname in self.param.configManager.getUserBlackList():
 							continue
-						mo = ModuleInstanceObject(self.coreProxy, minfo.moduleObj, minfo.moduleParamDict, pname, uname)
+						mo = ModuleInstanceObject(self, minfo.moduleObj, minfo.moduleParamDict, pname, uname)
 						mo.onInit()
+						mo.setState(SnModuleInstance.STATE_INACTIVE)
 						moduleObjList.append(mo)
 				else:
 					assert False
@@ -197,4 +225,7 @@ class SnLocalManager:
 		elif strList[1] == "client":
 			strList[1] = "server"
 		return "-".join(strList)
+
+	def _typeCheck(self, obj, typeobj):
+		return str(obj.__class__) == str(typeobj)
 

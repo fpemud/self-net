@@ -11,6 +11,29 @@ Some example: sys-server-distcc, sys-client-distcc, usr-server-ssh, usr-client-s
 Replace "-" with "_" can selfnet module name be converted to python module name.
 """
 
+"""
+ModuleInstance FSM trigger table:
+
+  STATE_NONE is the initial state.
+
+  STATE_NONE     -> STATE_INACTIVE : initialized
+  STATE_INACTIVE -> STATE_ACTIVE   : peer added, peer module added
+  STATE_ACTIVE   -> STATE_INACTIVE : peer removed, peer module removed
+  STATE_ACTIVE   -> STATE_REJECT   : reject sent, reject received
+  STATE_REJECT   -> STATE_INACTIVE : peer removed, peer module removed
+"""
+
+"""
+ModuleInstance FSM callback table:
+
+  STATE_NONE     -> STATE_INACTIVE : call onInit
+  STATE_INACTIVE -> STATE_ACTIVE   : call onActive
+  STATE_ACTIVE   -> STATE_INACTIVE : call onInactive
+  STATE_ACTIVE   -> STATE_REJECT   : call onInactive
+  STATE_ACTIVE                     : call onRecv when data received
+  STATE_ACTIVE                     : call onReject when reject received
+"""
+
 class SnModule:
 
 	def getModuleName(self):
@@ -22,19 +45,20 @@ class SnModule:
 
 class SnModuleInstance:
 
-	STATE_INACTIVE = 0
-	STATE_ACTIVE = 1
-	STATE_REJECT = 2
+	STATE_NONE = 0
+	STATE_INACTIVE = 1
+	STATE_ACTIVE = 2
+	STATE_REJECT = 3
 	
 	##### hidden to subclass ####
 
-	def __init__(self, coreProxy, classObj, paramDict, peerName, userName):
-		self.core = coreProxy
+	def __init__(self, coreObj, classObj, paramDict, peerName, userName):
+		self.coreObj = coreObj
 		self.classObj = classObj			# SnModule
 		self.paramDict = paramDict
 		self.peerName = peerName
 		self.userName = userName
-		self.state = self.STATE_INACTIVE
+		self.state = self.STATE_NONE
 
 	##### provide to subclass ####
 
@@ -50,13 +74,13 @@ class SnModuleInstance:
 	def getModuleName(self):
 		return self.classObj.getModuleName()
 
-	def send(self, data):
-		self.core._sendToPeer(self.getPeerName(), data)
+	def sendObject(self, obj):
+		self.coreObj._sendObject(self.peerName, self.userName, self.classObj.getModuleName(), obj)
 
-	def reject(self, rejectMessage):
-		self.core._rejectPeer(self.getPeerName(), rejectMessage)
+	def sendReject(self, rejectMessage):
+		self.coreObj._sendReject(self.peerName, self.userName, self.classObj.getModuleName(), rejectMessage)
 
-	##### provide to core only ####
+	##### provide to coreObj only ####
 
 	def getState(self):
 		return self.state
@@ -86,19 +110,4 @@ class SnModuleInstance:
 
 class SnModuleException(Exception):
 	pass
-
-class _SnModuleCoreProxy:
-
-	def getHostName(self):
-		assert False
-
-	def getNetRange(self):
-		"""Get the network range of selfnet, format: 192.168.1.1/255.255.255.0 or 128::1/24"""
-		assert False
-
-	def _sendToPeer(self, peerName, data):
-		pass
-
-	def _rejectPeer(self, peerName, rejectMessage):
-		pass
 
