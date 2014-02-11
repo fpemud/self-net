@@ -11,13 +11,10 @@ class ModuleObject(SnModule):
 	def getModuleName(self):
 		return "usr-client-ssh"
 
-	def getProperty(self, propertyName):
-		if propertyName == "allow-local-peer":
-			return True
-		return None
-
-	def onInit(self):
-		return
+	def getPropDict(self):
+		ret = dict()
+		ret["allow-local-peer"] = True
+		return ret
 
 class ModuleInstanceObject(SnModuleInstance):
 

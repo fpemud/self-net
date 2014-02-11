@@ -16,14 +16,8 @@ class SnModule:
 	def getModuleName(self):
 		assert False			# implement by subclass
 
-	def getProperty(self, propertyName):
-		"""Property list:
-		     allow-local-peer: true | false
-		   Returns None for unknown property name"""
-		assert False			# implement by subclass
-
-	def onInit(self):
-		"""Called after the module object is created"""
+	def getPropDict(self):
+		"""Property list: allow-local-peer: true | false"""
 		assert False			# implement by subclass
 
 class SnModuleInstance:
@@ -34,18 +28,18 @@ class SnModuleInstance:
 	
 	##### hidden to subclass ####
 
-	def __init__(self, coreProxy, classObj, peerName, userName):
+	def __init__(self, coreProxy, classObj, paramDict, peerName, userName):
 		self.core = coreProxy
 		self.classObj = classObj			# SnModule
+		self.paramDict = paramDict
 		self.peerName = peerName
 		self.userName = userName
 		self.state = self.STATE_INACTIVE
 
 	##### provide to subclass ####
 
-	def getConfig(self):
-		"""Get the configuration"""
-		assert False			# fixme
+	def getParamDict(self):
+		return self.paramDict
 
 	def getPeerName(self):
 		return self.peerName

@@ -155,11 +155,6 @@ class SnLocalManager:
 		pgs = strict_pgs.PasswdGroupShadow("/")
 		ret = dict()
 
-		# invoke SnModule.onInit
-		for mname in self.param.configManager.getModuleNameList():
-			minfo = self.param.configManager.getModuleInfo(mname)
-			minfo.moduleObj.onInit()
-
 		# create self.moduleObjDict, invoke SnModuleInstance.onInit
 		for pname in self.param.configManager.getHostNameList():
 			moduleObjList = []
@@ -167,14 +162,14 @@ class SnLocalManager:
 				minfo = self.param.configManager.getModuleInfo(mname)
 				exec("from %s import ModuleInstanceObject"%(mname.replace("-", "_")))
 				if minfo.moduleScope == "sys":
-					mo = ModuleInstanceObject(self.coreProxy, minfo.moduleObj, pname, None)
+					mo = ModuleInstanceObject(self.coreProxy, minfo.moduleObj, minfo.moduleParamDict, pname, None)
 					mo.onInit()
 					moduleObjList.append(mo)
 				elif minfo.moduleScope == "usr":
 					for uname in pgs.getUserList():
 						if uname in self.param.configManager.getUserBlackList():
 							continue
-						mo = ModuleInstanceObject(self.coreProxy, minfo.moduleObj, pname, uname)
+						mo = ModuleInstanceObject(self.coreProxy, minfo.moduleObj, minfo.moduleParamDict, pname, uname)
 						mo.onInit()
 						moduleObjList.append(mo)
 				else:
