@@ -40,6 +40,7 @@ class ModuleInstanceObject(SnModuleInstance):
 	def onRecv(self, dataObj):
 		if dataObj.__class__.__name__ == "_SshClientObject":
 			if not self._checkPubKey(dataObj.pubkey):
+				print "******* debug: %s"%(dataObj.pubkey)
 				self.sendReject("invalid SshClientObject received")
 				return
 

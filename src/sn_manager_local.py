@@ -134,7 +134,7 @@ class SnLocalManager:
 		self.param.peerManager._sendDataObject(peerName, userName, moduleName, rejectObj)
 
 		# add module graceful close callback
-		GLib.idle_add(self._gcComplete)
+		GLib.idle_add(self._gcComplete, peerName, userName, moduleName)
 
 	def _gcComplete(self, peerName, userName, moduleName):
 		logging.warning("module graceful close complete, %s, %s, %s", peerName, userName, moduleName)
