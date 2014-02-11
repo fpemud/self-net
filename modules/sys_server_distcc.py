@@ -23,7 +23,7 @@ class ModuleInstanceObject(SnModuleInstance):
 		# send sys param to client
 		obj = MachineParam()
 		obj.jobNumber = 4
-		self.send(obj)
+		self.sendObject(obj)
 
 	def onInactive(self):
 		return
@@ -32,7 +32,7 @@ class ModuleInstanceObject(SnModuleInstance):
 		return
 
 	def onRecv(self, dataObj):
-		self.reject("receive client data")
+		self.sendReject("receive client data")
 
 class MachineParam:
 	jobNumber = None				# int

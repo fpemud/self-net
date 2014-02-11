@@ -35,7 +35,7 @@ class ModuleInstanceObject(SnModuleInstance):
 		obj = ModuleSshClientObject()
 		with open(self.pubkeyFile, "rt") as f:
 			obj.pubkey = f.read()
-		self.send(obj)
+		self.sendObject(obj)
 
 	def onInactive(self):
 		return
@@ -44,7 +44,7 @@ class ModuleInstanceObject(SnModuleInstance):
 		return
 
 	def onRecv(self, dataObj):
-		self.reject("receive server data")
+		self.sendReject("receive server data")
 
 class _SshClientObject:
 	pubkey = None				# str

@@ -23,8 +23,8 @@ class ModuleInstanceObject(SnModuleInstance):
 		return
 
 	def onInactive(self):
-		if self.getPeerName() == self.core.getHostName():
-			return
+#		if self.getPeerName() == self.core.getHostName():
+#			return
 
 		# remove peer from distcc configuration file
 		cfgFile = ConfigFile("/etc/distcc/hosts")
@@ -34,11 +34,11 @@ class ModuleInstanceObject(SnModuleInstance):
 		return
 
 	def onRecv(self, dataObj):
-		if self.getPeerName() == self.core.getHostName():
-			return
+#		if self.getPeerName() == self.core.getHostName():
+#			return
 
 		if not isinstance(obj, MachineParam):
-			self.reject("invalid data received")
+			self.sendReject("invalid data received")
 			return
 
 		# add peer to distcc configuration file
