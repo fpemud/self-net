@@ -32,7 +32,7 @@ class ModuleInstanceObject(SnModuleInstance):
 			assert os.path.exists(self.privkeyFile) and os.path.exists(self.pubkeyFile)
 
 	def onActive(self):
-		obj = ModuleSshClientObject()
+		obj = _SshClientObject()
 		with open(self.pubkeyFile, "rt") as f:
 			obj.pubkey = f.read()
 		self.sendObject(obj)
