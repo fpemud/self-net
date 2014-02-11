@@ -3,6 +3,7 @@
 
 import logging
 import strict_pgs
+from gi.repository import GLib
 
 from sn_manager_peer import SnPeerInfo
 from sn_manager_peer import SnPeerInfoUser
@@ -125,22 +126,25 @@ class SnLocalManager:
 
 	def _sendReject(self, peerName, userName, moduleName, rejectMessage):
 		# record to log
-		logging.warning("send reject to peer module, %s, %s, %s, %s", peerName, userName, moduleName, rejectMessage)
+		logging.warning("send reject, module closing gracefully, %s, %s, %s, %s", peerName, userName, moduleName, rejectMessage)
 
 		# send reject message
 		rejectObj = SnDataPacketReject()
 		rejectObj.message = rejectMessage
 		self.param.peerManager._sendDataObject(peerName, userName, moduleName, rejectObj)
 
-		# change state
-		found = False
+		# add module graceful close callback
+		GLib.add_idle(self._gcComplete)
+
+	def _gcComplete(self, peerName, userName, moduleName):
+		logging.warning("module graceful close complete, %s, %s, %s", peerName, userName, moduleName)
+
 		for mo in self.moduleObjDict[peerName]:
 			if mo.getUserName() == userName and mo.getModuleName() == moduleName:
 				mo.onInactive()
 				mo.setState(SnModuleInstance.STATE_REJECT)
-				found = True
-				break
-		assert found
+				return False
+		assert False
 
 	def _getLocalInfo(self):
 		pgs = strict_pgs.PasswdGroupShadow("/")

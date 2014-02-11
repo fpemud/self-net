@@ -200,6 +200,7 @@ class SnPeerManager:
 		# establish peerSocket
 		sock.setEventFunc("recv", self.onSocketRecv)
 		sock.setEventFunc("error", self.onSocketError)
+		sock.setEventFunc("gracefulCloseComplete", self._gcComplete)
 
 		# record sock
 		self.peerInfoDict[sock.getPeerName()].state = _PeerInfoInternal.STATE_INIT
@@ -250,25 +251,6 @@ class SnPeerManager:
 		self._shutdownPeer(sock.getPeerName())
 		logging.debug("SnPeerManager.onSocketError: End")
 		return
-
-	def onSocketGracefulCloseComplete(self, sock):
-		logging.debug("SnPeerManager.onSocketGracefulCloseComplete: Start, %s", sock.getPeerName())
-
-		peerName = sock.getPeerName()
-		logging.warning("graceful close complete, %s", peerName)
-
-		# do notify
-		if self.peerInfoDict[peerName].state == _PeerInfoInternal.STATE_FULL:
-			self.param.localManager.onPeerRemove(peerName)
-
-		# remove peer
-		self.peerInfoDict[peerName].sock.close()
-		self.peerInfoDict[peerName].state = _PeerInfoInternal.STATE_REJECT
-		self.peerInfoDict[peerName].infoObj = None
-		self.peerInfoDict[peerName].sock = None
-
-		logging.debug("SnPeerManager.onSocketGracefulCloseComplete: End")
-		pass
 
 	def onPeerProbe(self):
 		connectId = time.time()
@@ -377,7 +359,7 @@ class SnPeerManager:
 
 	def _recvReject(self, peerName, rejectMessage):
 		# record to log
-		logging.warning("receive reject from peer, %s, %s", peerName, rejectMessage)
+		logging.warning("receive reject, %s, %s", peerName, rejectMessage)
 
 		# do notify
 		if self.peerInfoDict[peerName].state == _PeerInfoInternal.STATE_FULL:
@@ -396,7 +378,7 @@ class SnPeerManager:
 
 	def _sendReject(self, peerName, rejectMessage):
 		# record to log
-		logging.warning("send reject to peer, closing gracefully, %s, %s", peerName, rejectMessage)
+		logging.warning("send reject, closing gracefully, %s, %s", peerName, rejectMessage)
 
 		# send reject message
 		packetObj = SnSysPacket()
@@ -406,6 +388,20 @@ class SnPeerManager:
 
 		# graceful close, wait reject message to be sent
 		self.peerInfoDict[peerName].sock.gracefulClose()
+
+	def _gcComplete(self, sock):
+		peerName = sock.getPeerName()
+		logging.warning("graceful close complete, %s", peerName)
+
+		# do notify
+		if self.peerInfoDict[peerName].state == _PeerInfoInternal.STATE_FULL:
+			self.param.localManager.onPeerRemove(peerName)
+
+		# remove peer
+		self.peerInfoDict[peerName].sock.close()
+		self.peerInfoDict[peerName].state = _PeerInfoInternal.STATE_REJECT
+		self.peerInfoDict[peerName].infoObj = None
+		self.peerInfoDict[peerName].sock = None
 
 	def _sendDataObject(self, peerName, srcUserName, srcModuleName, obj):
 		packetObj = SnDataPacket()

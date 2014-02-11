@@ -384,6 +384,7 @@ class SnPeerSocket:
 		self.gcState = self._GC_STATE_COMPLETE
 		self.gcCompleteFunc(self)
 		assert self.sslSock is None			# gcCompleteFunc should close the socket
+		return False
 
 	def _checkValid(self):
 		return self.sslSock is not None and self.gcState == self._GC_STATE_NONE
