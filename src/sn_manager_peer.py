@@ -14,9 +14,9 @@ from sn_conn_peer import SnPeerClient
 from sn_conn_peer import SnPeerHandShaker
 from sn_manager_config import SnVersion
 from sn_manager_config import SnCfgSerializationObject
-from sn_manager_local import SnPeerInfo
-from sn_manager_local import SnPeerInfoUser
-from sn_manager_local import SnPeerInfoModule
+from sn_manager_local import SnSysInfo
+from sn_manager_local import SnSysInfoUser
+from sn_manager_local import SnSysInfoModule
 from sn_manager_local import SnDataPacket
 
 """
@@ -55,7 +55,7 @@ Peer FSM trigger table:
   STATE_NONE      -> STATE_INIT      : socket connected
   STATE_INIT      -> STATE_VER_MATCH : object SnVersion recevied
   STATE_VER_MATCH -> STATE_CFG_MATCH : object SnCfgSerializationObject recevied
-  STATE_CFG_MATCH -> STATE_FULL      : object SnPeerInfo recevied
+  STATE_CFG_MATCH -> STATE_FULL      : object SnSysInfo recevied
 
   STATE_INIT      -> STATE_REJECT    : reject sent, reject received
   STATE_VER_MATCH -> STATE_REJECT    : reject sent, reject received
@@ -72,7 +72,7 @@ Peer FSM trigger table:
 Peer FSM callback table:
 
   STATE_CFG_MATCH -> STATE_FULL      : call onPeerChange
-  STATE_FULL                         : call onPeerChange when SnPeerInfo is received
+  STATE_FULL                         : call onPeerChange when SnSysInfo is received
   STATE_FULL      -> STATE_REJECT    : call onPeerRemove
   STATE_FULL      -> STATE_NONE      : call onPeerRemove
 """
@@ -199,7 +199,7 @@ class SnPeerManager:
 			elif self._typeCheck(packetObj.data, SnCfgSerializationObject):
 				logging.debug("SnPeerManager.onSocketRecv: _recvCfgMatch")
 				self._recvCfgMatch(peerName, packetObj.data)
-			elif self._typeCheck(packetObj.data, SnPeerInfo):
+			elif self._typeCheck(packetObj.data, SnSysInfo):
 				logging.debug("SnPeerManager.onSocketRecv: _recvPeerInfo")
 				self._recvPeerInfo(peerName, packetObj.data)
 			elif self._typeCheck(packetObj.data, SnSysPacketReject):
@@ -407,6 +407,6 @@ class _PeerInfoInternal:
 	STATE_REJECT = 5
 
 	state = None				# enum
-	infoObj = None				# obj, SnPeerInfo
+	infoObj = None				# obj, SnSysInfo
 	sock = None					# obj, peer socket
 

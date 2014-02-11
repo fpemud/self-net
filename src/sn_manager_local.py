@@ -9,11 +9,11 @@ from sn_module import SnModuleInstance
 
 # fixme: needs to consider user change
 
-class SnPeerInfo:
-	userList = None					# list<SnPeerInfoUser>
-	moduleList = None				# list<SnPeerInfoModule>
+class SnSysInfo:
+	userList = None					# list<SnSysInfoUser>
+	moduleList = None				# list<SnSysInfoModule>
 
-class SnPeerInfoUser:
+class SnSysInfoUser:
 	userName = None					# str
 
 	def __eq__(self, other):
@@ -23,7 +23,7 @@ class SnPeerInfoUser:
 	def __hash__(self):
 		return hash(self.userName)
 
-class SnPeerInfoModule:
+class SnSysInfoModule:
 	moduleName = None				# str
 	userName = None					# str
 
@@ -48,7 +48,7 @@ class SnLocalManager:
 		logging.debug("SnLocalManager.__init__: Start")
 
 		self.param = param
-		self.localInfo = self._getLocalInfo()			# SnPeerInfo
+		self.localInfo = self._getLocalInfo()
 		self.moduleObjDict = self._getModuleObjDict()
 
 		logging.debug("SnLocalManager.__init__: End")
@@ -177,13 +177,13 @@ class SnLocalManager:
 
 	def _getLocalInfo(self):
 		pgs = strict_pgs.PasswdGroupShadow("/")
-		ret = SnPeerInfo()
+		ret = SnSysInfo()
 
 		ret.userList = []
 		for uname in pgs.getUserList():
 			if uname in self.param.configManager.getUserBlackList():
 				continue
-			n = SnPeerInfoUser()
+			n = SnSysInfoUser()
 			n.userName = uname
 			ret.userList.append(n)
 
@@ -191,7 +191,7 @@ class SnLocalManager:
 		for mname in self.param.configManager.getModuleNameList():
 			mInfo = self.param.configManager.getModuleInfo(mname)
 			if mInfo.moduleScope == "sys":
-				n = SnPeerInfoModule()
+				n = SnSysInfoModule()
 				n.moduleName = mname
 				n.userName = None
 				ret.moduleList.append(n)
@@ -199,7 +199,7 @@ class SnLocalManager:
 				for uname in pgs.getUserList():
 					if uname in self.param.configManager.getUserBlackList():
 						continue
-					n = SnPeerInfoModule()
+					n = SnSysInfoModule()
 					n.moduleName = mname
 					n.userName = uname
 					ret.moduleList.append(n)
