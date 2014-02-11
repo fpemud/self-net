@@ -33,10 +33,8 @@ class ModuleInstanceObject(SnModuleInstance):
 
 	def onInactive(self):
 		self._cleanup()
-		return
 
 	def onReject(self, rejectMessage):
-		self._cleanup()
 		return
 
 	def onRecv(self, dataObj):
@@ -47,10 +45,8 @@ class ModuleInstanceObject(SnModuleInstance):
 
 			cfgf = _CfgFileAuthorizedKeys(self.authkeysFile)
 			cfgf.addPubKey(dataObj.pubkey)
-			return
 		else:
 			self.sendReject("invalid client data received")
-			return
 
 	def _checkPubKey(self, pubkey):
 		strList = pubkey.split()

@@ -21,7 +21,7 @@ class ModuleInstanceObject(SnModuleInstance):
 
 	def onActive(self):
 		# send sys param to client
-		obj = MachineParam()
+		obj = _DistccServerObject()
 		obj.jobNumber = 4
 		self.sendObject(obj)
 
@@ -34,7 +34,7 @@ class ModuleInstanceObject(SnModuleInstance):
 	def onRecv(self, dataObj):
 		self.sendReject("receive client data")
 
-class MachineParam:
-	jobNumber = None				# int
 
+class _DistccServerObject:
+	jobNumber = None				# int
 

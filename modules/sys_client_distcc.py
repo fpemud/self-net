@@ -1,6 +1,8 @@
 #!/usr/bin/python2
 # -*- coding: utf-8; tab-width: 4; indent-tabs-mode: t -*-
 
+import os
+from sn_util import SnUtil
 from sn_module import SnModule
 from sn_module import SnModuleInstance
 
@@ -17,36 +19,35 @@ class ModuleObject(SnModule):
 class ModuleInstanceObject(SnModuleInstance):
 
 	def onInit(self):
-		return
+		self.cfgDir = "/etc/distcc"
+		self.hostsFile = os.path.join(self.cfgDir, "hosts")
+
+		# initialize config files
+		if not os.path.exists(self.hostsFile):
+			SnUtil.mkDir(self.cfgDir)
+			SnUtil.touchFile(self.hostsFile)
+		self._cleanup()
 
 	def onActive(self):
 		return
 
 	def onInactive(self):
-#		if self.getPeerName() == self.core.getHostName():
-#			return
-
-		# remove peer from distcc configuration file
-		cfgFile = ConfigFile("/etc/distcc/hosts")
-		cfgFile.removeHost(self.getPeerName())
+		self._cleanup()
 
 	def onReject(self, rejectMessage):
 		return
 
 	def onRecv(self, dataObj):
-#		if self.getPeerName() == self.core.getHostName():
-#			return
-
-		if not isinstance(obj, MachineParam):
+		if dataObj.__class__.__name__ == "_DistccServerObject":
+			# add peer to distcc configuration file
+			cfgFile = ConfigFile(self.hostsFile)
+			cfgFile.addHost(ConfigFile.Host(self.getPeerName(), dataObj.jobNumber))
+		else:
 			self.sendReject("invalid data received")
-			return
 
-		# add peer to distcc configuration file
-		cfgFile = ConfigFile("/etc/distcc/hosts")
-		cfgFile.addHost(ConfigFile.Host(self.getPeerName(), dataObj.jobNumber))
-
-class MachineParam:
-	jobNumber = None				# int
+	def _cleanup(self):
+		cfgFile = ConfigFile(self.hostsFile)
+		cfgFile.removeHost(self.getPeerName())
 
 class ConfigFile:
 
