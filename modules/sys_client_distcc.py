@@ -28,7 +28,7 @@ class ModuleInstanceObject(SnModuleInstance):
 
 		# remove peer from distcc configuration file
 		cfgFile = ConfigFile("/etc/distcc/hosts")
-		cfgFile.removeHost(peerName)
+		cfgFile.removeHost(self.getPeerName())
 
 	def onReject(self, rejectMessage):
 		return
