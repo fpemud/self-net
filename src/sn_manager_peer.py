@@ -12,6 +12,7 @@ from gi.repository import GObject
 from sn_conn_peer import SnPeerServer
 from sn_conn_peer import SnPeerClient
 from sn_conn_peer import SnPeerHandShaker
+from sn_conn_peer import SnPeerSocket
 from sn_manager_config import SnVersion
 from sn_manager_config import SnCfgSerializationObject
 from sn_manager_local import SnSysInfo
@@ -181,8 +182,10 @@ class SnPeerManager:
 
 	##### event callback ####
 
-	def onSocketConnected(self, sock):
-		logging.debug("SnPeerManager.onSocketConnected: Start, %s", sock.getPeerName())
+	def onSocketConnected(self, sslSock):
+		logging.debug("SnPeerManager.onSocketConnected: Start")
+
+		sock = SnPeerSocket(sslSock)
 
 		# only peer in self-net is allowed
 		if sock.getPeerName() not in self.peerInfoDict:

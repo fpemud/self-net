@@ -172,7 +172,7 @@ class SnPeerHandShaker:
 
 				# create SnPeerSocket
 				del self.sockDict[source]
-				self.connectFunc(SnPeerSocket(info.sslSock, peerName))
+				self.connectFunc(info.sslSock)
 
 				logging.debug("SnPeerHandShaker._onEvent: End")
 				return False
@@ -207,7 +207,10 @@ class SnPeerSocket:
 
 	def __init__(self, sslSock, peerName):
 		self.sslSock = sslSock
-		self.peerName = peerName
+
+		self.peerName = _getPeerName(self.sslSock)
+		assert self.peerName is not None
+
 		self.gcState = self._GC_STATE_NONE
 		self.recvFunc = None
 		self.errorFunc = None
