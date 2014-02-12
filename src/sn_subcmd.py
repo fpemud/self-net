@@ -62,6 +62,12 @@ class SnSubCmdMain:
 				zipf.writestr(certFileInfo, crypto.dump_certificate(crypto.FILETYPE_PEM, cert))
 				zipf.writestr(privkeyFileInfo, crypto.dump_privatekey(crypto.FILETYPE_PEM, k))
 
+	def listPeers(self):
+		assert False
+
+	def peerPowerOperation(self, peerName, opName):
+		assert False
+
 	def _loadCertAndKey(self, certFile, keyFile):
 		cert = None
 		with open(certFile, "rt") as f:

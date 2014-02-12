@@ -8,6 +8,7 @@ import tempfile
 import daemon
 import logging
 from gi.repository import GLib
+from dbus.mainloop.glib import DBusGMainLoop
 
 sys.path.append('/usr/lib/selfnetd')
 sys.path.append('/usr/lib/selfnetd/modules')		# fixme
@@ -73,10 +74,15 @@ try:
 		param.localManager = SnLocalManager(param)
 		param.peerManager = SnPeerManager(param)
 
+		# create dbus root object
+		param.dbusMainObject = DbusMainObject(param)
+
 		# start main loop
 		param.mainloop.run()
 	finally:
-		if param.peerManager is not None:
+		if param.dbusMainObject is not None:
+ 			param.dbusMainObject.release()
+ 		if param.peerManager is not None:
 			param.peerManager.dispose()
 			param.peerManager = None
 		if param.localManager is not None:

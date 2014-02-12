@@ -33,4 +33,5 @@ class SnParam:
 		self.configManager = None		# obj
 		self.localManager = None		# obj
 		self.peerManager = None			# obj
+		self.dbusMainObject = None		# obj
 
