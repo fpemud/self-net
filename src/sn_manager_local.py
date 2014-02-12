@@ -181,7 +181,7 @@ class SnLocalManager:
 		ret = SnSysInfo()
 
 		ret.userList = []
-		for uname in pgs.getUserList():
+		for uname in pgs.getNormalUserList():
 			if uname in self.param.configManager.getUserBlackList():
 				continue
 			n = SnSysInfoUser()
@@ -197,7 +197,7 @@ class SnLocalManager:
 				n.userName = None
 				ret.moduleList.append(n)
 			elif mInfo.moduleScope == "usr":
-				for uname in pgs.getUserList():
+				for uname in pgs.getNormalUserList():
 					if uname in self.param.configManager.getUserBlackList():
 						continue
 					n = SnSysInfoModule()
@@ -227,7 +227,7 @@ class SnLocalManager:
 					mo.setState(SnModuleInstance.STATE_INACTIVE)
 					moduleObjList.append(mo)
 				elif minfo.moduleScope == "usr":
-					for uname in pgs.getUserList():
+					for uname in pgs.getNormalUserList():
 						if uname in self.param.configManager.getUserBlackList():
 							continue
 						mo = ModuleInstanceObject(self, minfo.moduleObj, minfo.moduleParamDict, pname, uname)
