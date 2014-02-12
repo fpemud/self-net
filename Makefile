@@ -24,6 +24,7 @@ distclean:
 install:
 	install -d -m 0755 "$(DESTDIR)/$(prefix)/bin"
 	install -m 0755 selfnetd "$(DESTDIR)/$(prefix)/bin"
+	install -m 0755 selfnetctl "$(DESTDIR)/$(prefix)/bin"
 
 	install -d -m 0755 "$(DESTDIR)/$(prefix)/lib/selfnetd"
 	cp -r src/* "$(DESTDIR)/$(prefix)/lib/selfnetd"
