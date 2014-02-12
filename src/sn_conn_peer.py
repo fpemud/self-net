@@ -205,7 +205,7 @@ class SnPeerSocket:
 	_GC_STATE_PENDING = 1
 	_GC_STATE_COMPLETE = 2
 
-	def __init__(self, sslSock, peerName):
+	def __init__(self, sslSock):
 		self.sslSock = sslSock
 
 		self.peerName = _getPeerName(self.sslSock)

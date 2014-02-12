@@ -7,6 +7,7 @@ import dbus
 import dbus.service
 from gi.repository import GObject
 from sn_util import SnUtil
+from sn_manager_peer import SnPeerManager
 
 ################################################################################
 # DBus API Docs
@@ -43,7 +44,7 @@ class DbusMainObject(dbus.service.Object):
 		# initialize peer list
 		i = 0
 		for pn in self.param.peerManager.getPeerNameList():
-			po = DbusPeerObject(self.param, pn, i)
+			po = DbusPeerObject(self.param, i, pn)
 			self.peerList.append(po)
 			i = i + 1
 
@@ -113,7 +114,7 @@ class DbusPeerObject(dbus.service.Object):
 
 	@dbus.service.method('org.fpemud.SelfNet.Peer', sender_keyword='sender',
 	                     in_signature='s', out_signature='')
-	def DoPowerOperation(self, sender=None, opName):
+	def DoPowerOperation(self, opName, sender=None):
 		"""opName values:
 		     "poweron"
 		     "poweroff"

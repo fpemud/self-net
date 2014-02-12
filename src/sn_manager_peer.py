@@ -172,11 +172,17 @@ class SnPeerManager:
 
 	def peerPowerOperation(self, peerName, opName):
 		if opName == self.POWER_OP_POWERON:
+			pass
 		elif opName == self.POWER_OP_POWEROFF:
+			pass
 		elif opName == self.POWER_OP_RESTART:
+			pass
 		elif opName == self.POWER_OP_SUSPEND:
+			pass
 		elif opName == self.POWER_OP_HIBERNATE:
+			pass
 		elif opName == self.POWER_OP_HYBRID_SLEEP:
+			pass
 		else:
 			assert False
 
