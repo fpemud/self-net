@@ -40,7 +40,6 @@ class ModuleInstanceObject(SnModuleInstance):
 	def onRecv(self, dataObj):
 		if dataObj.__class__.__name__ == "_SshClientObject":
 			if not self._checkPubKey(dataObj.pubkey):
-				print "******* debug: %s"%(dataObj.pubkey)
 				self.sendReject("invalid SshClientObject received")
 				return
 
@@ -83,13 +82,16 @@ class _CfgFileAuthorizedKeys:
 			if line == "\n":
 				break
 			if line.startswith("#"):
+				i = i + 1
 				continue
 			strList = line.split()
 			if len(strList) != 3:
+				i = i + 1
 				continue
-			if strList[2] == "%s@%s\n"%(userName, hostName):
-				self.lineList.pop(i)
-				i = i - 1
+			if strList[2] != "%s@%s\n"%(userName, hostName):
+				i = i + 1
+				continue
+			self.lineList.pop(i)
 		self._close()
 
 	def _open(self):
