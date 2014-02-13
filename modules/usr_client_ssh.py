@@ -50,7 +50,7 @@ class ModuleInstanceObject(SnModuleInstance):
 				self.sendReject("invalid SshServerObject received")
 				return
 
-			cfgf = _CfgFileKnownHosts(self.authkeysFile)
+			cfgf = _CfgFileKnownHosts(self.knownHostsFile)
 			cfgf.addHost(dataObj.hostPubkeyEcdsa)
 		else:
 			self.sendReject("invalid client data received")
