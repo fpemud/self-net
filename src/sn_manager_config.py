@@ -108,10 +108,6 @@ class SnConfigManager:
 	def getModuleInfo(self, moduleName):
 		return self.moduleDict[moduleName]
 
-	def getUserGroupId(self, userName):
-		i = pwd.getpwnam(userName)
-		return (i.pw_uid, i.pw_gid)
-
 	def _checkCertFiles(self):
 		# check CA certificate
 		with open(self.param.caCertFile, 'r') as f:

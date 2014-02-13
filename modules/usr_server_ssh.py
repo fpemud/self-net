@@ -88,7 +88,7 @@ class _CfgFileAuthorizedKeys:
 			if len(strList) != 3:
 				i = i + 1
 				continue
-			if strList[2] != "%s@%s\n"%(userName, hostName):
+			if strList[2] != "%s@%s"%(userName, hostName):
 				i = i + 1
 				continue
 			self.lineList.pop(i)

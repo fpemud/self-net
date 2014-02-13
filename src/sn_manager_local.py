@@ -2,10 +2,12 @@
 # -*- coding: utf-8; tab-width: 4; indent-tabs-mode: t -*-
 
 import os
+import socket
 import logging
 import strict_pgs
 from gi.repository import GLib
 
+from sn_util import SnUtil
 from sn_module import SnModuleInstance
 
 # fixme: needs to consider user change
@@ -80,7 +82,7 @@ class SnLocalManager:
 			if not self._matchPeerModuleList(peerInfo, mo):
 				if mo.getState() == SnModuleInstance.STATE_ACTIVE:
 					logging.debug("SnLocalManager.onPeerChange: mo active -> inactive start, %s, %s, %s", peerName, mo.getUserName(), mo.getModuleName())
-					self._euidInvoke(mo.getUserName(), mo.onInactive)
+					SnUtil.euidInvoke(mo.getUserName(), mo.onInactive)
 					mo.setState(SnModuleInstance.STATE_INACTIVE)
 					logging.debug("SnLocalManager.onPeerChange: mo active -> inactive end")
 				elif mo.getState() == SnModuleInstance.STATE_INACTIVE:
@@ -101,7 +103,7 @@ class SnLocalManager:
 					pass
 				elif mo.getState() == SnModuleInstance.STATE_INACTIVE:
 					logging.debug("SnLocalManager.onPeerChange: mo inactive -> active start, %s, %s, %s", peerName, mo.getUserName(), mo.getModuleName())
-					self._euidInvoke(mo.getUserName(), mo.onActive)
+					SnUtil.euidInvoke(mo.getUserName(), mo.onActive)
 					mo.setState(SnModuleInstance.STATE_ACTIVE)
 					logging.debug("SnLocalManager.onPeerChange: mo inactive -> active end")
 				elif mo.getState() == SnModuleInstance.STATE_REJECT:
@@ -118,7 +120,7 @@ class SnLocalManager:
 		for mo in self.moduleObjDict[peerName]:
 			if mo.getState() == SnModuleInstance.STATE_ACTIVE:
 				logging.debug("SnLocalManager.onPeerRemove: mo active -> inactive start, %s, %s, %s", peerName, mo.getUserName(), mo.getModuleName())
-				self._euidInvoke(mo.getUserName(), mo.onInactive)
+				SnUtil.euidInvoke(mo.getUserName(), mo.onInactive)
 				mo.setState(SnModuleInstance.STATE_INACTIVE)
 				logging.debug("SnLocalManager.onPeerRemove: mo active -> inactive end")
 			elif mo.getState() == SnModuleInstance.STATE_INACTIVE:
@@ -140,11 +142,11 @@ class SnLocalManager:
 		for mo in self.moduleObjDict[peerName]:
 			if mo.getUserName() == userName and mo.getModuleName() == moduleName:
 				if self._typeCheck(data, SnDataPacketReject):
-					self._euidInvoke(mo.getUserName(), mo.onReject, data.message)
-					self._euidInvoke(mo.getUserName(), mo.onInactive)
+					SnUtil.euidInvoke(mo.getUserName(), mo.onReject, data.message)
+					SnUtil.euidInvoke(mo.getUserName(), mo.onInactive)
 					mo.setState(SnModuleInstance.STATE_REJECT)
 				else:
-					self._euidInvoke(mo.getUserName(), mo.onRecv, data)
+					SnUtil.euidInvoke(mo.getUserName(), mo.onRecv, data)
 				logging.debug("SnLocalManager.onPacketRecv: End")
 				return
 		assert False
@@ -171,7 +173,7 @@ class SnLocalManager:
 
 		for mo in self.moduleObjDict[peerName]:
 			if mo.getUserName() == userName and mo.getModuleName() == moduleName:
-				self._euidInvoke(mo.getUserName(), mo.onInactive)
+				SnUtil.euidInvoke(mo.getUserName(), mo.onInactive)
 				mo.setState(SnModuleInstance.STATE_REJECT)
 				return False
 		assert False
@@ -220,40 +222,36 @@ class SnLocalManager:
 			moduleObjList = []
 			for mname in self.param.configManager.getModuleNameList():
 				minfo = self.param.configManager.getModuleInfo(mname)
+
+				if pname == socket.gethostname():
+					continue
+#					propDict = minfo.getPropDict()
+#					if not propDict.get("allow-local-peer", False):
+#						continue
+
 				exec("from %s import ModuleInstanceObject"%(mname.replace("-", "_")))
 				if minfo.moduleScope == "sys":
 					mo = ModuleInstanceObject(self, minfo.moduleObj, minfo.moduleParamDict, pname, None)
-					self._euidInvoke(mo.getUserName(), mo.onInit)
+					logging.debug("SnLocalManager._getModuleObjDict: mo init, %s, %s", pname, mo.getModuleName())
+					SnUtil.euidInvoke(mo.getUserName(), mo.onInit)
 					mo.setState(SnModuleInstance.STATE_INACTIVE)
+					logging.debug("SnLocalManager._getModuleObjDict: mo init end")
 					moduleObjList.append(mo)
 				elif minfo.moduleScope == "usr":
 					for uname in pgs.getNormalUserList():
 						if uname in self.param.configManager.getUserBlackList():
 							continue
 						mo = ModuleInstanceObject(self, minfo.moduleObj, minfo.moduleParamDict, pname, uname)
-						self._euidInvoke(mo.getUserName(), mo.onInit)
+						logging.debug("SnLocalManager._getModuleObjDict: mo init, %s, %s, %s", pname, uname, mo.getModuleName())
+						SnUtil.euidInvoke(mo.getUserName(), mo.onInit)
 						mo.setState(SnModuleInstance.STATE_INACTIVE)
+						logging.debug("SnLocalManager._getModuleObjDict: mo init end")
 						moduleObjList.append(mo)
 				else:
 					assert False
 			ret[pname] = moduleObjList
 
 		return ret
-
-	def _euidInvoke(self, userName, func, *args):
-		if userName is not None:
-			oldeuid, oldegid = (os.geteuid(), os.getegid())
-			neweuid, newegid = self.param.configManager.getUserGroupId(userName)
-			try:
-				os.setegid(newegid)
-				os.seteuid(neweuid)
-
-				func(*args)
-			finally:
-				os.seteuid(oldeuid)
-				os.setegid(oldegid)
-		else:
-			func(*args)
 
 	def _matchPeerModuleList(self, peerInfo, mo):
 		for mio in peerInfo.moduleList:

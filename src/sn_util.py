@@ -200,40 +200,21 @@ class SnUtil:
 		return 32 - (netmask ^ 0xFFFFFFFF).bit_length()
 
 	@staticmethod
-	def loadKernelModule(modname):
-		"""Loads a kernel module."""
+	def euidInvoke(userName, func, *args):
+		if userName is not None:
+			oldeuid = os.geteuid()
+			oldegid = os.getegid()
+			pwobj = pwd.getpwnam(userName)
+			try:
+				os.setegid(pwobj.pw_uid)
+				os.seteuid(pwobj.pw_gid)
 
-		SnUtil.shell("/sbin/modprobe %s"%(modname))
-
-	@staticmethod
-	def initLog(filename):
-		SnUtil.forceDelete(filename)
-		SnUtil.writeFile(filename, "")
-
-	@staticmethod
-	def printLog(filename, msg):
-		f = open(filename, 'a')
-		if msg != "":
-			f.write(time.strftime("%Y-%m-%d %H:%M:%S  ", time.localtime()))
-			f.write(msg)
-			f.write("\n")
+				func(*args)
+			finally:
+				os.seteuid(oldeuid)
+				os.setegid(oldegid)
 		else:
-			f.write("\n")
-		f.close()
-
-	@staticmethod
-	def getUsername():
-		return pwd.getpwuid(os.getuid())[0]
-
-	@staticmethod
-	def getGroups():
-		"""Returns the group name list of the current user"""
-
-		uname = pwd.getpwuid(os.getuid())[0]
-		groups = [g.gr_name for g in grp.getgrall() if uname in g.gr_mem]
-		gid = pwd.getpwnam(uname).pw_gid
-		groups.append(grp.getgrgid(gid).gr_name)			# --fixme, should be prepend
-		return groups
+			func(*args)
 
 	@staticmethod
 	def getPidBySocket(socketInfo):
@@ -254,24 +235,4 @@ class SnUtil:
 			return None
 		uid = connection.get_unix_user(sender)
 		return pwd.getpwuid(uid).pw_name
-
-	@staticmethod
-	def tdbFileCreate(filename):
-		assert " " not in filename			# fixme, tdbtool can't operate filename with space
-
-		inStr = ""
-		inStr += "create %s\n"%(filename)
-		inStr += "quit\n"
-		SnUtil.shellInteractive("/usr/bin/tdbtool", inStr)
-
-	@staticmethod
-	def tdbFileAddUser(filename, username, password):
-		"""can only add unix user"""
-
-		assert " " not in filename			# fixme, v can't operate filename with space
-
-		inStr = ""
-		inStr += "%s\n"%(password)
-		inStr += "%s\n"%(password)
-		SnUtil.shellInteractive("/usr/bin/pdbedit -b tdbsam:%s -a \"%s\" -t"%(filename, username), inStr)
 

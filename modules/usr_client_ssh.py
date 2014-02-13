@@ -23,8 +23,18 @@ class ModuleInstanceObject(SnModuleInstance):
 		self.privkeyFile = os.path.join(self.sshDir, "id_rsa")
 		self.pubkeyFile = os.path.join(self.sshDir, "id_rsa.pub")
 
-		# initialize config files
+		# is config files initialization needed?
+		needInit = False
 		if not os.path.exists(self.privkeyFile) or not os.path.exists(self.pubkeyFile):
+			needInit = True
+		if os.path.exists(self.pubkeyFile):
+			with open(self.pubkeyFile, "rt") as f:
+				pubkey = f.read()
+				if not self._checkSelfPubKey(pubkey):
+					needInit = True
+
+		# initialize config files
+		if needInit:
 			comment = "%s@%s"%(self.getUserName(), self.getHostName())
 			SnUtil.forceDelete(self.privkeyFile)
 			SnUtil.forceDelete(self.pubkeyFile)
@@ -46,6 +56,16 @@ class ModuleInstanceObject(SnModuleInstance):
 
 	def onRecv(self, dataObj):
 		self.sendReject("receive server data")
+
+	def _checkSelfPubKey(self, pubkey):
+		strList = pubkey.split()
+		if len(strList) != 3:
+			return False
+		if strList[0] != "ssh-rsa":
+			return False
+		if strList[2] != "%s@%s"%(self.getUserName(), self.getHostName()):
+			return False
+		return True
 
 class _SshClientObject:
 	pubkey = None				# str
