@@ -34,6 +34,8 @@ ModuleInstance FSM callback table:
   STATE_ACTIVE                     : call onReject when reject received
 """
 
+import socket
+
 class SnModule:
 
 	def getModuleName(self):
@@ -64,6 +66,9 @@ class SnModuleInstance:
 
 	def getParamDict(self):
 		return self.paramDict
+
+	def getHostName(self):
+		return socket.gethostname()
 
 	def getPeerName(self):
 		return self.peerName

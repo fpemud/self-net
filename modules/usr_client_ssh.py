@@ -25,10 +25,11 @@ class ModuleInstanceObject(SnModuleInstance):
 
 		# initialize config files
 		if not os.path.exists(self.privkeyFile) or not os.path.exists(self.pubkeyFile):
+			comment = "%s@%s"%(self.getUserName(), self.getHostName())
 			SnUtil.forceDelete(self.privkeyFile)
 			SnUtil.forceDelete(self.pubkeyFile)
 			SnUtil.mkDir(self.sshDir)
-			SnUtil.shell("/bin/ssh-keygen -N \"\" -f %s -q"%(self.privkeyFile), "stdout")
+			SnUtil.shell("/bin/ssh-keygen -N \"\" -C \"%s\" -f \"%s\" -q"%(comment, self.privkeyFile), "stdout")
 			assert os.path.exists(self.privkeyFile) and os.path.exists(self.pubkeyFile)
 
 	def onActive(self):
