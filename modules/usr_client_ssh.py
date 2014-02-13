@@ -51,7 +51,7 @@ class ModuleInstanceObject(SnModuleInstance):
 				return
 
 			cfgf = _CfgFileKnownHosts(self.knownHostsFile)
-			cfgf.addHost(dataObj.hostPubkeyEcdsa)
+ 			cfgf.addHost(self.getPeerName(), dataObj.hostPubkeyEcdsa)
 		else:
 			self.sendReject("invalid client data received")
 
@@ -73,7 +73,7 @@ class _CfgFileKnownHosts:
 		self._open()
 		self._close()
 
-	def addHost(self, hostName, keyType, pubkey):
+	def addHost(self, hostName, pubkey):
 		self._open()
 
 		strList = pubkey.split()
