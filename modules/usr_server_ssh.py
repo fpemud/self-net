@@ -60,12 +60,12 @@ class ModuleInstanceObject(SnModuleInstance):
 
 	def onRecv(self, dataObj):
 		if dataObj.__class__.__name__ == "_SshClientObject":
-			if not SnUtil.checkSshPubKey(dataObj.pubkey, "rsa", self.getUserName(), self.getPeerName()):
+			if not SnUtil.checkSshPubKey(dataObj.userPubkey, "rsa", self.getUserName(), self.getPeerName()):
 				self.sendReject("invalid SshClientObject received")
 				return
 
 			cfgf = _CfgFileAuthorizedKeys(self.authkeysFile)
-			cfgf.addPubKey(dataObj.pubkey)
+			cfgf.addPubKey(dataObj.userPubkey)
 		else:
 			self.sendReject("invalid client data received")
 
