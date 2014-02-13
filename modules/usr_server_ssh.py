@@ -19,17 +19,38 @@ class ModuleObject(SnModule):
 class ModuleInstanceObject(SnModuleInstance):
 
 	def onInit(self):
+		self.sshSysDir = "/etc/ssh"
+		self.sshSysRsaPrivFile = os.path.join(self.sshSysDir, "ssh_host_rsa_key")
+		self.sshSysRsaPubFile = os.path.join(self.sshSysDir, "ssh_host_rsa_key.pub")
+		self.sshSysDsaPrivFile = os.path.join(self.sshSysDir, "ssh_host_dsa_key")
+		self.sshSysDsaPubFile = os.path.join(self.sshSysDir, "ssh_host_dsa_key.pub")
+		self.sshSysEcdsaPrivFile = os.path.join(self.sshSysDir, "ssh_host_ecdsa_key")
+		self.sshSysEcdsaPubFile = os.path.join(self.sshSysDir, "ssh_host_ecdsa_key.pub")
+
 		self.sshDir = os.path.expanduser("~%s/.ssh"%(self.getUserName()))
 		self.authkeysFile = os.path.join(self.sshDir, "authorized_keys")
 
-		# initialize config files
-		if not os.path.exists(self.authkeysFile):
-			SnUtil.mkDir(self.sshDir)
-			SnUtil.touchFile(self.authkeysFile)
+		# initialize system key files
+		SnUtil.initSshKeyFile("rsa", "root", self.getHostName(), self.sshSysRsaPrivFile, self.sshSysRsaPubFile)
+		SnUtil.initSshKeyFile("dsa", "root", self.getHostName(), self.sshSysDsaPrivFile, self.sshSysDsaPubFile)
+		SnUtil.initSshKeyFile("ecdsa", "root", self.getHostName(), self.sshSysEcdsaPrivFile, self.sshSysEcdsaPubFile)
+
+		# initialize user auth-keys files
+		SnUtil.mkDir(self.sshDir)
+		_CfgFileAuthorizedKeys(self.authkeysFile).touch()
+
+		# do cleanup for robostness
 		self._cleanup()
 
 	def onActive(self):
-		return
+		obj = _SshServerObject()
+		with open(self.sshSysRsaPubFile, "rt") as f:
+			obj.hostPubkeyRsa = f.read()
+		with open(self.sshSysDsaPubFile, "rt") as f:
+			obj.hostPubkeyDsa = f.read()
+		with open(self.sshSysEcdsaPubFile, "rt") as f:
+			obj.hostPubkeyEcdsa = f.read()
+		self.sendObject(obj)
 
 	def onInactive(self):
 		self._cleanup()
@@ -39,7 +60,7 @@ class ModuleInstanceObject(SnModuleInstance):
 
 	def onRecv(self, dataObj):
 		if dataObj.__class__.__name__ == "_SshClientObject":
-			if not self._checkPubKey(dataObj.pubkey):
+			if not SnUtil.checkSshPubKey(dataObj.pubkey, "rsa", self.getUserName(), self.getPeerName()):
 				self.sendReject("invalid SshClientObject received")
 				return
 
@@ -48,19 +69,14 @@ class ModuleInstanceObject(SnModuleInstance):
 		else:
 			self.sendReject("invalid client data received")
 
-	def _checkPubKey(self, pubkey):
-		strList = pubkey.split()
-		if len(strList) != 3:
-			return False
-		if strList[0] != "ssh-rsa":
-			return False
-		if strList[2] != "%s@%s"%(self.getUserName(), self.getPeerName()):
-			return False
-		return True
-
 	def _cleanup(self):
 		cfgf = _CfgFileAuthorizedKeys(self.authkeysFile)
 		cfgf.removePubKey(self.getUserName(), self.getPeerName())
+
+class _SshServerObject:
+	hostPubkeyRsa = None				# str
+	hostPubkeyDsa = None				# str
+	hostPubkeyEcdsa = None				# str
 
 class _CfgFileAuthorizedKeys:
 
@@ -68,6 +84,10 @@ class _CfgFileAuthorizedKeys:
 		self.filename = filename
 		self.lineList = []
 		self.titleIndex = -1
+
+	def touch(self):
+		self._open()
+		self._close()
 
 	def addPubKey(self, pubkey):
 		self._open()
@@ -95,6 +115,9 @@ class _CfgFileAuthorizedKeys:
 		self._close()
 
 	def _open(self):
+		if not os.path.exists(self.filename):
+			return
+
 		# read file
 		endIndex = -1
 		with open(self.filename, "rt") as f:

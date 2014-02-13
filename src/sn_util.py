@@ -4,8 +4,6 @@
 import os
 import shutil
 import subprocess
-import time
-import grp
 import pwd
 import socket
 import re
@@ -215,6 +213,44 @@ class SnUtil:
 				os.setegid(oldegid)
 		else:
 			func(*args)
+
+	@staticmethod
+	def checkSshPubKey(pubkey, keyType, userName, hostName):
+		if keyType == "rsa":
+			prefix = "ssh-rsa"
+		elif keyType == "dsa":
+			prefix = "ssh-dss"
+		elif keyType == "ecdsa":
+			prefix = "ecdsa-sha2-nistp256"
+		else:
+			assert False
+
+		strList = pubkey.split()
+		if len(strList) != 3:
+			return False
+		if strList[0] != prefix:
+			return False
+		if strList[2] != "%s@%s"%(userName, hostName):
+			return False
+		return True
+
+	@staticmethod
+	def initSshKeyFile(keyType, userName, hostName, privkeyFile, pubkeyFile):
+		needInit = False
+		if not os.path.exists(privkeyFile) or not os.path.exists(pubkeyFile):
+			needInit = True
+		if os.path.exists(pubkeyFile):
+			with open(pubkeyFile, "rt") as f:
+				pubkey = f.read()
+				if not SnUtil.checkSshPubKey(pubkey, keyType, userName, hostName):
+					needInit = True
+
+		if needInit:
+			comment = "%s@%s"%(userName, hostName)
+			SnUtil.forceDelete(privkeyFile)
+			SnUtil.forceDelete(pubkeyFile)
+			SnUtil.shell("/bin/ssh-keygen -t %s -N \"\" -C \"%s\" -f \"%s\" -q"%(keyType, comment, privkeyFile), "stdout")
+			assert os.path.exists(privkeyFile) and os.path.exists(pubkeyFile)
 
 	@staticmethod
 	def getPidBySocket(socketInfo):

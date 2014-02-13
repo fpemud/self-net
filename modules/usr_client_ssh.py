@@ -22,51 +22,119 @@ class ModuleInstanceObject(SnModuleInstance):
 		self.sshDir = os.path.expanduser("~%s/.ssh"%(self.getUserName()))
 		self.privkeyFile = os.path.join(self.sshDir, "id_rsa")
 		self.pubkeyFile = os.path.join(self.sshDir, "id_rsa.pub")
+		self.knownHostsFile = os.path.join(self.sshDir, "known_hosts")
 
-		# is config files initialization needed?
-		needInit = False
-		if not os.path.exists(self.privkeyFile) or not os.path.exists(self.pubkeyFile):
-			needInit = True
-		if os.path.exists(self.pubkeyFile):
-			with open(self.pubkeyFile, "rt") as f:
-				pubkey = f.read()
-				if not self._checkSelfPubKey(pubkey):
-					needInit = True
+		# initialize user key file, known-hosts file
+		SnUtil.mkDir(self.sshDir)
+		SnUtil.initSshKeyFile("rsa", self.getUserName(), self.getHostName(), self.privkeyFile, self.pubkeyFile)
+		_CfgFileKnownHosts(self.knownHostsFile).touch()
 
-		# initialize config files
-		if needInit:
-			comment = "%s@%s"%(self.getUserName(), self.getHostName())
-			SnUtil.forceDelete(self.privkeyFile)
-			SnUtil.forceDelete(self.pubkeyFile)
-			SnUtil.mkDir(self.sshDir)
-			SnUtil.shell("/bin/ssh-keygen -N \"\" -C \"%s\" -f \"%s\" -q"%(comment, self.privkeyFile), "stdout")
-			assert os.path.exists(self.privkeyFile) and os.path.exists(self.pubkeyFile)
+		# do cleanup for robostness
+		self._cleanup()
 
 	def onActive(self):
 		obj = _SshClientObject()
 		with open(self.pubkeyFile, "rt") as f:
-			obj.pubkey = f.read()
+			obj.userPubkey = f.read()
 		self.sendObject(obj)
 
 	def onInactive(self):
-		return
+		self._cleanup()
 
 	def onReject(self, rejectMessage):
 		return
 
 	def onRecv(self, dataObj):
-		self.sendReject("receive server data")
+		if dataObj.__class__.__name__ == "_SshServerObject":
+			if not SnUtil.checkSshPubKey(dataObj.hostPubkeyEcdsa, "ecdsa", "root", self.getPeerName()):
+				self.sendReject("invalid SshServerObject received")
+				return
 
-	def _checkSelfPubKey(self, pubkey):
-		strList = pubkey.split()
-		if len(strList) != 3:
-			return False
-		if strList[0] != "ssh-rsa":
-			return False
-		if strList[2] != "%s@%s"%(self.getUserName(), self.getHostName()):
-			return False
-		return True
+			cfgf = _CfgFileKnownHosts(self.authkeysFile)
+			cfgf.addHost(dataObj.hostPubkeyEcdsa)
+		else:
+			self.sendReject("invalid client data received")
+
+	def _cleanup(self):
+		cfgf = _CfgFileKnownHosts(self.knownHostsFile)
+		cfgf.removeHost(self.getPeerName())
 
 class _SshClientObject:
-	pubkey = None				# str
+	userPubkey = None				# str
+
+class _CfgFileKnownHosts:
+
+	def __init__(self, filename):
+		self.filename = filename
+		self.lineList = []
+		self.titleIndex = -1
+
+	def touch(self):
+		self._open()
+		self._close()
+
+	def addHost(self, hostName, keyType, pubkey):
+		self._open()
+
+		strList = pubkey.split()
+		assert len(strList) == 3
+		line = "%s %s %s"%(hostName, strList[0], strList[1])
+		self.lineList.insert(self.titleIndex + 1, line)
+
+		self._close()
+
+	def removeHost(self, hostName):
+		self._open()
+		i = self.titleIndex + 1
+		while i < len(self.lineList):
+			line = self.lineList[i]
+			if line == "\n":
+				break
+			if line.startswith("#"):
+				i = i + 1
+				continue
+			strList = line.split()
+			if len(strList) != 3:
+				i = i + 1
+				continue
+			if strList[0] != hostName:
+				i = i + 1
+				continue
+			self.lineList.pop(i)
+		self._close()
+
+	def _open(self):
+		if not os.path.exists(self.filename):
+			return
+
+		# read file
+		endIndex = -1
+		with open(self.filename, "rt") as f:
+			i = 0
+			for line in f:
+				self.lineList.append(line)
+				if self.titleIndex == -1 and line == "# selfnet usr-server-ssh\n":
+					self.titleIndex = i
+				if self.titleIndex > 0 and endIndex == -1 and line == "\n":
+					endIndex = i
+				i = i + 1
+
+		# last line of section must ends with "\n"
+		if endIndex == -1 and len(self.lineList) > 0 and not self.lineList[-1].endswith("\n"):
+			self.lineList[-1].append("\n")
+
+		# need to create a section
+		if self.titleIndex == -1:
+			if len(self.lineList) > 0:
+				self.lineList.append("\n")
+			self.lineList.append("# selfnet usr-server-ssh\n")
+			self.lineList.append("\n")
+			self.titleIndex = len(self.lineList) - 2
+
+	def _close(self):
+		with open(self.filename, "wt") as f:
+			for line in self.lineList:
+				f.write(line)
+		self.lineList = []
+		self.titleIndex = -1
 
