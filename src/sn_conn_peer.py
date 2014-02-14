@@ -317,7 +317,11 @@ class SnPeerSocket:
 			return False
 		
 		# send data as much as possible
-		sendLen = self.sslSock.send(self.sendBuffer)
+		sendLen = 0
+		try:
+			sendLen = self.sslSock.send(self.sendBuffer)
+		except socket.error:
+			pass
 		self.sendBuffer = self.sendBuffer[sendLen:]
 
 		# still has data to send
