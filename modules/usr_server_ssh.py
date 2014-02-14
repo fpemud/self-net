@@ -66,13 +66,13 @@ class ModuleInstanceObject(SnModuleInstance):
 		cfgf.removePubKey(self.getUserName(), self.getPeerName())
 
 	def _checkServerCfg(self):
-		self.sshSysDir = "/etc/ssh"
-		self.sshSysRsaPrivFile = os.path.join(self.sshSysDir, "ssh_host_rsa_key")
-		self.sshSysRsaPubFile = os.path.join(self.sshSysDir, "ssh_host_rsa_key.pub")
-		self.sshSysDsaPrivFile = os.path.join(self.sshSysDir, "ssh_host_dsa_key")
-		self.sshSysDsaPubFile = os.path.join(self.sshSysDir, "ssh_host_dsa_key.pub")
-		self.sshSysEcdsaPrivFile = os.path.join(self.sshSysDir, "ssh_host_ecdsa_key")
-		self.sshSysEcdsaPubFile = os.path.join(self.sshSysDir, "ssh_host_ecdsa_key.pub")
+		sshSysDir = "/etc/ssh"
+		sshSysRsaPrivFile = os.path.join(sshSysDir, "ssh_host_rsa_key")
+		sshSysRsaPubFile = os.path.join(sshSysDir, "ssh_host_rsa_key.pub")
+		sshSysDsaPrivFile = os.path.join(sshSysDir, "ssh_host_dsa_key")
+		sshSysDsaPubFile = os.path.join(sshSysDir, "ssh_host_dsa_key.pub")
+		sshSysEcdsaPrivFile = os.path.join(sshSysDir, "ssh_host_ecdsa_key")
+		sshSysEcdsaPubFile = os.path.join(sshSysDir, "ssh_host_ecdsa_key.pub")
 
 		if not os.path.exists(sshSysRsaPrivFile):
 			raise SnModuleInstanceInitException("server rsa private key file does not exist")
@@ -131,7 +131,7 @@ class _CfgFileAuthorizedKeys:
 
 		i = 0
 		while i < len(self.lineList):
-			if line == "# selfnet usr-server-ssh\n":
+			if self.lineList[i] == "# selfnet usr-server-ssh\n":
 				i = i + 1
 				break
 

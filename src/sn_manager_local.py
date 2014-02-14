@@ -9,6 +9,7 @@ from gi.repository import GLib
 
 from sn_util import SnUtil
 from sn_module import SnModuleInstance
+from sn_module import SnModuleInstanceInitException
 
 # fixme: needs to consider user change, both local user change and user change received by peer
 

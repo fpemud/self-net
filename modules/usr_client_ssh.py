@@ -92,7 +92,7 @@ class _CfgFileKnownHosts:
 
 		i = 0
 		while i < len(self.lineList):
-			if line == "# selfnet usr-server-ssh\n":
+			if self.lineList[i] == "# selfnet usr-server-ssh\n":
 				i = i + 1
 				break
 
