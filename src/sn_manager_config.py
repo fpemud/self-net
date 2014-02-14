@@ -205,6 +205,18 @@ class SnConfigManager:
 			moduleObj = ModuleObject()
 			if m != moduleObj.getModuleName():
 				raise Exception("Module \"%s\" does not exists"%(m))
+			if True:
+				propDict = moduleObj.getPropDict()
+				if "allow-local-peer" not in propDict:
+					raise Exception("Property \"%s\" not provided by module \"%s\""%("allow-local-peer", m))
+				if "suid" not in propDict:
+					raise Exception("Property \"%s\" not provided by module \"%s\""%("suid", m))
+				if not isinstance(propDict["allow-local-peer"], bool):
+					raise Exception("Property \"%s\" in module \"%s\"should be of type bool"%("allow-local-peer", m))
+				if not isinstance(propDict["suid"], bool):
+					raise Exception("Property \"%s\" in module \"%s\"should be of type bool"%("suid", m))
+				if moduleScope == "sys" and propDict["suid"]:
+					raise Exception("Property \"%s\" in module \"%s\"must be equal to False"%("suid", m))
 
 			# fill SnCfgModuleInfo object
 			self.moduleDict[m].moduleScope = moduleScope
