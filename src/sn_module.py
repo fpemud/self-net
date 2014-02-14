@@ -42,7 +42,8 @@ class SnModule:
 		assert False			# implement by subclass
 
 	def getPropDict(self):
-		"""Property list: allow-local-peer: true | false"""
+		"""Property list: allow-local-peer: true | false
+		                  suid: true | false"""
 		assert False			# implement by subclass
 
 class SnModuleInstance:
@@ -113,6 +114,6 @@ class SnModuleInstance:
 		"""Called when data is received from the peer"""
 		assert False			# implement by subclass
 
-class SnModuleException(Exception):
+class SnModuleInstanceInitException(Exception):
 	pass
 
