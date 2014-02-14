@@ -5,6 +5,7 @@ import os
 from sn_util import SnUtil
 from sn_module import SnModule
 from sn_module import SnModuleInstance
+from sn_module import SnModuleInstanceInitException
 
 class ModuleObject(SnModule):
 
@@ -14,6 +15,7 @@ class ModuleObject(SnModule):
 	def getPropDict(self):
 		ret = dict()
 		ret["allow-local-peer"] = True
+		ret["suid"] = False
 		return ret
 
 class ModuleInstanceObject(SnModuleInstance):
@@ -22,9 +24,12 @@ class ModuleInstanceObject(SnModuleInstance):
 		self.cfgDir = "/etc/distcc"
 		self.hostsFile = os.path.join(self.cfgDir, "hosts")
 
-		# initialize config files
+		# check distcc config
+		if not os.path.isdir(self.cfgDir):
+			raise SnModuleInstanceInitException("directory \"%s\" does not exist"%(self.cfgDir))
+
+		# initialize distcc hosts file
 		if not os.path.exists(self.hostsFile):
-			SnUtil.mkDir(self.cfgDir)
 			SnUtil.touchFile(self.hostsFile)
 		self._cleanup()
 

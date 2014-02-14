@@ -16,22 +16,23 @@ ModuleInstance FSM trigger table:
 
   STATE_NONE is the initial state.
 
-  STATE_NONE     -> STATE_INACTIVE : initialized
-  STATE_INACTIVE -> STATE_ACTIVE   : peer added, peer module added
-  STATE_ACTIVE   -> STATE_INACTIVE : peer removed, peer module removed
-  STATE_ACTIVE   -> STATE_REJECT   : reject sent, reject received
-  STATE_REJECT   -> STATE_INACTIVE : peer removed, peer module removed
+  STATE_NONE     -> STATE_INIT_FAILED : initializing failed
+  STATE_NONE     -> STATE_INACTIVE    : initialized
+  STATE_INACTIVE -> STATE_ACTIVE      : peer added, peer module added
+  STATE_ACTIVE   -> STATE_INACTIVE    : peer removed, peer module removed
+  STATE_ACTIVE   -> STATE_REJECT      : reject sent, reject received
+  STATE_REJECT   -> STATE_INACTIVE    : peer removed, peer module removed
 """
 
 """
 ModuleInstance FSM callback table:
 
-  STATE_NONE     -> STATE_INACTIVE : call onInit
-  STATE_INACTIVE -> STATE_ACTIVE   : call onActive
-  STATE_ACTIVE   -> STATE_INACTIVE : call onInactive
-  STATE_ACTIVE   -> STATE_REJECT   : call onInactive
-  STATE_ACTIVE                     : call onRecv when data received
-  STATE_ACTIVE                     : call onReject when reject received
+  STATE_NONE     -> STATE_INACTIVE    : call onInit
+  STATE_INACTIVE -> STATE_ACTIVE      : call onActive
+  STATE_ACTIVE   -> STATE_INACTIVE    : call onInactive
+  STATE_ACTIVE   -> STATE_REJECT      : call onInactive
+  STATE_ACTIVE                        : call onRecv when data received
+  STATE_ACTIVE                        : call onReject when reject received
 """
 
 import socket
@@ -42,15 +43,17 @@ class SnModule:
 		assert False			# implement by subclass
 
 	def getPropDict(self):
-		"""Property list: allow-local-peer: true | false"""
+		"""Property list: allow-local-peer: true | false
+		                  suid: true | false"""
 		assert False			# implement by subclass
 
 class SnModuleInstance:
 
 	STATE_NONE = 0
-	STATE_INACTIVE = 1
-	STATE_ACTIVE = 2
-	STATE_REJECT = 3
+	STATE_INIT_FAILED = 1
+	STATE_INACTIVE = 2
+	STATE_ACTIVE = 3
+	STATE_REJECT = 4
 	
 	##### hidden to subclass ####
 
@@ -61,6 +64,7 @@ class SnModuleInstance:
 		self.peerName = peerName
 		self.userName = userName
 		self.state = self.STATE_NONE
+		self.initFailMessage = ""
 
 	##### provide to subclass ####
 
@@ -93,6 +97,12 @@ class SnModuleInstance:
 	def setState(self, state):
 		self.state = state
 
+	def getInitFailMessage(self):
+		return self.initFailMessage
+
+	def setInitFailMessage(self, initFailMessage):
+		self.initFailMessage = initFailMessage
+
 	def onInit(self):
 		"""Called after the module instance object is created"""
 		assert False			# implement by subclass
@@ -113,6 +123,6 @@ class SnModuleInstance:
 		"""Called when data is received from the peer"""
 		assert False			# implement by subclass
 
-class SnModuleException(Exception):
+class SnModuleInstanceInitException(Exception):
 	pass
 
