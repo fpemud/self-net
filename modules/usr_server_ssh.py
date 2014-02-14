@@ -83,7 +83,6 @@ class _CfgFileAuthorizedKeys:
 	def __init__(self, filename):
 		self.filename = filename
 		self.lineList = []
-		self.titleIndex = -1
 
 	def touch(self):
 		self._open()
@@ -91,15 +90,26 @@ class _CfgFileAuthorizedKeys:
 
 	def addPubKey(self, pubkey):
 		self._open()
-		self.lineList.insert(self.titleIndex + 1, pubkey)
+
+		for i in range(0, len(self.lineList)):
+			if self.lineList[i] == "# selfnet usr-server-ssh\n":
+				self.lineList.insert(i + 1, pubkey)
+				break
+
 		self._close()
 
 	def removePubKey(self, userName, hostName):
 		self._open()
-		i = self.titleIndex + 1
+
+		i = 0
+		while i < len(self.lineList):
+			if line == "# selfnet usr-server-ssh\n":
+				i = i + 1
+				break
+
 		while i < len(self.lineList):
 			line = self.lineList[i]
-			if line == "\n":
+			if line == "# selfnet usr-server-ssh end\n":
 				break
 			if line.startswith("#"):
 				i = i + 1
@@ -112,40 +122,30 @@ class _CfgFileAuthorizedKeys:
 				i = i + 1
 				continue
 			self.lineList.pop(i)
+
 		self._close()
 
 	def _open(self):
 		if not os.path.exists(self.filename):
 			return
 
-		# read file
-		endIndex = -1
+		titleIndex = -1
 		with open(self.filename, "rt") as f:
 			i = 0
 			for line in f:
 				self.lineList.append(line)
-				if self.titleIndex == -1 and line == "# selfnet usr-server-ssh\n":
-					self.titleIndex = i
-				if self.titleIndex > 0 and endIndex == -1 and line == "\n":
-					endIndex = i
+				if titleIndex == -1 and line == "# selfnet usr-server-ssh\n":
+					titleIndex = i
 				i = i + 1
 
-		# last line of section must ends with "\n"
-		if endIndex == -1 and len(self.lineList) > 0 and not self.lineList[-1].endswith("\n"):
-			self.lineList[-1].append("\n")
-
-		# need to create a section
-		if self.titleIndex == -1:
-			if len(self.lineList) > 0:
-				self.lineList.append("\n")
+		if titleIndex == -1:
 			self.lineList.append("# selfnet usr-server-ssh\n")
+			self.lineList.append("# selfnet usr-server-ssh end\n")
 			self.lineList.append("\n")
-			self.titleIndex = len(self.lineList) - 2
 
 	def _close(self):
 		with open(self.filename, "wt") as f:
 			for line in self.lineList:
 				f.write(line)
 		self.lineList = []
-		self.titleIndex = -1
 

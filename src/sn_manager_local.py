@@ -10,7 +10,7 @@ from gi.repository import GLib
 from sn_util import SnUtil
 from sn_module import SnModuleInstance
 
-# fixme: needs to consider user change
+# fixme: needs to consider user change, both local user change and user change received by peer
 
 class SnSysInfo:
 	userList = None					# list<SnSysInfoUser>
