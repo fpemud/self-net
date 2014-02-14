@@ -52,7 +52,7 @@ class ModuleInstanceObject(SnModuleInstance):
 				return
 
 			cfgf = _CfgFileKnownHosts(self.knownHostsFile)
- 			cfgf.addHost(self.getPeerName(), dataObj.hostPubkeyEcdsa)
+			cfgf.addHost(self.getPeerName(), dataObj.addrList, dataObj.hostPubkeyEcdsa)
 		else:
 			self.sendReject("invalid client data received")
 
@@ -73,12 +73,13 @@ class _CfgFileKnownHosts:
 		self._open()
 		self._close()
 
-	def addHost(self, hostName, pubkey):
+	def addHost(self, hostName, addrList, pubkey):
 		self._open()
 
+		prefix = "%s,%s"%(hostName, ",".join(addrList))
 		strList = pubkey.split()
 		assert len(strList) == 3
-		line = "%s %s %s"%(hostName, strList[0], strList[1])
+		line = "%s %s %s"%(prefix, strList[0], strList[1])
 
 		for i in range(0, len(self.lineList)):
 			if self.lineList[i] == "# selfnet usr-server-ssh\n":
@@ -107,7 +108,7 @@ class _CfgFileKnownHosts:
 			if len(strList) != 3:
 				i = i + 1
 				continue
-			if strList[0] != hostName:
+			if strList[0].split(",")[0] != hostName:
 				i = i + 1
 				continue
 			self.lineList.pop(i)

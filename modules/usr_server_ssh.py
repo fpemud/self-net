@@ -2,6 +2,7 @@
 # -*- coding: utf-8; tab-width: 4; indent-tabs-mode: t -*-
 
 import os
+import netifaces
 from sn_util import SnUtil
 from sn_module import SnModule
 from sn_module import SnModuleInstance
@@ -21,6 +22,14 @@ class ModuleObject(SnModule):
 class ModuleInstanceObject(SnModuleInstance):
 
 	def onInit(self):
+		self.sshSysDir = "/etc/ssh"
+		self.sshSysRsaPrivFile = os.path.join(self.sshSysDir, "ssh_host_rsa_key")
+		self.sshSysRsaPubFile = os.path.join(self.sshSysDir, "ssh_host_rsa_key.pub")
+		self.sshSysDsaPrivFile = os.path.join(self.sshSysDir, "ssh_host_dsa_key")
+		self.sshSysDsaPubFile = os.path.join(self.sshSysDir, "ssh_host_dsa_key.pub")
+		self.sshSysEcdsaPrivFile = os.path.join(self.sshSysDir, "ssh_host_ecdsa_key")
+		self.sshSysEcdsaPubFile = os.path.join(self.sshSysDir, "ssh_host_ecdsa_key.pub")
+
 		self.sshDir = os.path.expanduser("~%s/.ssh"%(self.getUserName()))
 		self.authkeysFile = os.path.join(self.sshDir, "authorized_keys")
 
@@ -36,6 +45,7 @@ class ModuleInstanceObject(SnModuleInstance):
 
 	def onActive(self):
 		obj = _SshServerObject()
+		obj.addrList = self._getAddrList()
 		with open(self.sshSysRsaPubFile, "rt") as f:
 			obj.hostPubkeyRsa = f.read()
 		with open(self.sshSysDsaPubFile, "rt") as f:
@@ -66,42 +76,48 @@ class ModuleInstanceObject(SnModuleInstance):
 		cfgf.removePubKey(self.getUserName(), self.getPeerName())
 
 	def _checkServerCfg(self):
-		sshSysDir = "/etc/ssh"
-		sshSysRsaPrivFile = os.path.join(sshSysDir, "ssh_host_rsa_key")
-		sshSysRsaPubFile = os.path.join(sshSysDir, "ssh_host_rsa_key.pub")
-		sshSysDsaPrivFile = os.path.join(sshSysDir, "ssh_host_dsa_key")
-		sshSysDsaPubFile = os.path.join(sshSysDir, "ssh_host_dsa_key.pub")
-		sshSysEcdsaPrivFile = os.path.join(sshSysDir, "ssh_host_ecdsa_key")
-		sshSysEcdsaPubFile = os.path.join(sshSysDir, "ssh_host_ecdsa_key.pub")
-
-		if not os.path.exists(sshSysRsaPrivFile):
+		if not os.path.exists(self.sshSysRsaPrivFile):
 			raise SnModuleInstanceInitException("server rsa private key file does not exist")
-		if not os.path.exists(sshSysRsaPubFile):
+		if not os.path.exists(self.sshSysRsaPubFile):
 			raise SnModuleInstanceInitException("server rsa public key file does not exist")
-		with open(sshSysRsaPubFile, "rt") as f:
+		with open(self.sshSysRsaPubFile, "rt") as f:
 			pubkey = f.read()
 			if not SnUtil.checkSshPubKey(pubkey, "rsa", "root", self.getHostName()):
 				raise SnModuleInstanceInitException("server rsa public key file is invalid")
 				
-		if not os.path.exists(sshSysDsaPrivFile):
+		if not os.path.exists(self.sshSysDsaPrivFile):
 			raise SnModuleInstanceInitException("server dsa private key file does not exist")
-		if not os.path.exists(sshSysDsaPubFile):
+		if not os.path.exists(self.sshSysDsaPubFile):
 			raise SnModuleInstanceInitException("server dsa private key file does not exist")
-		with open(sshSysDsaPubFile, "rt") as f:
+		with open(self.sshSysDsaPubFile, "rt") as f:
 			pubkey = f.read()
 			if not SnUtil.checkSshPubKey(pubkey, "dsa", "root", self.getHostName()):
 				raise SnModuleInstanceInitException("server dsa public key file is invalid")
 
-		if not os.path.exists(sshSysEcdsaPrivFile):
+		if not os.path.exists(self.sshSysEcdsaPrivFile):
 			raise SnModuleInstanceInitException("server ecdsa private key file does not exist")
-		if not os.path.exists(sshSysEcdsaPubFile):
+		if not os.path.exists(self.sshSysEcdsaPubFile):
 			raise SnModuleInstanceInitException("server ecdsa private key file does not exist")
-		with open(sshSysEcdsaPubFile, "rt") as f:
+		with open(self.sshSysEcdsaPubFile, "rt") as f:
 			pubkey = f.read()
 			if not SnUtil.checkSshPubKey(pubkey, "ecdsa", "root", self.getHostName()):
 				raise SnModuleInstanceInitException("server ecdsa public key file is invalid")
 
+	def _getAddrList(self):
+		ret = []
+		for ifname in netifaces.interfaces():
+			if ifname == "lo":
+				continue
+			addr = netifaces.ifaddresses(ifname)[netifaces.AF_INET].get("addr")
+				if addr is not None:
+					ret.addrList.append(addr)
+			addr = netifaces.ifaddresses(ifname)[netifaces.AF_INET6].get("addr")
+				if addr is not None:
+					ret.addrList.append(addr)
+		return ret
+
 class _SshServerObject:
+	hostAddrList = None					# list<str>
 	hostPubkeyRsa = None				# str
 	hostPubkeyDsa = None				# str
 	hostPubkeyEcdsa = None				# str
