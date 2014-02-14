@@ -5,6 +5,7 @@ import os
 from sn_util import SnUtil
 from sn_module import SnModule
 from sn_module import SnModuleInstance
+from sn_module import SnModuleInstanceInitException
 
 class ModuleObject(SnModule):
 
