@@ -5,6 +5,7 @@ import os
 from sn_util import SnUtil
 from sn_module import SnModule
 from sn_module import SnModuleInstance
+from sn_module import SnModuleInstanceInitException
 
 class ModuleObject(SnModule):
 
@@ -14,26 +15,17 @@ class ModuleObject(SnModule):
 	def getPropDict(self):
 		ret = dict()
 		ret["allow-local-peer"] = True
+		ret["suid"] = False
 		return ret
 
 class ModuleInstanceObject(SnModuleInstance):
 
 	def onInit(self):
-		self.sshSysDir = "/etc/ssh"
-		self.sshSysRsaPrivFile = os.path.join(self.sshSysDir, "ssh_host_rsa_key")
-		self.sshSysRsaPubFile = os.path.join(self.sshSysDir, "ssh_host_rsa_key.pub")
-		self.sshSysDsaPrivFile = os.path.join(self.sshSysDir, "ssh_host_dsa_key")
-		self.sshSysDsaPubFile = os.path.join(self.sshSysDir, "ssh_host_dsa_key.pub")
-		self.sshSysEcdsaPrivFile = os.path.join(self.sshSysDir, "ssh_host_ecdsa_key")
-		self.sshSysEcdsaPubFile = os.path.join(self.sshSysDir, "ssh_host_ecdsa_key.pub")
-
 		self.sshDir = os.path.expanduser("~%s/.ssh"%(self.getUserName()))
 		self.authkeysFile = os.path.join(self.sshDir, "authorized_keys")
 
-		# initialize system key files
-		SnUtil.initSshKeyFile("rsa", "root", self.getHostName(), self.sshSysRsaPrivFile, self.sshSysRsaPubFile)
-		SnUtil.initSshKeyFile("dsa", "root", self.getHostName(), self.sshSysDsaPrivFile, self.sshSysDsaPubFile)
-		SnUtil.initSshKeyFile("ecdsa", "root", self.getHostName(), self.sshSysEcdsaPrivFile, self.sshSysEcdsaPubFile)
+		# check server configuration
+		self._checkServerCfg()
 
 		# initialize user auth-keys files
 		SnUtil.mkDir(self.sshDir)
@@ -72,6 +64,42 @@ class ModuleInstanceObject(SnModuleInstance):
 	def _cleanup(self):
 		cfgf = _CfgFileAuthorizedKeys(self.authkeysFile)
 		cfgf.removePubKey(self.getUserName(), self.getPeerName())
+
+	def _checkServerCfg(self):
+		self.sshSysDir = "/etc/ssh"
+		self.sshSysRsaPrivFile = os.path.join(self.sshSysDir, "ssh_host_rsa_key")
+		self.sshSysRsaPubFile = os.path.join(self.sshSysDir, "ssh_host_rsa_key.pub")
+		self.sshSysDsaPrivFile = os.path.join(self.sshSysDir, "ssh_host_dsa_key")
+		self.sshSysDsaPubFile = os.path.join(self.sshSysDir, "ssh_host_dsa_key.pub")
+		self.sshSysEcdsaPrivFile = os.path.join(self.sshSysDir, "ssh_host_ecdsa_key")
+		self.sshSysEcdsaPubFile = os.path.join(self.sshSysDir, "ssh_host_ecdsa_key.pub")
+
+		if not os.path.exists(sshSysRsaPrivFile):
+			raise SnModuleInstanceInitException("server rsa private key file does not exist")
+		if not os.path.exists(sshSysRsaPubFile):
+			raise SnModuleInstanceInitException("server rsa public key file does not exist")
+		with open(sshSysRsaPubFile, "rt") as f:
+			pubkey = f.read()
+			if not SnUtil.checkSshPubKey(pubkey, "rsa", "root", self.getHostName()):
+				raise SnModuleInstanceInitException("server rsa public key file is invalid")
+				
+		if not os.path.exists(sshSysDsaPrivFile):
+			raise SnModuleInstanceInitException("server dsa private key file does not exist")
+		if not os.path.exists(sshSysDsaPubFile):
+			raise SnModuleInstanceInitException("server dsa private key file does not exist")
+		with open(sshSysDsaPubFile, "rt") as f:
+			pubkey = f.read()
+			if not SnUtil.checkSshPubKey(pubkey, "dsa", "root", self.getHostName()):
+				raise SnModuleInstanceInitException("server dsa public key file is invalid")
+
+		if not os.path.exists(sshSysEcdsaPrivFile):
+			raise SnModuleInstanceInitException("server ecdsa private key file does not exist")
+		if not os.path.exists(sshSysEcdsaPubFile):
+			raise SnModuleInstanceInitException("server ecdsa private key file does not exist")
+		with open(sshSysEcdsaPubFile, "rt") as f:
+			pubkey = f.read()
+			if not SnUtil.checkSshPubKey(pubkey, "ecdsa", "root", self.getHostName()):
+				raise SnModuleInstanceInitException("server ecdsa public key file is invalid")
 
 class _SshServerObject:
 	hostPubkeyRsa = None				# str

@@ -62,7 +62,7 @@ class SnLocalManager:
 
 		for peerName, moduleObjList in self.moduleObjDict.items():
 			for mo in moduleObjList:
-				assert mo.getState() == SnModuleInstance.STATE_INACTIVE
+				assert mo.getState() in [ SnModuleInstance.STATE_INIT_FAILED, SnModuleInstance.STATE_INACTIVE ]
 
 		logging.debug("SnLocalManager.dispose: End")
 		return
@@ -80,7 +80,9 @@ class SnLocalManager:
 		# process module inactive
 		for mo in self.moduleObjDict[peerName]:
 			if not self._matchPeerModuleList(peerInfo, mo):
-				if mo.getState() == SnModuleInstance.STATE_ACTIVE:
+				if mo.getState() == SnModuleInstance.STATE_INIT_FAILED:
+					pass
+				elif mo.getState() == SnModuleInstance.STATE_ACTIVE:
 					logging.debug("SnLocalManager.onPeerChange: mo active -> inactive start, %s, %s, %s", peerName, mo.getUserName(), mo.getModuleName())
 					SnUtil.euidInvoke(mo.getUserName(), mo.onInactive)
 					mo.setState(SnModuleInstance.STATE_INACTIVE)
@@ -99,7 +101,9 @@ class SnLocalManager:
 		for mio in peerInfo.moduleList:
 			mo = self._findModuleList(self.moduleObjDict[peerName], mio)
 			if mo is not None:
-				if mo.getState() == SnModuleInstance.STATE_ACTIVE:
+				if mo.getState() == SnModuleInstance.STATE_INIT_FAILED:
+					pass
+				elif mo.getState() == SnModuleInstance.STATE_ACTIVE:
 					pass
 				elif mo.getState() == SnModuleInstance.STATE_INACTIVE:
 					logging.debug("SnLocalManager.onPeerChange: mo inactive -> active start, %s, %s, %s", peerName, mo.getUserName(), mo.getModuleName())
@@ -118,7 +122,9 @@ class SnLocalManager:
 		logging.debug("SnLocalManager.onPeerRemove: Start, %s", peerName)
 
 		for mo in self.moduleObjDict[peerName]:
-			if mo.getState() == SnModuleInstance.STATE_ACTIVE:
+			if mo.getState() == SnModuleInstance.STATE_INIT_FAILED:
+				pass
+			elif mo.getState() == SnModuleInstance.STATE_ACTIVE:
 				logging.debug("SnLocalManager.onPeerRemove: mo active -> inactive start, %s, %s, %s", peerName, mo.getUserName(), mo.getModuleName())
 				SnUtil.euidInvoke(mo.getUserName(), mo.onInactive)
 				mo.setState(SnModuleInstance.STATE_INACTIVE)
@@ -141,12 +147,15 @@ class SnLocalManager:
 		moduleName = self._getModuleNameByPeerModuleName(srcModuleName)
 		for mo in self.moduleObjDict[peerName]:
 			if mo.getUserName() == userName and mo.getModuleName() == moduleName:
+				assert mo.getState() == SnModuleInstance.STATE_ACTIVE
+
 				if self._typeCheck(data, SnDataPacketReject):
 					SnUtil.euidInvoke(mo.getUserName(), mo.onReject, data.message)
 					SnUtil.euidInvoke(mo.getUserName(), mo.onInactive)
 					mo.setState(SnModuleInstance.STATE_REJECT)
 				else:
 					SnUtil.euidInvoke(mo.getUserName(), mo.onRecv, data)
+
 				logging.debug("SnLocalManager.onPacketRecv: End")
 				return
 		assert False
@@ -233,9 +242,14 @@ class SnLocalManager:
 				if minfo.moduleScope == "sys":
 					mo = ModuleInstanceObject(self, minfo.moduleObj, minfo.moduleParamDict, pname, None)
 					logging.debug("SnLocalManager._getModuleObjDict: mo init, %s, %s", pname, mo.getModuleName())
-					SnUtil.euidInvoke(mo.getUserName(), mo.onInit)
-					mo.setState(SnModuleInstance.STATE_INACTIVE)
-					logging.debug("SnLocalManager._getModuleObjDict: mo init end")
+					try:
+						SnUtil.euidInvoke(mo.getUserName(), mo.onInit)
+						mo.setState(SnModuleInstance.STATE_INACTIVE)
+						logging.debug("SnLocalManager._getModuleObjDict: mo init end")
+					except SnModuleInstanceInitException as e:
+						mo.setState(SnModuleInstance.STATE_INIT_FAILED)
+						mo.setInitFailMessage(e.message)
+						logging.debug("SnLocalManager._getModuleObjDict: mo init failed, %s", e.message)
 					moduleObjList.append(mo)
 				elif minfo.moduleScope == "usr":
 					for uname in pgs.getNormalUserList():
@@ -243,9 +257,14 @@ class SnLocalManager:
 							continue
 						mo = ModuleInstanceObject(self, minfo.moduleObj, minfo.moduleParamDict, pname, uname)
 						logging.debug("SnLocalManager._getModuleObjDict: mo init, %s, %s, %s", pname, uname, mo.getModuleName())
-						SnUtil.euidInvoke(mo.getUserName(), mo.onInit)
-						mo.setState(SnModuleInstance.STATE_INACTIVE)
-						logging.debug("SnLocalManager._getModuleObjDict: mo init end")
+						try:
+							SnUtil.euidInvoke(mo.getUserName(), mo.onInit)
+							mo.setState(SnModuleInstance.STATE_INACTIVE)
+							logging.debug("SnLocalManager._getModuleObjDict: mo init end")
+						except SnModuleInstanceInitException as e:
+							mo.setState(SnModuleInstance.STATE_INIT_FAILED)
+							mo.setInitFailMessage(e.message)
+							logging.debug("SnLocalManager._getModuleObjDict: mo init failed, %s", e.message)
 						moduleObjList.append(mo)
 				else:
 					assert False
