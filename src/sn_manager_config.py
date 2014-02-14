@@ -208,15 +208,15 @@ class SnConfigManager:
 			if True:
 				propDict = moduleObj.getPropDict()
 				if "allow-local-peer" not in propDict:
-					raise Exception("Property \"%s\" not provided by module \"%s\""%("allow-local-peer", m))
+					raise Exception("Property \"allow-local-peer\" not provided by module \"%s\""%(m))
 				if "suid" not in propDict:
-					raise Exception("Property \"%s\" not provided by module \"%s\""%("suid", m))
+					raise Exception("Property \"suid\" not provided by module \"%s\""%(m))
 				if not isinstance(propDict["allow-local-peer"], bool):
-					raise Exception("Property \"%s\" in module \"%s\"should be of type bool"%("allow-local-peer", m))
+					raise Exception("Property \"allow-local-peer\" in module \"%s\"should be of type bool"%(m))
 				if not isinstance(propDict["suid"], bool):
-					raise Exception("Property \"%s\" in module \"%s\"should be of type bool"%("suid", m))
+					raise Exception("Property \"suid\" in module \"%s\"should be of type bool"%(m))
 				if moduleScope == "sys" and propDict["suid"]:
-					raise Exception("Property \"%s\" in module \"%s\"must be equal to False"%("suid", m))
+					raise Exception("Property \"suid\" in module \"%s\"must be equal to False"%(m))
 
 			# fill SnCfgModuleInfo object
 			self.moduleDict[m].moduleScope = moduleScope
