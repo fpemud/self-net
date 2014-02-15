@@ -108,14 +108,14 @@ class ModuleInstanceObject(SnModuleInstance):
 		for ifname in netifaces.interfaces():
 			if ifname == "lo":
 				continue
-			for link in netifaces.ifaddresses(ifname)[netifaces.AF_INET]:
-				addr = link.get("addr")
-				if addr is not None:
-					ret.append(addr)
-			for link in netifaces.ifaddresses(ifname)[netifaces.AF_INET6]:
-				addr =  link.get("addr")
-				if addr is not None:
-					ret.append(addr)
+			if netifaces.AF_INET in netifaces.ifaddresses(ifname):
+				for link in netifaces.ifaddresses(ifname)[netifaces.AF_INET]:
+					if "addr" in link:
+						ret.append(link["addr"])
+			if netifaces.AF_INET6 in netifaces.ifaddresses(ifname):
+				for link in netifaces.ifaddresses(ifname)[netifaces.AF_INET6]:
+					if "addr" in link:
+						ret.append(link["addr"])
 		return ret
 
 class _SshServerObject:
