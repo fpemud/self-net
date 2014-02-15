@@ -289,11 +289,15 @@ class SnPeerSocket:
 				raise _CbConditionException(cb_condition)
 			sendLen = self.sslSock.send(self.sendBuffer)
 			self.sendBuffer = self.sendBuffer[sendLen:]
-		except (socket.error, _CbConditionException) as e:
+		except (socket.error, ssl.SSLError, _CbConditionException) as e:
 			if self.gcState == self._GC_STATE_NONE:
+				if self.errorFunc is None:
+					self.sendSourceId = GLib.io_add_watch(self.sslSock, GLib.IO_OUT, self._onSend)
+					return False
+				# do error processing
 				logging.debug("SnPeerSocket._onSend: Socket error, %s, %s", e.__class__, e)
-				self.sendBuffer = ""
-				self.sendSourceId = None
+				self.errorFunc(self)
+				return False
 			elif self.gcState == self._GC_STATE_PENDING:
 				logging.debug("SnPeerSocket._onSend: Socket error, graceful close complete, %s, %s", e.__class__, e)
 				self.sendBuffer = ""
@@ -337,9 +341,9 @@ class SnPeerSocket:
 			if self.errorFunc is None:
 				return True
 			# do error processing
+			logging.debug("SnPeerSocket._onRecv: Socket error, %s, %s", e.__class__, e)
 			self.errorFunc(self)
 			ret = self._getRetBySource(self.recvSourceId)
-			logging.debug("SnPeerSocket._onRecv: Socket error, %s, %s", e.__class__, e)
 			return ret
 
 		# no callback registered
