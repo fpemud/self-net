@@ -1,0 +1,12 @@
+[Unit]
+Description=selfnetd
+After=network.target
+
+[Service]
+Type=dbus
+BusName=org.freedesktop.SelfNet
+ExecStart=/usr/sbin/selfnetd
+
+[Install]
+WantedBy=multi-user.target
+
