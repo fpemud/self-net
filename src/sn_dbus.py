@@ -102,20 +102,20 @@ class DbusPeerObject(dbus.service.Object):
 		     "hybrid-sleep"
 		"""
 	
-		peerInfo = self.param.peerManager.getPeerInfo(self.peerName)
-		if peerInfo.powerState == SnPeerManager.POWER_STATE_UNKNOWN:
+		powerState = self.param.peerManager.getPeerPowerState(self.peerName)
+		if powerState == SnPeerManager.POWER_STATE_UNKNOWN:
 			return "unknown"
-		elif peerInfo.powerState == SnPeerManager.POWER_STATE_RUNNING:
+		elif powerState == SnPeerManager.POWER_STATE_RUNNING:
 			return "running"
-		elif peerInfo.powerState == SnPeerManager.POWER_STATE_POWEROFF:
+		elif powerState == SnPeerManager.POWER_STATE_POWEROFF:
 			return "poweroff"
-		elif peerInfo.powerState == SnPeerManager.POWER_STATE_RESTARTING:
+		elif powerState == SnPeerManager.POWER_STATE_RESTARTING:
 			return "restarting"
-		elif peerInfo.powerState == SnPeerManager.POWER_STATE_SUSPEND:
+		elif powerState == SnPeerManager.POWER_STATE_SUSPEND:
 			return "suspend"
-		elif peerInfo.powerState == SnPeerManager.POWER_STATE_HIBERNATE:
+		elif powerState == SnPeerManager.POWER_STATE_HIBERNATE:
 			return "hibernate"
-		elif peerInfo.powerState == SnPeerManager.POWER_STATE_HYBRID_SLEEP:
+		elif powerState == SnPeerManager.POWER_STATE_HYBRID_SLEEP:
 			return "hybrid-sleep"
 		else:
 			assert False
