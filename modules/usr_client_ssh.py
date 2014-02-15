@@ -36,7 +36,7 @@ class ModuleInstanceObject(SnModuleInstance):
 	def onActive(self):
 		obj = _SshClientObject()
 		with open(self.pubkeyFile, "rt") as f:
-			obj.userPubkey = f.read()
+			obj.userPubkey = f.readline().rstrip("\n")
 		self.sendObject(obj)
 
 	def onInactive(self):
