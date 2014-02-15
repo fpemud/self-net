@@ -103,8 +103,6 @@ class SnPeerHandShaker:
 		pass
 
 	def addSocket(self, sock, serverSide, connectId=None, hostname=None, port=None):
-		logging.debug("SnPeerHandShaker.addSocket: Start")
-
 		info = _HandShakerConnInfo()
 		info.serverSide = serverSide
 		info.state = SnPeerHandShaker.HANDSHAKE_NONE
@@ -118,19 +116,14 @@ class SnPeerHandShaker:
 		sock.setblocking(0)
 		GLib.io_add_watch(sock, GLib.IO_IN | GLib.IO_OUT | _flagError, self._onEvent)
 
-		logging.debug("SnPeerHandShaker.addSocket: End")
-		return
-
 	def _onEvent(self, source, cb_condition):
-		logging.debug("SnPeerHandShaker._onEvent: Start, %s", _cb_condition_to_str(cb_condition))
-
 		info = self.sockDict[source]
 		oldState = info.state
 
 		try:
 			# check error
 			if cb_condition & _flagError:
-				raise _ConnException("Socket error")
+				raise _ConnException("Socket error, %s"%(_cb_condition_to_str(cb_condition)))
 
 			# HANDSHAKE_NONE
 			if info.state == SnPeerHandShaker.HANDSHAKE_NONE:
@@ -166,15 +159,9 @@ class SnPeerHandShaker:
 					if peerName is None or peerName != info.hostname:
 						raise _ConnException("Hostname incorrect, %s, %s"%(_handshake_info_to_str(info), peerName))
 
-				# completion log
-				logging.debug("SnPeerHandShaker._onEvent: %s -> %s", _handshake_state_to_str(oldState),
-						_handshake_state_to_str(info.state))
-
 				# create SnPeerSocket
 				del self.sockDict[source]
 				self.connectFunc(info.sslSock)
-
-				logging.debug("SnPeerHandShaker._onEvent: End")
 				return False
 
 		except _ConnException as e:
@@ -195,8 +182,6 @@ class SnPeerHandShaker:
 		else:
 			assert False
 
-		logging.debug("SnPeerHandShaker._onEvent: End, %s -> %s", _handshake_state_to_str(oldState),
-				_handshake_state_to_str(info.state))
 		return False
 
 class SnPeerSocket:
@@ -298,8 +283,6 @@ class SnPeerSocket:
 	def _onSend(self, source, cb_condition):
 		assert source == self.sslSock
 
-		logging.debug("SnPeerSocket._onSend: Start, %s, %s", self.peerName, _cb_condition_to_str(cb_condition))
-
 		# send data as much as possible
 		try:
 			if cb_condition & _flagError:
@@ -324,15 +307,12 @@ class SnPeerSocket:
 		# still has data to send
 		if self.sendBuffer != "":
 			self.sendSourceId = GLib.io_add_watch(self.sslSock, GLib.IO_OUT, self._onSend)
-			logging.debug("SnPeerSocket._onSend: Data remains")
 			return False
 
 		# no data to send
 		if self.gcState == self._GC_STATE_NONE:
-			logging.debug("SnPeerSocket._onSend: No data remains")
 			self.sendSourceId = None
 		elif self.gcState == self._GC_STATE_PENDING:
-			logging.debug("SnPeerSocket._onSend: No data remains, graceful close complete")
 			self.gcState = self._GC_STATE_COMPLETE
 			self.gcCompleteFunc(self)
 			assert self.sslSock is None			# gcCompleteFunc should close the socket
@@ -347,46 +327,42 @@ class SnPeerSocket:
 		#assert source == self.sslSock
 		assert self.gcState == self._GC_STATE_NONE
 
-		logging.debug("SnPeerSocket._onRecv: Start, %s, %s", self.peerName, _cb_condition_to_str(cb_condition))
-
 		try:
 			if cb_condition & _flagError:
 				raise _CbConditionException(cb_condition)
 			self.recvBuffer += self.sslSock.recv(4096)
-		except (socket.error, _CbConditionException) as e:
+		except (socket.error, ssl.SSLError, _CbConditionException) as e:
+			if isinstance(e, ssl.SSLError) and e.args[0] == ssl.SSL_ERROR_WANT_READ:
+				return True
+			if self.errorFunc is None:
+				return True
 			# do error processing
-			if self.errorFunc is not None:
-				self.errorFunc(self)
-				ret = self._getRetBySource(self.recvSourceId)
-				logging.debug("SnPeerSocket._onRecv: Socket error, %s, %s", e.__class__, e)
-				return ret
-			return True
-
-		if self.recvFunc is not None:
-			# get packet header
-			headerLen = struct.calcsize("!I")
-			if len(self.recvBuffer) < headerLen:
-				logging.debug("SnPeerSocket._onRecv: More data needed")
-				return True
-
-			# get packet data
-			dataLen = struct.unpack("!I", self.recvBuffer[:headerLen])[0]
-			totalLen = headerLen + dataLen
-			if len(self.recvBuffer) < totalLen:
-				logging.debug("SnPeerSocket._onRecv: More data needed")
-				return True
-
-			# invoke callback function
-			dataObj = pickle.loads(self.recvBuffer[headerLen:totalLen])
-			self.recvBuffer = self.recvBuffer[totalLen:]
-			self.recvFunc(self, dataObj)
+			self.errorFunc(self)
 			ret = self._getRetBySource(self.recvSourceId)
-
-			logging.debug("SnPeerSocket._onRecv: Data object received")
+			logging.debug("SnPeerSocket._onRecv: Socket error, %s, %s", e.__class__, e)
 			return ret
 
-		logging.debug("SnPeerSocket._onRecv: Data received")
-		return True
+		# no callback registered
+		if self.recvFunc is None:
+			return True
+
+		# get packet header
+		headerLen = struct.calcsize("!I")
+		if len(self.recvBuffer) < headerLen:
+			return True
+
+		# get packet data
+		dataLen = struct.unpack("!I", self.recvBuffer[:headerLen])[0]
+		totalLen = headerLen + dataLen
+		if len(self.recvBuffer) < totalLen:
+			return True
+
+		# invoke callback function
+		dataObj = pickle.loads(self.recvBuffer[headerLen:totalLen])
+		self.recvBuffer = self.recvBuffer[totalLen:]
+		self.recvFunc(self, dataObj)
+		ret = self._getRetBySource(self.recvSourceId)
+		return ret
 
 	def _gcCompleteIdleFunc(self):
 		self.gcState = self._GC_STATE_COMPLETE
