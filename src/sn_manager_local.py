@@ -8,6 +8,7 @@ import strict_pgs
 from gi.repository import GLib
 
 from sn_util import SnUtil
+from sn_util import SnSleepNotifier
 from sn_module import SnModuleInstance
 from sn_module import SnModuleInstanceInitException
 
@@ -54,6 +55,7 @@ class SnLocalManager:
 		self.param = param
 		self.localInfo = self._getLocalInfo()
 		self.moduleObjDict = self._getModuleObjDict()
+		self.sleepNotifier = SnSleepNotifier(self.onBeforeSleep, self.onAfterResume)
 
 		logging.debug("SnLocalManager.__init__: End")
 		return
@@ -160,6 +162,12 @@ class SnLocalManager:
 				logging.debug("SnLocalManager.onPacketRecv: End")
 				return
 		assert False
+
+	def onBeforeSleep(self, sleepType):
+		pass
+
+	def onAfterResume(self, sleepType):
+		pass
 
 	##### implementation ####
 

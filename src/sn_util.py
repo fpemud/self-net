@@ -272,3 +272,16 @@ class SnUtil:
 		uid = connection.get_unix_user(sender)
 		return pwd.getpwuid(uid).pw_name
 
+class SnSleepNotifier:
+
+	SLEEP_TYPE_SUSPEND = 0
+	SLEEP_TYPE_HIBERNATE = 1
+	SLEEP_TYPE_HYBRID_SLEEP = 2
+
+	def __init__(self, cbBeforeSleep, cbAfterResume):
+		self.cbBeforeSleep = cbBeforeSleep
+		self.cbAfterResume = cbAfterResume
+
+	def dispose(self):
+		pass
+

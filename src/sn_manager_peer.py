@@ -97,6 +97,12 @@ class SnSysPacketReject:
 class SnSysPacketKeepalive:
 	pass
 
+class SnSysPacketPowerOp:
+	name = None						# str
+
+class SnSysPacketPowerState:
+	name = None						# str
+
 class SnPeerManager:
 
 	POWER_OP_POWERON = 0
@@ -240,6 +246,12 @@ class SnPeerManager:
 			elif self._typeCheck(packetObj.data, SnSysInfo):
 				logging.debug("SnPeerManager.onSocketRecv: _recvPeerInfo")
 				self._recvPeerInfo(peerName, packetObj.data)
+			elif self._typeCheck(packetObj.data, SnSysPacketPowerOp):
+				logging.debug("SnPeerManager.onSocketRecv: _recvPowerOp")
+				self._recvPowerOp(peerName, packetObj.data)
+			elif self._typeCheck(packetObj.data, SnSysPacketPowerState):
+				logging.debug("SnPeerManager.onSocketRecv: _recvPowerState")
+				self._recvPowerState(peerName, packetObj.data)
 			elif self._typeCheck(packetObj.data, SnSysPacketReject):
 				logging.debug("SnPeerManager.onSocketRecv: _recvReject")
 				self._recvReject(peerName, packetObj.data.message)
@@ -364,6 +376,34 @@ class SnPeerManager:
 
 		# do notify
 		self.param.localManager.onPeerChange(peerName)
+
+	def _recvPowerOp(self, peerName, powerOp):
+		if powerOp.name == "poweroff":
+			assert False
+		elif powerOp.name == "restart":
+			assert False
+		elif powerOp.name == "suspend":
+			assert False
+		elif powerOp.name == "hibernate":
+			assert False
+		elif powerOp.name == "hybrid-sleep":
+			assert False
+		else:
+			self._sendReject(peerName, "invalid power operation name \"%s\""%(powerOp.name))
+
+	def _recvPowerState(self, peerName, powerState):
+		if powerState.name == "poweroff":
+			assert False
+		elif powerState.name == "restarting":
+			assert False
+		elif powerState.name == "suspend":
+			assert False
+		elif powerState.name == "hibernate":
+			assert False
+		elif powerState.name == "hybrid-sleep":
+			assert False
+		else:
+			self._sendReject(peerName, "invalid power state name \"%s\""%(powerState.name))
 
 	def _recvReject(self, peerName, rejectMessage):
 		# record to log
