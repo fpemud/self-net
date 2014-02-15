@@ -39,31 +39,35 @@ try:
 	SnUtil.mkDirAndClear(param.runDir)
 	param.tmpDir = tempfile.mkdtemp(prefix="selfnetd-")
 
+	# set logging parameter
+	if parseResult.daemonize:
+		logging.getLogger().addHandler(logging.FileHandler(param.logFile))
+	else:
+		logging.getLogger().addHandler(logging.StreamHandler(sys.stderr))
+
+	if parseResult.debug_level is not None:
+		if parseResult.debug_level == "CRITICAL":
+			logLevel = logging.CRITICAL
+		elif parseResult.debug_level == "ERROR":
+			logLevel = logging.ERROR
+		elif parseResult.debug_level == "WARNING":
+			logLevel = logging.WARNING
+		elif parseResult.debug_level == "INFO":
+			logLevel = logging.INFO
+		elif parseResult.debug_level == "DEBUG":
+			logLevel = logging.DEBUG
+		else:
+			assert False
+		logging.getLogger().setLevel(logLevel)
+
+	logging.debug("selfnetd: Start")
+
 	# daemonize
-	dc = daemon.DaemonContext(pidfile=param.pidFile)
+	dc = daemon.DaemonContext()
 	if parseResult.daemonize:
 		dc.open()
 	try:
-		# set logging parameter
-		if parseResult.daemonize:
-			logging.getLogger().addHandler(logging.FileHandler(param.logFile))
-		else:
-			logging.getLogger().addHandler(logging.StreamHandler(sys.stderr))
-
-		if parseResult.debug_level is not None:
-			if parseResult.debug_level == "CRITICAL":
-				logLevel = logging.CRITICAL
-			elif parseResult.debug_level == "ERROR":
-				logLevel = logging.ERROR
-			elif parseResult.debug_level == "WARNING":
-				logLevel = logging.WARNING
-			elif parseResult.debug_level == "INFO":
-				logLevel = logging.INFO
-			elif parseResult.debug_level == "DEBUG":
-				logLevel = logging.DEBUG
-			else:
-				assert False
-			logging.getLogger().setLevel(logLevel)
+		logging.info("selfnetd: Initializaition starts")
 
 		# create main loop
 		DBusGMainLoop(set_as_default=True)
@@ -78,7 +82,9 @@ try:
 		param.dbusMainObject = DbusMainObject(param)
 
 		# start main loop
+		logging.info("selfnetd: Mainloop begins")
 		param.mainloop.run()
+		logging.info("selfnetd: Mainloop exits")
 	finally:
 		if param.dbusMainObject is not None:
  			param.dbusMainObject.release()
@@ -91,6 +97,7 @@ try:
 		if param.configManager is not None:
 			param.configManager.dispose()
 			param.configManager = None
+		logging.info("selfnetd: Finalization completes")
 		logging.shutdown()
 		dc.close()
 finally:
