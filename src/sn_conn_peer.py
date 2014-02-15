@@ -317,12 +317,23 @@ class SnPeerSocket:
 			return False
 		
 		# send data as much as possible
-		sendLen = 0
 		try:
 			sendLen = self.sslSock.send(self.sendBuffer)
-		except socket.error:
-			pass
-		self.sendBuffer = self.sendBuffer[sendLen:]
+			self.sendBuffer = self.sendBuffer[sendLen:]
+		except socket.error as e:
+			if self.gcState == self._GC_STATE_NONE:
+				logging.debug("SnPeerSocket._onSend: Socket error, %s, %s", e.__class__, e)
+				self.sendBuffer = ""
+				self.sendSourceId = None
+			elif self.gcState == self._GC_STATE_PENDING:
+				logging.debug("SnPeerSocket._onSend: Socket error, graceful close complete, %s, %s", e.__class__, e)
+				self.sendBuffer = ""
+				self.gcState = self._GC_STATE_COMPLETE
+				self.gcCompleteFunc(self)
+				assert self.sslSock is None		# gcCompleteFunc should close the socket
+			else:
+				assert False
+			return False
 
 		# still has data to send
 		if self.sendBuffer != "":
