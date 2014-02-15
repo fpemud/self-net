@@ -207,8 +207,6 @@ class SnPeerManager:
 	##### event callback ####
 
 	def onSocketConnected(self, sslSock):
-		logging.debug("SnPeerManager.onSocketConnected: Start")
-
 		sock = SnPeerSocket(sslSock)
 		peerName = sock.getPeerName()
 
@@ -230,9 +228,11 @@ class SnPeerManager:
 		sock.setEventFunc("gracefulCloseComplete", self._gcComplete)
 
 		# record sock
+		oldFsmState = self.peerInfoDict[peerName].fsmState
 		self.peerInfoDict[peerName].fsmState = _PeerInfoInternal.STATE_INIT
 		self.peerInfoDict[peerName].infoObj = None
 		self.peerInfoDict[peerName].sock = sock
+		logging.debug("SnPeerManager.onSocketConnected: %s", _dbgmsg_peer_state_change(peerName, oldFsmState, self.peerInfoDict[peerName].fsmState))
 
 		# timer operation
 		self._timerOperation()
@@ -242,23 +242,16 @@ class SnPeerManager:
 		self._sendObject(peerName, self.param.configManager.getCfgSerializationObject())
 		self._sendObject(peerName, self.param.localManager.getLocalInfo())
 
-		logging.debug("SnPeerManager.onSocketConnected: End")
-		return
-
 	def onSocketRecv(self, sock, packetObj):
 		peerName = sock.getPeerName()
 		if self._typeCheck(packetObj, SnSysPacket):
 			if self._typeCheck(packetObj.data, SnSysPacketKeepalive):
-				logging.debug("SnPeerManager.onSocketRecv: _recvKeepalive, %s", datetime.now())
 				self._recvKeepalive(peerName)
 			elif self._typeCheck(packetObj.data, SnVersion):
-				logging.debug("SnPeerManager.onSocketRecv: _recvVerMatch, %s", packetObj.data.version)
 				self._recvVerMatch(peerName, packetObj.data)
 			elif self._typeCheck(packetObj.data, SnCfgSerializationObject):
-				logging.debug("SnPeerManager.onSocketRecv: _recvCfgMatch")
 				self._recvCfgMatch(peerName, packetObj.data)
 			elif self._typeCheck(packetObj.data, SnSysInfo):
-				logging.debug("SnPeerManager.onSocketRecv: _recvPeerInfo")
 				self._recvPeerInfo(peerName, packetObj.data)
 			elif self._typeCheck(packetObj.data, SnSysPacketPowerOp):
 				logging.debug("SnPeerManager.onSocketRecv: _recvPowerOp")
@@ -270,7 +263,6 @@ class SnPeerManager:
 				logging.debug("SnPeerManager.onSocketRecv: _recvPowerState")
 				self._recvPowerState(peerName, packetObj.data)
 			elif self._typeCheck(packetObj.data, SnSysPacketReject):
-				logging.debug("SnPeerManager.onSocketRecv: _recvReject")
 				self._recvReject(peerName, packetObj.data.message)
 			else:
 				self._sendReject(peerName, "invalid system packet data format")
@@ -281,11 +273,9 @@ class SnPeerManager:
 			self._sendReject(peerName, "invalid packet format, %s"%(packetObj.__class__))
 
 	def onSocketError(self, sock):
-		logging.debug("SnPeerManager.onSocketError: Start, %s", sock.getPeerName())
-		self._shutdownPeer(sock.getPeerName(), _PeerInfoInternal.STATE_NONE)
+		oldFsmState = self._shutdownPeer(sock.getPeerName(), _PeerInfoInternal.STATE_NONE)
+		logging.debug("SnPeerManager.onSocketError: %s", _dbgmsg_peer_state_change(sock.getPeerName(), oldFsmState, _PeerInfoInternal.STATE_NONE))
 		self._timerOperation()
-		logging.debug("SnPeerManager.onSocketError: End")
-		return
 
 	def onPeerProbe(self):
 		connectId = time.time()
@@ -322,7 +312,9 @@ class SnPeerManager:
 			return
 
 		# do operation
+		oldFsmState = self.peerInfoDict[peerName].fsmState
 		self.peerInfoDict[peerName].fsmState = _PeerInfoInternal.STATE_VER_MATCH
+		logging.debug("SnPeerManager._recvVerMatch: %s", _dbgmsg_peer_state_change(peerName, oldFsmState, self.peerInfoDict[peerName].fsmState))
 
 	def _recvCfgMatch(self, peerName, peerCfgSerializationObject):
 		# check state
@@ -336,7 +328,9 @@ class SnPeerManager:
 			return
 
 		# do operation
+		oldFsmState = self.peerInfoDict[peerName].fsmState
 		self.peerInfoDict[peerName].fsmState = _PeerInfoInternal.STATE_CFG_MATCH
+		logging.debug("SnPeerManager._recvCfgMatch: %s", _dbgmsg_peer_state_change(peerName, oldFsmState, self.peerInfoDict[peerName].fsmState))
 
 	def _recvPeerInfo(self, peerName, peerInfo):
 		# check state
@@ -378,8 +372,10 @@ class SnPeerManager:
 				return
 
 		# do operation
+		oldFsmState = self.peerInfoDict[peerName].fsmState
 		self.peerInfoDict[peerName].fsmState = _PeerInfoInternal.STATE_FULL
 		self.peerInfoDict[peerName].infoObj = peerInfo
+		logging.debug("SnPeerManager._recvPeerInfo: %s", _dbgmsg_peer_state_change(peerName, oldFsmState, self.peerInfoDict[peerName].fsmState))
 
 		# do notify
 		self.param.localManager.onPeerChange(peerName)
@@ -416,20 +412,19 @@ class SnPeerManager:
 			self._sendReject(peerName, "invalid power state name \"%s\""%(powerState.name))
 
 	def _recvReject(self, peerName, rejectMessage):
-		# record to log
 		logging.warning("receive reject, %s, %s", peerName, rejectMessage)
 
-		peerInfo = self.peerInfoDict[peerName]
-
 		# do notify
-		if peerInfo.fsmState == _PeerInfoInternal.STATE_FULL:
+		if self.peerInfoDict[peerName].fsmState == _PeerInfoInternal.STATE_FULL:
 			self.param.localManager.onPeerRemove(peerName)
 
 		# remove peer
-		peerInfo.sock.close()
-		peerInfo.fsmState = _PeerInfoInternal.STATE_REJECT
-		peerInfo.infoObj = None
-		peerInfo.sock = None
+		oldFsmState = self.peerInfoDict[peerName].fsmState
+		self.peerInfoDict[peerName].sock.close()
+		self.peerInfoDict[peerName].fsmState = _PeerInfoInternal.STATE_REJECT
+		self.peerInfoDict[peerName].infoObj = None
+		self.peerInfoDict[peerName].sock = None
+		logging.debug("SnPeerManager._recvReject: %s", _dbgmsg_peer_state_change(peerName, oldFsmState, self.peerInfoDict[peerName].fsmState))
 
 	def _sendObject(self, peerName, obj):
 		packetObj = SnSysPacket()
@@ -437,7 +432,6 @@ class SnPeerManager:
 		self.peerInfoDict[peerName].sock.send(packetObj)
 
 	def _sendReject(self, peerName, rejectMessage):
-		# record to log
 		logging.warning("send reject, closing gracefully, %s, %s", peerName, rejectMessage)
 
 		# send reject message
@@ -450,7 +444,8 @@ class SnPeerManager:
 		self.peerInfoDict[peerName].sock.gracefulClose()
 
 	def _gcComplete(self, sock):
-		self._shutdownPeer(sock.getPeerName(), _PeerInfoInternal.STATE_REJECT)
+		oldFsmState = self._shutdownPeer(sock.getPeerName(), _PeerInfoInternal.STATE_REJECT)
+		logging.debug("SnPeerManager._gcComplete: %s", _dbgmsg_peer_state_change(sock.getPeerName(), oldFsmState, _PeerInfoInternal.STATE_REJECT))
 		self._timerOperation()
 
 	def _sendDataObject(self, peerName, srcUserName, srcModuleName, obj):
@@ -463,17 +458,18 @@ class SnPeerManager:
 	def _shutdownPeer(self, peerName, dstState):
 		assert dstState in [ _PeerInfoInternal.STATE_NONE, _PeerInfoInternal.STATE_REJECT ]
 
-		peerInfo = self.peerInfoDict[peerName]
-
 		# do notify
-		if peerInfo.fsmState == _PeerInfoInternal.STATE_FULL:
+		if self.peerInfoDict[peerName].fsmState == _PeerInfoInternal.STATE_FULL:
 			self.param.localManager.onPeerRemove(peerName)
 
 		# remove peer
-		peerInfo.sock.close()
-		peerInfo.fsmState = dstState
-		peerInfo.infoObj = None
-		peerInfo.sock = None
+		oldFsmState = self.peerInfoDict[peerName].fsmState
+		self.peerInfoDict[peerName].sock.close()
+		self.peerInfoDict[peerName].fsmState = dstState
+		self.peerInfoDict[peerName].infoObj = None
+		self.peerInfoDict[peerName].sock = None
+
+		return oldFsmState
 
 	def _timerOperation(self):
 		hasNotNone = any(x for x in self.peerInfoDict.values() if x.sock is not None)
@@ -515,4 +511,23 @@ class _PeerInfoInternal:
 	powerState = None			# enum
 	infoObj = None				# obj, SnSysInfo
 	sock = None					# obj, peer socket
+
+def _dbgmsg_peer_state_change(peerName, oldPeerState, peerState):
+	return "Peer %s, %s -> %s"%(peerName, _peer_state_to_str(oldPeerState), _peer_state_to_str(peerState))
+
+def _peer_state_to_str(peerState):
+	if peerState == _PeerInfoInternal.STATE_NONE:
+		return "STATE_NONE"
+	elif peerState == _PeerInfoInternal.STATE_INIT:
+		return "STATE_INIT"
+	elif peerState == _PeerInfoInternal.STATE_VER_MATCH:
+		return "STATE_VER_MATCH"
+	elif peerState == _PeerInfoInternal.STATE_CFG_MATCH:
+		return "STATE_CFG_MATCH"
+	elif peerState == _PeerInfoInternal.STATE_FULL:
+		return "STATE_FULL"
+	elif peerState == _PeerInfoInternal.STATE_REJECT:
+		return "STATE_REJECT"
+	else:
+		assert False
 

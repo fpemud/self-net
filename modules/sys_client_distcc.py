@@ -26,7 +26,7 @@ class ModuleInstanceObject(SnModuleInstance):
 
 		# check distcc config
 		if not os.path.isdir(self.cfgDir):
-			raise SnModuleInstanceInitException("directory \"%s\" does not exist"%(self.cfgDir))
+			raise SnModuleInstanceInitException("distcc configuration directory does not exist")
 
 		# initialize distcc hosts file
 		if not os.path.exists(self.hostsFile):

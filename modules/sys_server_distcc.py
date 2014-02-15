@@ -1,6 +1,7 @@
 #!/usr/bin/python2
 # -*- coding: utf-8; tab-width: 4; indent-tabs-mode: t -*-
 
+import os
 from sn_module import SnModule
 from sn_module import SnModuleInstance
 
@@ -18,6 +19,10 @@ class ModuleObject(SnModule):
 class ModuleInstanceObject(SnModuleInstance):
 
 	def onInit(self):
+		self.cfgDir = "/etc/distcc"
+		if not os.path.isdir(self.cfgDir):
+			raise SnModuleInstanceInitException("distcc configuration directory does not exist")
+
 		return
 
 	def onActive(self):
