@@ -13,15 +13,74 @@ from dbus.mainloop.glib import DBusGMainLoop
 sys.path.append('/usr/lib/selfnetd')
 from sn_subcmd import SnSubCmdMain
 
+def parseArgs():
+	argParser = argparse.ArgumentParser()
+	subparsers = argParser.add_subparsers()
+
+	apGenCaCert = subParsers.add_parser("generate-ca-cert")
+	apGenCaCert.set_defaults(subcmd="generate_ca_cert")
+
+	apGenCert = subParsers.add_parser("generate-cert")
+	apGenCert.set_defaults(subcmd="generate_cert")
+	apGenCert.add_argument("--hostname")
+	apGenCert.add_argument("--outdir")
+	apGenCert.add_argument("--export", action="store_true")
+
+	apListPeer = subParsers.add_parser("list-peers")
+	apListPeer.set_defaults(subcmd="list_peers")
+
+	apOpPowerOn = subParsers.add_parser("poweron")
+	apOpPowerOn.set_defaults(subcmd="poweron")
+	apOpPowerOn.add_argument("peerName")
+
+	apOpPowerOff = subParsers.add_parser("poweroff")
+	apOpPowerOff.set_defaults(subcmd="poweroff")
+	apOpPowerOff.add_argument("peerName")
+
+	apOpReboot = subParsers.add_parser("reboot")
+	apOpReboot.set_defaults(subcmd="reboot")
+	apOpReboot.add_argument("peerName")
+	
+	apOpSuspend = subParsers.add_parser("suspend")
+	apOpSuspend.set_defaults(subcmd="suspend")
+	apOpSuspend.add_argument("peerName")
+
+	apOpHibernate = subParsers.add_parser("hibernate")
+	apOpHibernate.set_defaults(subcmd="hibernate")
+	apOpHibernate.add_argument("peerName")
+
+	apOpHybridSleep = subParsers.add_parser("hybrid-sleep")
+	apOpHybridSleep.set_defaults(subcmd="hybrid_sleep")
+	apOpHybridSleep.add_argument("peerName")
+
+	return argParser.parse_args()
+
+################################################################################
+
 param = SnParam()
-parseResult = SnCommandArgument()
+parseResult = parseArgs()
 
 # some assistant sub command
 if parseResult.subcmd == "generate_ca_cert":
 	SnSubCmdMain(param).generateCaCert()
-	sys.exit(0)
 elif parseResult.subcmd == "generate_cert":
 	SnSubCmdMain(param).generateCert(parseResult.hostname, parseResult.out_dir, parseResult.export)
-	sys.exit(0)
+elif parseResult.subcmd == "list_peers":
+	SnSubCmdMain(param).listPeers()
+elif parseResult.subcmd == "poweron":
+	SnSubCmdMain(param).peerPowerOperation(parseResult.peerName, SnPeerManager.POWER_OP_POWERON)
+elif parseResult.subcmd == "poweroff":
+	SnSubCmdMain(param).peerPowerOperation(parseResult.peerName, SnPeerManager.POWER_OP_POWEROFF)
+elif parseResult.subcmd == "restart":
+	SnSubCmdMain(param).peerPowerOperation(parseResult.peerName, SnPeerManager.POWER_OP_RESTART)
+elif parseResult.subcmd == "suspend":
+	SnSubCmdMain(param).peerPowerOperation(parseResult.peerName, SnPeerManager.POWER_OP_SUSPEND)
+elif parseResult.subcmd == "hibernate":
+	SnSubCmdMain(param).peerPowerOperation(parseResult.peerName, SnPeerManager.POWER_OP_HIBERNATE)
+elif parseResult.subcmd == "hybrid_sleep":
+	SnSubCmdMain(param).peerPowerOperation(parseResult.peerName, SnPeerManager.POWER_OP_HYBRID_SLEEP)
 else:
-	assert parseResult.subcmd == ""
+	assert False
+
+sys.exit(0)
+

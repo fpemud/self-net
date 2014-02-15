@@ -7,6 +7,7 @@ import shutil
 import tempfile
 import daemon
 import logging
+import argparse
 from gi.repository import GLib
 from dbus.mainloop.glib import DBusGMainLoop
 
@@ -14,27 +15,24 @@ sys.path.append('/usr/lib/selfnetd')
 sys.path.append('/usr/lib/selfnetd/modules')		# fixme
 from sn_util import SnUtil
 from sn_param import SnParam
-from sn_command_argument import SnCommandArgument
 from sn_manager_config import SnConfigManager
 from sn_manager_local import SnLocalManager
 from sn_manager_peer import SnPeerManager
 from sn_dbus import DbusMainObject
-from sn_subcmd import SnSubCmdMain
+
+def parseArgs():
+	argParser = argparse.ArgumentParser()
+	argParser.add_argument("-D", dest='daemonize', action="store_false", default=True,
+		help="selfnetd will not detach and does not become a daemon when this option is specified")
+	argParser.add_argument("-d", "--debug-level", dest='debug_level',
+		choices=['CRITICAL', 'ERROR', 'WARNING', 'INFO', 'DEBUG'], default="WARNING",
+		help="Set output debug message level")
+	return argParser.parse_args()
+
+################################################################################
 
 param = SnParam()
-parseResult = SnCommandArgument()
-
-# some assistant sub command
-if parseResult.subcmd == "generate_ca_cert":
-	SnSubCmdMain(param).generateCaCert()
-	sys.exit(0)
-elif parseResult.subcmd == "generate_cert":
-	SnSubCmdMain(param).generateCert(parseResult.hostname, parseResult.out_dir, parseResult.export)
-	sys.exit(0)
-else:
-	assert parseResult.subcmd == ""
-
-# the main process
+parseResult = parseArgs()
 try:
 	# create directory
 	SnUtil.mkDir(param.logDir)
