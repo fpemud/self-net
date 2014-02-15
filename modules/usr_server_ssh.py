@@ -139,7 +139,7 @@ class _CfgFileAuthorizedKeys:
 
 		for i in range(0, len(self.lineList)):
 			if self.lineList[i] == "# selfnet usr-server-ssh\n":
-				self.lineList.insert(i + 1, pubkey)
+				self.lineList.insert(i + 1, pubkey + "\n")
 				break
 
 		self._close()

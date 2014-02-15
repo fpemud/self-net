@@ -79,7 +79,7 @@ class _CfgFileKnownHosts:
 		prefix = "%s,%s"%(hostName, ",".join(addrList))
 		strList = pubkey.split()
 		assert len(strList) == 3
-		line = "%s %s %s"%(prefix, strList[0], strList[1])
+		line = "%s %s %s\n"%(prefix, strList[0], strList[1])
 
 		for i in range(0, len(self.lineList)):
 			if self.lineList[i] == "# selfnet usr-server-ssh\n":
