@@ -273,8 +273,9 @@ class SnPeerManager:
 			self._sendReject(peerName, "invalid packet format, %s"%(packetObj.__class__))
 
 	def onSocketError(self, sock):
-		oldFsmState = self._shutdownPeer(sock.getPeerName(), _PeerInfoInternal.STATE_NONE)
-		logging.debug("SnPeerManager.onSocketError: %s", _dbgmsg_peer_state_change(sock.getPeerName(), oldFsmState, _PeerInfoInternal.STATE_NONE))
+		peerName = sock.getPeerName()
+		oldFsmState = self._shutdownPeer(peerName, _PeerInfoInternal.STATE_NONE)
+		logging.debug("SnPeerManager.onSocketError: %s", _dbgmsg_peer_state_change(peerName, oldFsmState, _PeerInfoInternal.STATE_NONE))
 		self._timerOperation()
 
 	def onPeerProbe(self):
@@ -444,8 +445,9 @@ class SnPeerManager:
 		self.peerInfoDict[peerName].sock.gracefulClose()
 
 	def _gcComplete(self, sock):
-		oldFsmState = self._shutdownPeer(sock.getPeerName(), _PeerInfoInternal.STATE_REJECT)
-		logging.debug("SnPeerManager._gcComplete: %s", _dbgmsg_peer_state_change(sock.getPeerName(), oldFsmState, _PeerInfoInternal.STATE_REJECT))
+		peerName = sock.getPeerName()
+		oldFsmState = self._shutdownPeer(peerName, _PeerInfoInternal.STATE_REJECT)
+		logging.debug("SnPeerManager._gcComplete: %s", _dbgmsg_peer_state_change(peerName, oldFsmState, _PeerInfoInternal.STATE_REJECT))
 		self._timerOperation()
 
 	def _sendDataObject(self, peerName, srcUserName, srcModuleName, obj):
