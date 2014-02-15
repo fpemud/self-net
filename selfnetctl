@@ -3,21 +3,23 @@
 
 import os
 import sys
+import argparse
 sys.path.append('/usr/lib/selfnetd')
+from sn_param import SnParam
 from sn_subcmd import SnSubCmdMain
 
 def parseArgs():
 	argParser = argparse.ArgumentParser()
-	subparsers = argParser.add_subparsers()
+	subParsers = argParser.add_subparsers()
 
 	apGenCaCert = subParsers.add_parser("generate-ca-cert")
 	apGenCaCert.set_defaults(subcmd="generate_ca_cert")
 
 	apGenCert = subParsers.add_parser("generate-cert")
 	apGenCert.set_defaults(subcmd="generate_cert")
-	apGenCert.add_argument("--hostname")
+	apGenCert.add_argument("--hostname", required=True)
 	apGenCert.add_argument("--outdir")
-	apGenCert.add_argument("--export", action="store_true")
+	apGenCert.add_argument("--export", action="store_true", default=False)
 
 	apListPeer = subParsers.add_parser("list-peers")
 	apListPeer.set_defaults(subcmd="list_peers")
@@ -57,7 +59,7 @@ parseResult = parseArgs()
 if parseResult.subcmd == "generate_ca_cert":
 	SnSubCmdMain(param).generateCaCert()
 elif parseResult.subcmd == "generate_cert":
-	SnSubCmdMain(param).generateCert(parseResult.hostname, parseResult.out_dir, parseResult.export)
+	SnSubCmdMain(param).generateCert(parseResult.hostname, parseResult.outdir, parseResult.export)
 elif parseResult.subcmd == "list_peers":
 	SnSubCmdMain(param).listPeers()
 elif parseResult.subcmd == "poweron":

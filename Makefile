@@ -36,6 +36,9 @@ install:
 	find "$(DESTDIR)/$(prefix)/lib/selfnetd/modules" -type f | xargs chmod 644
 	find "$(DESTDIR)/$(prefix)/lib/selfnetd/modules" -type d | xargs chmod 755
 
+	install -d -m 0755 "$(DESTDIR)/$(prefix)/share/dbus-1/system-services"
+	install -m 0644 data/org.fpemud.SelfNet.service "$(DESTDIR)/$(prefix)/share/dbus-1/system-services"
+
 	install -d -m 0755 "$(DESTDIR)/etc/dbus-1/system.d"
 	install -m 0644 data/org.fpemud.SelfNet.conf "$(DESTDIR)/etc/dbus-1/system.d"
 

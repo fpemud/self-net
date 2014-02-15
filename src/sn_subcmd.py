@@ -2,10 +2,12 @@
 # -*- coding: utf-8; tab-width: 4; indent-tabs-mode: t -*-
 
 import os
+import dbus
 import random
 import zipfile
 from OpenSSL import crypto
 from sn_util import SnUtil
+from sn_manager_peer import SnPeerManager
 
 class SnSubCmdMain:
 
@@ -30,6 +32,9 @@ class SnSubCmdMain:
 		self._dumpCertAndKey(cert, k, self.param.caCertFile, self.param.caPrivkeyFile)
 
 	def generateCert(self, hostname, outDir, isExport):
+		if outDir is None:
+			outDir = self.param.cfgDir
+
 		# get CA certificate and private key
 		caCert, caKey = self._loadCertAndKey(self.param.caCertFile, self.param.caPrivkeyFile)
 
@@ -63,13 +68,21 @@ class SnSubCmdMain:
 				zipf.writestr(privkeyFileInfo, crypto.dump_privatekey(crypto.FILETYPE_PEM, k))
 
 	def listPeers(self):
-		for pname in self.param.peerManager.getPeerNameList():
-			powerState = self.param.peerManager.getPeerPowerState(pname)
-			powerStateStr = self._powerStateToStr(powerState)
-			print "%s: %s"%(pname, powerStateStr)
+		dbusObj = dbus.SystemBus().get_object('org.fpemud.SelfNet', '/org/fpemud/SelfNet')
+		peerIdList = dbusObj.GetPeerList(dbus_interface='org.fpemud.SelfNet')
+
+		for peerId in peerIdList:
+			peerObj = dbus.SystemBus().get_object('org.fpemud.SelfNet', '/org/fpemud/SelfNet/Peers/%d'%(peerId))
+			peerName = peerObj.GetPeerName(dbus_interface='org.fpemud.SelfNet.Peer')
+			peerPowerState = peerObj.GetPeerState(dbus_interface='org.fpemud.SelfNet.Peer')
+			print "%s:"%(peerName)
+			print "\tPowerState:\t%s"%(peerPowerState)
+			print ""
 
 	def peerPowerOperation(self, peerName, opName):
-		if peerName not in self.param.peerManager.getPeerNameList():
+		dbusObj = dbus.SystemBus().get_object('org.fpemud.SelfNet', '/org/fpemud/SelfNet')
+		peerId = dbusObj.GetPeerByName(dbus_interface='org.fpemud.SelfNet')
+		if peerId == -1:
 			raise Exception("peer \"%s\" does not exist"%(peerName))
 
 		assert False
@@ -98,21 +111,3 @@ class SnSubCmdMain:
 			f.write(buf)
 			os.fchmod(f.fileno(), 0600)
 
-	def _powerStateToStr(self, powerState):
-		if powerState == POWER_STATE_UNKNOWN:
-			return "POWER_STATE_UNKNOWN"
-		elif powerState == POWER_STATE_RUNNING:
-			return "POWER_STATE_RUNNING"
-		elif powerState == POWER_STATE_POWEROFF:
-			return "POWER_STATE_POWEROFF"
-		elif powerState == POWER_STATE_RESTARTING:
-			return "POWER_STATE_RESTARTING"
-		elif powerState == POWER_STATE_SUSPEND:
-			return "POWER_STATE_SUSPEND"
-		elif powerState == POWER_STATE_HIBERNATE:
-			return "POWER_STATE_HIBERNATE"
-		elif powerState == POWER_STATE_HYBRID_SLEEP:
-			return "POWER_STATE_HYBRID_SLEEP"
-		else:
-			assert False
-	

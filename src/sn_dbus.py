@@ -20,6 +20,7 @@ from sn_manager_peer import SnPeerManager
 #
 # Methods:
 # array<peerId:int> GetPeerList()
+# peerId:int        GetPeerByName(peerName:str)
 #
 # ==== Peer ====
 # Service               org.fpemud.SelfNet
@@ -61,6 +62,13 @@ class DbusMainObject(dbus.service.Object):
 		for po in self.peerList:
 			ret.append(po.peerId)
 		return ret
+
+	@dbus.service.method('org.fpemud.SelfNet', in_signature='s', out_signature='i')
+	def GetPeerByName(self, peerName):
+		for po in self.peerList:
+			if peerName == po.peerName:
+				return po.peerId
+		return -1
 
 class DbusPeerObject(dbus.service.Object):
 
