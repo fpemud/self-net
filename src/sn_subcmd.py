@@ -63,9 +63,15 @@ class SnSubCmdMain:
 				zipf.writestr(privkeyFileInfo, crypto.dump_privatekey(crypto.FILETYPE_PEM, k))
 
 	def listPeers(self):
-		assert False
+		for pname in self.param.peerManager.getPeerNameList():
+			powerState = self.param.peerManager.getPeerPowerState(pname)
+			powerStateStr = self._powerStateToStr(powerState)
+			print "%s: %s"%(pname, powerStateStr)
 
 	def peerPowerOperation(self, peerName, opName):
+		if peerName not in self.param.peerManager.getPeerNameList():
+			raise Exception("peer \"%s\" does not exist"%(peerName))
+
 		assert False
 
 	def _loadCertAndKey(self, certFile, keyFile):
@@ -92,3 +98,21 @@ class SnSubCmdMain:
 			f.write(buf)
 			os.fchmod(f.fileno(), 0600)
 
+	def _powerStateToStr(self, powerState):
+		if powerState == POWER_STATE_UNKNOWN:
+			return "POWER_STATE_UNKNOWN"
+		elif powerState == POWER_STATE_RUNNING:
+			return "POWER_STATE_RUNNING"
+		elif powerState == POWER_STATE_POWEROFF:
+			return "POWER_STATE_POWEROFF"
+		elif powerState == POWER_STATE_RESTARTING:
+			return "POWER_STATE_RESTARTING"
+		elif powerState == POWER_STATE_SUSPEND:
+			return "POWER_STATE_SUSPEND"
+		elif powerState == POWER_STATE_HIBERNATE:
+			return "POWER_STATE_HIBERNATE"
+		elif powerState == POWER_STATE_HYBRID_SLEEP:
+			return "POWER_STATE_HYBRID_SLEEP"
+		else:
+			assert False
+	

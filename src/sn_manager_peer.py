@@ -168,7 +168,7 @@ class SnPeerManager:
 		return self.peerInfoDict[peerName].infoObj
 
 	def getPeerPowerState(self, peerName):
-		return None
+		return self.peerInfoDict[peerName].powerState
 
 	def peerPowerOperation(self, peerName, opName):
 		if opName == self.POWER_OP_POWERON:

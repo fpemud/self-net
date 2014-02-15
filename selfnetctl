@@ -3,13 +3,6 @@
 
 import os
 import sys
-import shutil
-import tempfile
-import daemon
-import logging
-from gi.repository import GLib
-from dbus.mainloop.glib import DBusGMainLoop
-
 sys.path.append('/usr/lib/selfnetd')
 from sn_subcmd import SnSubCmdMain
 
