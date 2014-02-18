@@ -54,6 +54,9 @@ class SnModuleInstance:
 	STATE_INACTIVE = 2
 	STATE_ACTIVE = 3
 	STATE_REJECT = 4
+
+	WORK_STATE_IDLE = 0
+	WORK_STATE_WORKING = 1
 	
 	##### hidden to subclass ####
 
@@ -64,6 +67,7 @@ class SnModuleInstance:
 		self.peerName = peerName
 		self.userName = userName
 		self.state = self.STATE_NONE
+		self.workState = self.WORK_STATE_IDLE
 		self.initFailMessage = ""
 
 	##### provide to subclass ####
@@ -89,6 +93,9 @@ class SnModuleInstance:
 	def sendReject(self, rejectMessage):
 		self.coreObj._sendReject(self.peerName, self.userName, self.classObj.getModuleName(), rejectMessage)
 
+	def setWorkState(self, workState):
+		self.workState = workState
+
 	##### provide to coreObj only ####
 
 	def getState(self):
@@ -96,6 +103,9 @@ class SnModuleInstance:
 
 	def setState(self, state):
 		self.state = state
+
+	def getWorkState(self):
+		return self.workState
 
 	def getInitFailMessage(self):
 		return self.initFailMessage

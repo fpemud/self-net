@@ -49,6 +49,9 @@ class SnDataPacketReject:
 
 class SnLocalManager:
 
+	WORK_STATE_IDLE = 0
+	WORK_STATE_WORKING = 1
+
 	def __init__(self, param):
 		logging.debug("SnLocalManager.__init__: Start")
 
@@ -72,6 +75,13 @@ class SnLocalManager:
 
 	def getLocalInfo(self):
 		return self.localInfo
+
+	def getWorkState(self):
+		for moduleObjList in self.moduleObjDictvalues():
+			for mo in moduleObjList:
+				if mo.getWorkState() == SnModuleInstance.WORK_STATE_WORKING:
+					return SnModuleInstance.WORK_STATE_WORKING
+		return SnModuleInstance.WORK_STATE_IDLE
 
 	##### event callback ####
 

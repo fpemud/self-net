@@ -19,6 +19,7 @@ from sn_manager_peer import SnPeerManager
 # Object path           /
 #
 # Methods:
+# str               GetWorkState()
 # array<peerId:int> GetPeerList()
 # peerId:int        GetPeerByName(peerName:str)
 #
@@ -55,6 +56,16 @@ class DbusMainObject(dbus.service.Object):
 
 	def release(self):
 		self.remove_from_connection()
+
+	@dbus.service.method('org.fpemud.SelfNet', in_signature='', out_signature='s')
+	def GetWorkState(self):
+		ws = self.param.localManager.getWorkState()
+		if ws == SnLocalManager.WORK_STATE_IDLE:
+			return "idle"
+		elif ws == SnLocalManager.WORK_STATE_WORKING:
+			return "working"
+		else:
+			assert False
 
 	@dbus.service.method('org.fpemud.SelfNet', in_signature='', out_signature='ai')
 	def GetPeerList(self):
