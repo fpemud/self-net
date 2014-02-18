@@ -60,12 +60,16 @@ class SnModuleInstance:
 	
 	##### hidden to subclass ####
 
-	def __init__(self, coreObj, classObj, paramDict, peerName, userName):
-		self.coreObj = coreObj
-		self.classObj = classObj			# SnModule
-		self.paramDict = paramDict
-		self.peerName = peerName
-		self.userName = userName
+	def __init__(self, initParam):
+		self.initParam = initParam
+
+		self.coreObj = initParam.coreObj		# for convience
+		self.classObj = initParam.classObj
+		self.paramDict = initParam.paramDict
+		self.peerName = initParam.peerName
+		self.userName = initParam.userName
+		self.tmpDir = initParam.tmpDir
+
 		self.state = self.STATE_NONE
 		self.workState = self.WORK_STATE_IDLE
 		self.initFailMessage = ""
@@ -87,6 +91,14 @@ class SnModuleInstance:
 	def getModuleName(self):
 		return self.classObj.getModuleName()
 
+	def getTmpDir(self):
+		"""Temp directory is created when being used for the first time, deleted
+		   before change to inactive state"""
+
+		if not os.path.exists(self.tmpDir):
+			os.mkdir(self.tmpDir)
+		return self.tmpDir
+
 	def sendObject(self, obj):
 		self.coreObj._sendObject(self.peerName, self.userName, self.classObj.getModuleName(), obj)
 
@@ -97,6 +109,9 @@ class SnModuleInstance:
 		self.workState = workState
 
 	##### provide to coreObj only ####
+
+	def getInitParam(self):
+		return self.initParam
 
 	def getState(self):
 		return self.state
@@ -132,6 +147,14 @@ class SnModuleInstance:
 	def onRecv(self, dataObj):
 		"""Called when data is received from the peer"""
 		assert False			# implement by subclass
+
+class SnModuleInstanceInitParam:
+	coreObj = None		# obj, SnLocalManager
+	classObj = None		# obj, SnModule
+	paramDict = None	# dict
+	peerName = None		# str
+	userName = None		# str
+	tmpDir = None		# str
 
 class SnModuleInstanceInitException(Exception):
 	pass

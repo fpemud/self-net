@@ -98,6 +98,7 @@ class SnLocalManager:
 				elif mo.getState() == SnModuleInstance.STATE_ACTIVE:
 					logging.debug("SnLocalManager.onPeerChange: mo active -> inactive start, %s, %s, %s", peerName, mo.getUserName(), mo.getModuleName())
 					SnUtil.euidInvoke(mo.getUserName(), mo.onInactive)
+					shutil.rmtree(mo.getInitParam().tmpDir, True)
 					mo.setState(SnModuleInstance.STATE_INACTIVE)
 					logging.debug("SnLocalManager.onPeerChange: mo active -> inactive end")
 				elif mo.getState() == SnModuleInstance.STATE_INACTIVE:
@@ -140,6 +141,7 @@ class SnLocalManager:
 			elif mo.getState() == SnModuleInstance.STATE_ACTIVE:
 				logging.debug("SnLocalManager.onPeerRemove: mo active -> inactive start, %s, %s, %s", peerName, mo.getUserName(), mo.getModuleName())
 				SnUtil.euidInvoke(mo.getUserName(), mo.onInactive)
+				shutil.rmtree(mo.getInitParam().tmpDir, True)
 				mo.setState(SnModuleInstance.STATE_INACTIVE)
 				logging.debug("SnLocalManager.onPeerRemove: mo active -> inactive end")
 			elif mo.getState() == SnModuleInstance.STATE_INACTIVE:
@@ -165,6 +167,7 @@ class SnLocalManager:
 				if self._typeCheck(data, SnDataPacketReject):
 					SnUtil.euidInvoke(mo.getUserName(), mo.onReject, data.message)
 					SnUtil.euidInvoke(mo.getUserName(), mo.onInactive)
+					shutil.rmtree(mo.getInitParam().tmpDir, True)
 					mo.setState(SnModuleInstance.STATE_REJECT)
 				else:
 					SnUtil.euidInvoke(mo.getUserName(), mo.onRecv, data)
@@ -202,6 +205,7 @@ class SnLocalManager:
 		for mo in self.moduleObjDict[peerName]:
 			if mo.getUserName() == userName and mo.getModuleName() == moduleName:
 				SnUtil.euidInvoke(mo.getUserName(), mo.onInactive)
+				shutil.rmtree(mo.getInitParam().tmpDir, True)
 				mo.setState(SnModuleInstance.STATE_REJECT)
 				return False
 		assert False
@@ -259,7 +263,14 @@ class SnLocalManager:
 
 				exec("from %s import ModuleInstanceObject"%(mname.replace("-", "_")))
 				if minfo.moduleScope == "sys":
-					mo = ModuleInstanceObject(self, minfo.moduleObj, minfo.moduleParamDict, pname, None)
+					initParam = SnModuleInstanceInitParam()
+					initParam.coreObj = self
+					initParam.classObj = minfo.moduleObj
+					initParam.paramDict = minfo.moduleParamDict
+					initParam.peerName = pname
+					initParam.userName = None
+					initParam.tmpDir = os.path.join(self.param.tmpDir, mname)
+					mo = ModuleInstanceObject(initParam)
 					logging.debug("SnLocalManager._getModuleObjDict: mo init, %s, %s", pname, mo.getModuleName())
 					try:
 						SnUtil.euidInvoke(mo.getUserName(), mo.onInit)
@@ -274,7 +285,15 @@ class SnLocalManager:
 					for uname in pgs.getNormalUserList():
 						if uname in self.param.configManager.getUserBlackList():
 							continue
-						mo = ModuleInstanceObject(self, minfo.moduleObj, minfo.moduleParamDict, pname, uname)
+
+						initParam = SnModuleInstanceInitParam()
+						initParam.coreObj = self
+						initParam.classObj = minfo.moduleObj
+						initParam.paramDict = minfo.moduleParamDict
+						initParam.peerName = pname
+						initParam.userName = uname
+						initParam.tmpDir = os.path.join(self.param.tmpDir, "%s-%s"%(mname, uname))
+						mo = ModuleInstanceObject(initParam)
 						logging.debug("SnLocalManager._getModuleObjDict: mo init, %s, %s, %s", pname, uname, mo.getModuleName())
 						try:
 							SnUtil.euidInvoke(mo.getUserName(), mo.onInit)
