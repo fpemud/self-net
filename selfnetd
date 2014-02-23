@@ -5,9 +5,10 @@ import os
 import sys
 import shutil
 import tempfile
-import daemon
 import logging
 import argparse
+from daemon import daemon
+from daemon import pidfile
 from gi.repository import GLib
 from dbus.mainloop.glib import DBusGMainLoop
 
@@ -22,8 +23,8 @@ from sn_dbus import DbusMainObject
 
 def parseArgs():
 	argParser = argparse.ArgumentParser()
-	argParser.add_argument("-D", dest='daemonize', action="store_false", default=True,
-		help="selfnetd will not detach and does not become a daemon when this option is specified")
+	argParser.add_argument("--no-daemon", dest='daemonize', action="store_false", default=True,
+		help="Do not daemonize.")
 	argParser.add_argument("--pid-file", dest='pid_file', help="Specify location of a PID file.")
 	argParser.add_argument("-d", "--debug-level", dest='debug_level',
 		choices=['CRITICAL', 'ERROR', 'WARNING', 'INFO', 'DEBUG'], default="WARNING",
@@ -69,10 +70,12 @@ try:
 	logging.debug("selfnetd: Start")
 
 	# daemonize
-	pidfile = daemon.pidlockfile.PIDLockFile(param.pidFile)
-	dc = daemon.DaemonContext(pidfile=pidfile)
+	dc = None
 	if parseResult.daemonize:
+		pidf = pidfile.PIDLockFile(param.pidFile)
+		dc = daemon.DaemonContext(pidfile=pidf)
 		dc.open()
+
 	try:
 		logging.info("selfnetd: Initializaition starts")
 
@@ -106,7 +109,8 @@ try:
 			param.configManager = None
 		logging.info("selfnetd: Finalization completes")
 		logging.shutdown()
-		dc.close()
+		if dc is not None:
+			dc.close()
 finally:
 	# shouldn't remove log directory
 	if param.tmpDir is not None and os.path.exists(param.tmpDir):

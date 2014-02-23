@@ -22,8 +22,10 @@ distclean:
 	rm -Rf "$(distdir)" "$(distdir)".tar "$(distdir)".tar.bz2
 
 install:
+	install -d -m 0755 "$(DESTDIR)/$(prefix)/sbin"
+	install -m 0755 selfnetd "$(DESTDIR)/$(prefix)/sbin"
+
 	install -d -m 0755 "$(DESTDIR)/$(prefix)/bin"
-	install -m 0755 selfnetd "$(DESTDIR)/$(prefix)/bin"
 	install -m 0755 selfnetctl "$(DESTDIR)/$(prefix)/bin"
 
 	install -d -m 0755 "$(DESTDIR)/$(prefix)/lib/selfnetd"

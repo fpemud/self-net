@@ -4,8 +4,10 @@ After=network.target
 
 [Service]
 Type=dbus
-BusName=org.freedesktop.SelfNet
-ExecStart=/usr/sbin/selfnetd
+PIDFile=/var/run/selfnetd/selfnetd.pid
+BusName=org.fpemud.SelfNet
+ExecStart=/sbin/selfnetd
+ExecReload=/bin/kill -HUP $MAINPID
 
 [Install]
 WantedBy=multi-user.target
