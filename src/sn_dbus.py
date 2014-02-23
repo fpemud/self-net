@@ -24,7 +24,7 @@ from sn_manager_peer import SnPeerManager
 # peerId:int        GetPeerByName(peerName:str)
 #
 # Signals:
-# WorkStateChanged(workState:str)
+# WorkStateChanged(newWorkState:str)
 #
 # ==== Peer ====
 # Service               org.fpemud.SelfNet
@@ -37,7 +37,7 @@ from sn_manager_peer import SnPeerManager
 # void              DoPowerOperation(opName:str)
 # 
 # Signals:
-# PeerStateChanged(peerId:int)
+# PowerStateChanged(newPowerState:str)
 #
 
 class DbusMainObject(dbus.service.Object):
@@ -83,6 +83,10 @@ class DbusMainObject(dbus.service.Object):
 			if peerName == po.peerName:
 				return po.peerId
 		return -1
+
+	@dbus.service.signal(dbus_interface='org.fpemud.SelfNet', signature='s')
+	def WorkStateChanged(self, newWorkState):
+		pass
 
 class DbusPeerObject(dbus.service.Object):
 
@@ -160,4 +164,8 @@ class DbusPeerObject(dbus.service.Object):
 			self.param.peerManager.peerPowerOperation(self.peerName, SnPeerManager.POWER_OP_HYBRID_SLEEP)
 		else:
 			assert False
+
+	@dbus.service.signal(dbus_interface='org.fpemud.SelfNet.Peer', signature='s')
+	def PowerStateChanged(self, newPowerState):
+		pass
 
