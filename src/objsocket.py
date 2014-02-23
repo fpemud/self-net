@@ -33,13 +33,13 @@ class SnPeerSocket:
 		self.sendSourceId = None
 
 	def getPeerName(self):
-		# should be removed from this class
+		# should be removed
 
-		assert self._checkValid()
+		assert self.sslSock is not None and self.gcState == self._GC_STATE_NONE
 		return self.peerName
 
 	def send(self, dataObj):
-		assert self._checkValid()
+		assert self.sslSock is not None and self.gcState == self._GC_STATE_NONE
 
 		data = pickle.dumps(dataObj)
 		header = struct.pack("!I", len(data))
@@ -53,7 +53,7 @@ class SnPeerSocket:
 		"""This function does not close the socket, the socket must be closed
 		   by graceful close complete callback funtion"""
 
-		assert self._checkValid()
+		assert self.sslSock is not None and self.gcState == self._GC_STATE_NONE
 
 		# no receiving in graceful closing
 		if self.recvSourceId is not None:
@@ -99,31 +99,32 @@ class SnPeerSocket:
 		except (socket.error, ssl.SSLError, _CbConditionException) as e:
 			if self.gcState == self._GC_STATE_NONE:
 				self.errorFunc(self)
+				assert self.sslSock is None		# errorFunc should close the socket
 				return False
 			elif self.gcState == self._GC_STATE_PENDING:
 				self.sendBuffer = ""
 				self.gcState = self._GC_STATE_COMPLETE
 				self.gcCompleteFunc(self)
 				assert self.sslSock is None		# gcCompleteFunc should close the socket
+				return False
 			else:
 				assert False
-			return False
 
 		# still has data to send
 		if self.sendBuffer != "":
-			self.sendSourceId = GLib.io_add_watch(self.sslSock, GLib.IO_OUT, self._onSend)
-			return False
+			return True
 
 		# no data to send
 		if self.gcState == self._GC_STATE_NONE:
 			self.sendSourceId = None
+			return False
 		elif self.gcState == self._GC_STATE_PENDING:
 			self.gcState = self._GC_STATE_COMPLETE
 			self.gcCompleteFunc(self)
 			assert self.sslSock is None			# gcCompleteFunc should close the socket
+			return False
 		else:
 			assert False
-		return False
 
 	def _onRecv(self, source, cb_condition):
 		# fixme: weird, It seems that GLib.source_remove has no effect
@@ -141,10 +142,12 @@ class SnPeerSocket:
 			self.recvBuffer += ret
 		except (socket.error, ssl.SSLError, _CbConditionException, _EofException) as e:
 			if isinstance(e, ssl.SSLError) and e.args[0] == ssl.SSL_ERROR_WANT_READ:
+				print "*** debug_x1"
 				return True
 			self.errorFunc(self)
-			ret = self._getRetBySource(self.recvSourceId)
-			return ret
+			assert self.sslSock is None		# errorFunc should close the socket
+			print "*** debug_x2"
+			return False
 
 		i = 0
 		while True:
@@ -158,14 +161,14 @@ class SnPeerSocket:
 			dataLen = struct.unpack("!I", self.recvBuffer[:headerLen])[0]
 			totalLen = headerLen + dataLen
 			if len(self.recvBuffer) < totalLen:
-				print "*** debug2: %d"%(i)
+				print "*** debug2: %d, %d, %d"%(i, totalLen, len(self.recvBuffer))
 				return True
 
 			# invoke callback function
 			dataObj = pickle.loads(self.recvBuffer[headerLen:totalLen])
 			self.recvBuffer = self.recvBuffer[totalLen:]
 			self.recvFunc(self, dataObj)
-			if not self._getRetBySource(self.recvSourceId):
+			if self.sslSock is None or self.self.gcState != self._GC_STATE_NONE:
 				print "*** debug3: %d"%(i)
 				return False
 
@@ -176,20 +179,6 @@ class SnPeerSocket:
 		self.gcCompleteFunc(self)
 		assert self.sslSock is None			# gcCompleteFunc should close the socket
 		return False
-
-	def _checkValid(self):
-		return self.sslSock is not None and self.gcState == self._GC_STATE_NONE
-
-	def _getRetBySource(self, sourceId):
-		# I find removing the source handler in callback function has no effect.
-		# It is still depended on the return value.
-		# I can't understand this design.
-		# I write a function here to get the return value by the availability of source handler.
-
-		if sourceId is not None:
-			return True
-		else:
-			return False
 
 class _CbConditionException(Exception):
 	def __init__(self, cb_condition):
