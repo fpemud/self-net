@@ -78,7 +78,7 @@ class SnLocalManager:
 		return self.localInfo
 
 	def getWorkState(self):
-		for moduleObjList in self.moduleObjDictvalues():
+		for moduleObjList in self.moduleObjDict.values():
 			for mo in moduleObjList:
 				if mo.getWorkState() == SnModuleInstance.WORK_STATE_WORKING:
 					return SnModuleInstance.WORK_STATE_WORKING

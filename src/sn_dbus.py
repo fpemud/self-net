@@ -23,6 +23,9 @@ from sn_manager_peer import SnPeerManager
 # array<peerId:int> GetPeerList()
 # peerId:int        GetPeerByName(peerName:str)
 #
+# Signals:
+# WorkStateChanged(workState:str)
+#
 # ==== Peer ====
 # Service               org.fpemud.SelfNet
 # Interface             org.fpemud.SelfNet.Peer
