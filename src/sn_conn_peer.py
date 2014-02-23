@@ -8,6 +8,7 @@ import pickle
 import struct
 import logging
 from gi.repository import GLib
+from sn_util import SnUtil
 
 class SnPeerServer:
 
@@ -151,7 +152,7 @@ class SnPeerHandShaker:
 			# HANDSHAKE_COMPLETE
 			if info.state == SnPeerHandShaker.HANDSHAKE_COMPLETE:
 				# check peer name
-				peerName = _getPeerName(info.sslSock)
+				peerName = SnUtil.getSslSocketPeerName(info.sslSock)
 				if info.serverSide:
 					if peerName is None:
 						raise _ConnException("Hostname incorrect, %s, %s"%(_handshake_info_to_str(info), peerName))
@@ -190,43 +191,25 @@ class SnPeerSocket:
 	_GC_STATE_PENDING = 1
 	_GC_STATE_COMPLETE = 2
 
-	def __init__(self, sslSock):
+	def __init__(self, sslSock, recvFunc, errorFunc, gcCompleteFunc):
 		self.sslSock = sslSock
 
-		self.peerName = _getPeerName(self.sslSock)
+		self.peerName = SnUtil.getSslSocketPeerName(self.sslSock)
 		assert self.peerName is not None
 
 		self.gcState = self._GC_STATE_NONE
-		self.recvFunc = None
-		self.errorFunc = None
-		self.gcCompleteFunc = None
+		self.recvFunc = recvFunc
+		self.errorFunc = errorFunc
+		self.gcCompleteFunc = gcCompleteFunc
 
 		self.sendBuffer = ""
 		self.recvBuffer = ""
-		self.recvSourceId = None
+		self.recvSourceId = GLib.io_add_watch(self.sslSock, GLib.IO_IN | _flagError, self._onRecv)
 		self.sendSourceId = None
 
-	def setEventFunc(self, funcName, func):
-		assert self._checkValid()
-		assert func is not None
-
-		if funcName == "recv":
-			assert self.recvFunc is None
-			self.recvFunc = func
-			if self.recvSourceId is None:
-				self.recvSourceId = GLib.io_add_watch(self.sslSock, GLib.IO_IN | _flagError, self._onRecv)
-		elif funcName == "error":
-			assert self.errorFunc is None
-			self.errorFunc = func
-			if self.recvSourceId is None:
-				self.recvSourceId = GLib.io_add_watch(self.sslSock, GLib.IO_IN | _flagError, self._onRecv)
-		elif funcName == "gracefulCloseComplete":
-			assert self.gcCompleteFunc is None
-			self.gcCompleteFunc = func
-		else:
-			assert False
-
 	def getPeerName(self):
+		# should be removed from this class
+
 		assert self._checkValid()
 		return self.peerName
 
@@ -246,7 +229,6 @@ class SnPeerSocket:
 		   by graceful close complete callback funtion"""
 
 		assert self._checkValid()
-		assert self.gcCompleteFunc is not None
 
 		# no receiving in graceful closing
 		if self.recvSourceId is not None:
@@ -291,9 +273,6 @@ class SnPeerSocket:
 			self.sendBuffer = self.sendBuffer[sendLen:]
 		except (socket.error, ssl.SSLError, _CbConditionException) as e:
 			if self.gcState == self._GC_STATE_NONE:
-				if self.errorFunc is None:
-					self.sendSourceId = GLib.io_add_watch(self.sslSock, GLib.IO_OUT, self._onSend)
-					return False
 				# do error processing
 				logging.debug("SnPeerSocket._onSend: Socket error, %s, %s", e.__class__, e)
 				self.errorFunc(self)
@@ -338,35 +317,30 @@ class SnPeerSocket:
 		except (socket.error, ssl.SSLError, _CbConditionException) as e:
 			if isinstance(e, ssl.SSLError) and e.args[0] == ssl.SSL_ERROR_WANT_READ:
 				return True
-			if self.errorFunc is None:
-				return True
 			# do error processing
 			logging.debug("SnPeerSocket._onRecv: Socket error, %s, %s", e.__class__, e)
 			self.errorFunc(self)
 			ret = self._getRetBySource(self.recvSourceId)
 			return ret
 
-		# no callback registered
-		if self.recvFunc is None:
-			return True
+		while True:
+			# get packet header
+			headerLen = struct.calcsize("!I")
+			if len(self.recvBuffer) < headerLen:
+				return True
 
-		# get packet header
-		headerLen = struct.calcsize("!I")
-		if len(self.recvBuffer) < headerLen:
-			return True
+			# get packet data
+			dataLen = struct.unpack("!I", self.recvBuffer[:headerLen])[0]
+			totalLen = headerLen + dataLen
+			if len(self.recvBuffer) < totalLen:
+				return True
 
-		# get packet data
-		dataLen = struct.unpack("!I", self.recvBuffer[:headerLen])[0]
-		totalLen = headerLen + dataLen
-		if len(self.recvBuffer) < totalLen:
-			return True
-
-		# invoke callback function
-		dataObj = pickle.loads(self.recvBuffer[headerLen:totalLen])
-		self.recvBuffer = self.recvBuffer[totalLen:]
-		self.recvFunc(self, dataObj)
-		ret = self._getRetBySource(self.recvSourceId)
-		return ret
+			# invoke callback function
+			dataObj = pickle.loads(self.recvBuffer[headerLen:totalLen])
+			self.recvBuffer = self.recvBuffer[totalLen:]
+			self.recvFunc(self, dataObj)
+			if not self._getRetBySource(self.recvSourceId):
+				return False
 
 	def _gcCompleteIdleFunc(self):
 		self.gcState = self._GC_STATE_COMPLETE
@@ -411,14 +385,6 @@ class _HandShakerConnInfo:
 	hostname = None				# str
 	port = None					# int
 	spname = None				# str
-
-def _getPeerName(sslSock):
-	cert = sslSock.getpeercert()
-	if cert is not None and "subject" in cert:
-		for item in cert["subject"]:
-			if item[0][0] == "commonName":
-				return item[0][1]
-	return None
 
 def _cb_condition_to_str(cb_condition):
         ret = ""

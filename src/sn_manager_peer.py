@@ -9,6 +9,7 @@ from datetime import datetime
 from gi.repository import GLib
 from gi.repository import GObject
 
+from sn_util import SnUtil
 from sn_conn_peer import SnPeerServer
 from sn_conn_peer import SnPeerClient
 from sn_conn_peer import SnPeerHandShaker
@@ -200,32 +201,25 @@ class SnPeerManager:
 	##### event callback ####
 
 	def onSocketConnected(self, sslSock):
-		sock = SnPeerSocket(sslSock)
-		peerName = sock.getPeerName()
+		peerName = SnUtil.getSslSocketPeerName(sslSock)
+
+		# need peer name
+		if peerName is None:
+			sslSock.close()
+			logging.debug("SnPeerManager.onSocketConnected: Fail, error1")
+			return
 
 		# only peer in self-net is allowed
 		if peerName not in self.peerInfoDict:
-			sock.close()
-			logging.debug("SnPeerManager.onSocketConnected: Fail, error1")
+			sslSock.close()
+			logging.debug("SnPeerManager.onSocketConnected: Fail, error2")
 			return
 
 		# only one connection between a pair of hosts
 		if self.peerInfoDict[peerName].fsmState != _PeerInfoInternal.STATE_NONE:
-			sock.close()
-			logging.debug("SnPeerManager.onSocketConnected: Fail, error2")
+			sslSock.close()
+			logging.debug("SnPeerManager.onSocketConnected: Fail, error3")
 			return
-
-		# establish peerSocket
-		sock.setEventFunc("recv", self.onSocketRecv)
-		sock.setEventFunc("error", self.onSocketError)
-		sock.setEventFunc("gracefulCloseComplete", self._gcComplete)
-
-		# record sock
-		oldFsmState = self.peerInfoDict[peerName].fsmState
-		self.peerInfoDict[peerName].fsmState = _PeerInfoInternal.STATE_INIT
-		self.peerInfoDict[peerName].infoObj = None
-		self.peerInfoDict[peerName].sock = sock
-		logging.info("SnPeerManager.onSocketConnected: %s", _dbgmsg_peer_state_change(peerName, oldFsmState, self.peerInfoDict[peerName].fsmState))
 
 		# send keep-alive packet for every second, close the connection after 5 failure
 		assert sslSock.getsockopt(socket.SOL_SOCKET, socket.SO_KEEPALIVE) == 0
@@ -233,6 +227,13 @@ class SnPeerManager:
 		sslSock.setsockopt(socket.IPPROTO_TCP, socket.TCP_KEEPIDLE, 1)
 		sslSock.setsockopt(socket.IPPROTO_TCP, socket.TCP_KEEPINTVL, 1)
 		sslSock.setsockopt(socket.IPPROTO_TCP, socket.TCP_KEEPCNT, 3)
+
+		# record sock
+		oldFsmState = self.peerInfoDict[peerName].fsmState
+		self.peerInfoDict[peerName].fsmState = _PeerInfoInternal.STATE_INIT
+		self.peerInfoDict[peerName].infoObj = None
+		self.peerInfoDict[peerName].sock = SnPeerSocket(sslSock, self.onSocketRecv, self.onSocketError, self._gcComplete)
+		logging.info("SnPeerManager.onSocketConnected: %s", _dbgmsg_peer_state_change(peerName, oldFsmState, self.peerInfoDict[peerName].fsmState))
 
 		# timer operation
 		self._timerOperation()
