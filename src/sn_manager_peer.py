@@ -6,6 +6,7 @@ import socket
 import logging
 import time
 from datetime import datetime
+from objsocket import SnPeerSocket
 from gi.repository import GLib
 from gi.repository import GObject
 
@@ -13,7 +14,6 @@ from sn_util import SnUtil
 from sn_conn_peer import SnPeerServer
 from sn_conn_peer import SnPeerClient
 from sn_conn_peer import SnPeerHandShaker
-from sn_conn_peer import SnPeerSocket
 from sn_manager_config import SnVersion
 from sn_manager_config import SnCfgSerializationObject
 from sn_manager_local import SnSysInfo
@@ -223,10 +223,10 @@ class SnPeerManager:
 
 		# send keep-alive packet for every second, close the connection after 5 failure
 		assert sslSock.getsockopt(socket.SOL_SOCKET, socket.SO_KEEPALIVE) == 0
-		sslSock.setsockopt(socket.SOL_SOCKET, socket.SO_KEEPALIVE, 1)
 		sslSock.setsockopt(socket.IPPROTO_TCP, socket.TCP_KEEPIDLE, 1)
 		sslSock.setsockopt(socket.IPPROTO_TCP, socket.TCP_KEEPINTVL, 1)
-		sslSock.setsockopt(socket.IPPROTO_TCP, socket.TCP_KEEPCNT, 3)
+		sslSock.setsockopt(socket.IPPROTO_TCP, socket.TCP_KEEPCNT, 1)
+		sslSock.setsockopt(socket.SOL_SOCKET, socket.SO_KEEPALIVE, 1)
 
 		# record sock
 		oldFsmState = self.peerInfoDict[peerName].fsmState
