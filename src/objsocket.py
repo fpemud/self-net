@@ -135,24 +135,30 @@ class SnPeerSocket:
 		try:
 			if cb_condition & _flagError:
 				raise _CbConditionException(cb_condition)
-			self.recvBuffer += self.sslSock.recv(4096)
-		except (socket.error, ssl.SSLError, _CbConditionException) as e:
+			ret = self.sslSock.recv(4096)
+			if len(ret) == 0:
+				raise _EofException()
+			self.recvBuffer += ret
+		except (socket.error, ssl.SSLError, _CbConditionException, _EofException) as e:
 			if isinstance(e, ssl.SSLError) and e.args[0] == ssl.SSL_ERROR_WANT_READ:
 				return True
 			self.errorFunc(self)
 			ret = self._getRetBySource(self.recvSourceId)
 			return ret
 
+		i = 0
 		while True:
 			# get packet header
 			headerLen = struct.calcsize("!I")
 			if len(self.recvBuffer) < headerLen:
+				print "*** debug1: %d"%(i)
 				return True
 
 			# get packet data
 			dataLen = struct.unpack("!I", self.recvBuffer[:headerLen])[0]
 			totalLen = headerLen + dataLen
 			if len(self.recvBuffer) < totalLen:
+				print "*** debug2: %d"%(i)
 				return True
 
 			# invoke callback function
@@ -160,7 +166,10 @@ class SnPeerSocket:
 			self.recvBuffer = self.recvBuffer[totalLen:]
 			self.recvFunc(self, dataObj)
 			if not self._getRetBySource(self.recvSourceId):
+				print "*** debug3: %d"%(i)
 				return False
+
+			i = i + 1
 
 	def _gcCompleteIdleFunc(self):
 		self.gcState = self._GC_STATE_COMPLETE
@@ -186,6 +195,10 @@ class _CbConditionException(Exception):
 	def __init__(self, cb_condition):
 		s = _cb_condition_to_str(cb_condition)
 		super(_CbConditionException, self).__init__(s)
+
+class _EofException(Exception):
+	def __init__(self):
+		super(_EofException, self).__init__("EOF encountered")
 
 def _cb_condition_to_str(cb_condition):
         ret = ""
