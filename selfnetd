@@ -24,6 +24,7 @@ def parseArgs():
 	argParser = argparse.ArgumentParser()
 	argParser.add_argument("-D", dest='daemonize', action="store_false", default=True,
 		help="selfnetd will not detach and does not become a daemon when this option is specified")
+	argParser.add_argument("--pid-file", dest='pid_file', help="Specify location of a PID file.")
 	argParser.add_argument("-d", "--debug-level", dest='debug_level',
 		choices=['CRITICAL', 'ERROR', 'WARNING', 'INFO', 'DEBUG'], default="WARNING",
 		help="Set output debug message level")
@@ -31,8 +32,13 @@ def parseArgs():
 
 ################################################################################
 
-param = SnParam()
 parseResult = parseArgs()
+
+# initialize SnParam
+param = SnParam()
+if parseResult.pid_file is not None:
+	self.pidFile = parseResult.pid_file
+
 try:
 	# create directory
 	SnUtil.mkDir(param.logDir)
@@ -63,7 +69,8 @@ try:
 	logging.debug("selfnetd: Start")
 
 	# daemonize
-	dc = daemon.DaemonContext()
+	pidfile = daemon.pidlockfile.PIDLockFile(param.pidFile)
+	dc = daemon.DaemonContext(pidfile=pidfile)
 	if parseResult.daemonize:
 		dc.open()
 	try:

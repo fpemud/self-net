@@ -121,8 +121,8 @@ class SnLocalManager:
 					pass
 				elif mo.getState() == SnModuleInstance.STATE_INACTIVE:
 					logging.debug("SnLocalManager.onPeerChange: mo inactive -> active start, %s, %s, %s", peerName, mo.getUserName(), mo.getModuleName())
-					SnUtil.euidInvoke(mo.getUserName(), mo.onActive)
 					mo.setState(SnModuleInstance.STATE_ACTIVE)
+					SnUtil.euidInvoke(mo.getUserName(), mo.onActive)
 					logging.debug("SnLocalManager.onPeerChange: mo inactive -> active end")
 				elif mo.getState() == SnModuleInstance.STATE_REJECT:
 					pass
