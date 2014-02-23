@@ -63,7 +63,7 @@ class SnPeerSocket:
 
 		# set state
 		self.gcState = self._GC_STATE_PENDING
-		if self.sendBuffer == "":
+		if len(self.sendBuffer) == 0:
 			# for consistency sake, gcCompleteFunc should be called in event
 			# context, so we use idle callback here
 			GLib.idle_add(self._gcCompleteIdleFunc)
@@ -94,7 +94,11 @@ class SnPeerSocket:
 		try:
 			if cb_condition & _flagError:
 				raise _CbConditionException(cb_condition)
-			sendLen = self.sslSock.send(self.sendBuffer)
+			sendLen = self.sslSock.write(self.sendBuffer)
+			self.sslSock.flush()
+
+			print "**** objsock._onSend, %d"%(sendLen)
+
 			self.sendBuffer = self.sendBuffer[sendLen:]
 		except (socket.error, ssl.SSLError, _CbConditionException) as e:
 			if self.gcState == self._GC_STATE_NONE:
@@ -111,7 +115,7 @@ class SnPeerSocket:
 				assert False
 
 		# still has data to send
-		if self.sendBuffer != "":
+		if len(self.sendBuffer) > 0:
 			return True
 
 		# no data to send
@@ -127,16 +131,16 @@ class SnPeerSocket:
 			assert False
 
 	def _onRecv(self, source, cb_condition):
-		# fixme: weird, It seems that GLib.source_remove has no effect
-		if source != self.sslSock:
-			return False
-		#assert source == self.sslSock
+
+		print "**** objsock._onRecv, Start"
+
+		assert source == self.sslSock
 		assert self.gcState == self._GC_STATE_NONE
 
 		try:
 			if cb_condition & _flagError:
 				raise _CbConditionException(cb_condition)
-			ret = self.sslSock.recv(4096)
+			ret = self.sslSock.read()
 			if len(ret) == 0:
 				raise _EofException()
 			self.recvBuffer += ret
@@ -161,7 +165,7 @@ class SnPeerSocket:
 			dataLen = struct.unpack("!I", self.recvBuffer[:headerLen])[0]
 			totalLen = headerLen + dataLen
 			if len(self.recvBuffer) < totalLen:
-				print "*** debug2: %d, %d, %d"%(i, totalLen, len(self.recvBuffer))
+				print "*** debug2: %d, %d, %d, %d"%(i, totalLen, len(self.recvBuffer), len(self.sendBuffer))
 				return True
 
 			# invoke callback function
