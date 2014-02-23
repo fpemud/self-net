@@ -98,12 +98,9 @@ class SnPeerSocket:
 			self.sendBuffer = self.sendBuffer[sendLen:]
 		except (socket.error, ssl.SSLError, _CbConditionException) as e:
 			if self.gcState == self._GC_STATE_NONE:
-				# do error processing
-				logging.debug("SnPeerSocket._onSend: Socket error, %s, %s", e.__class__, e)
 				self.errorFunc(self)
 				return False
 			elif self.gcState == self._GC_STATE_PENDING:
-				logging.debug("SnPeerSocket._onSend: Socket error, graceful close complete, %s, %s", e.__class__, e)
 				self.sendBuffer = ""
 				self.gcState = self._GC_STATE_COMPLETE
 				self.gcCompleteFunc(self)
@@ -142,8 +139,6 @@ class SnPeerSocket:
 		except (socket.error, ssl.SSLError, _CbConditionException) as e:
 			if isinstance(e, ssl.SSLError) and e.args[0] == ssl.SSL_ERROR_WANT_READ:
 				return True
-			# do error processing
-			logging.debug("SnPeerSocket._onRecv: Socket error, %s, %s", e.__class__, e)
 			self.errorFunc(self)
 			ret = self._getRetBySource(self.recvSourceId)
 			return ret
