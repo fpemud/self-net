@@ -87,9 +87,6 @@ class SnConfigManager:
 	def getPeerProbeInterval(self):
 		return self.cfgGlobal.peerProbeInterval
 
-	def getPeerKeepaliveInterval(self):
-		return self.cfgGlobal.peerKeepaliveInterval
-
 	def getUserBlackList(self):
 		return self.cfgGlobal.userBlackList
 
