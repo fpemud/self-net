@@ -18,6 +18,7 @@ class SnPeerSocket:
 
 	def __init__(self, sslSock, recvFunc, errorFunc, gcCompleteFunc):
 		self.sslSock = sslSock
+		self.sslSock.setblocking(1)
 
 		self.peerName = SnUtil.getSslSocketPeerName(self.sslSock)
 		assert self.peerName is not None
@@ -94,8 +95,7 @@ class SnPeerSocket:
 		try:
 			if cb_condition & _flagError:
 				raise _CbConditionException(cb_condition)
-			sendLen = self.sslSock.write(self.sendBuffer)
-			self.sslSock.flush()
+			sendLen = self.sslSock.send(self.sendBuffer)
 
 			print "**** objsock._onSend, %d"%(sendLen)
 
@@ -140,7 +140,7 @@ class SnPeerSocket:
 		try:
 			if cb_condition & _flagError:
 				raise _CbConditionException(cb_condition)
-			ret = self.sslSock.read()
+			ret = self.sslSock.recv(4096)
 			if len(ret) == 0:
 				raise _EofException()
 			self.recvBuffer += ret
