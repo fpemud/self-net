@@ -35,6 +35,7 @@ ModuleInstance FSM callback table:
   STATE_ACTIVE                        : call onReject when reject received
 """
 
+import os
 import socket
 
 class SnModule:

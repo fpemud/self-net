@@ -7,6 +7,7 @@ import dbus
 import dbus.service
 from gi.repository import GObject
 from sn_util import SnUtil
+from sn_manager_local import SnLocalManager
 from sn_manager_peer import SnPeerManager
 
 ################################################################################
