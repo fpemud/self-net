@@ -168,7 +168,7 @@ class SnPeerSocket:
 			dataObj = pickle.loads(self.recvBuffer[headerLen:totalLen])
 			self.recvBuffer = self.recvBuffer[totalLen:]
 			self.recvFunc(self, dataObj)
-			if self.sslSock is None or self.self.gcState != self._GC_STATE_NONE:
+			if self.sslSock is None or self.gcState != self._GC_STATE_NONE:
 				print "*** debug3: %d"%(i)
 				return False
 
