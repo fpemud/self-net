@@ -102,11 +102,10 @@ class SnPeerSocket:
 
 			sendLen = self.sslSock.send(self.sendBuffer[:sendLen])
 			self.sendBuffer = self.sendBuffer[sendLen:]
-		except SSL.WantWriteError:
+		except (SSL.WantReadError, SSL.WantWriteError):
 			return True
 		except (socket.error, SSL.Error, _CbConditionException) as e:
 			if self.gcState == self._GC_STATE_NONE:
-				print "***** %s, %s"%(e.__class__.__name__, e)
 				self.errorFunc(self)
 				assert self.sslSock is None		# errorFunc should close the socket
 				return False
@@ -146,10 +145,9 @@ class SnPeerSocket:
 			if len(ret) == 0:
 				raise _EofException()
 			self.recvBuffer += ret
-		except SSL.WantReadError:
+		except (SSL.WantReadError, SSL.WantWriteError):
 			return True
 		except (socket.error, SSL.Error, _CbConditionException, _EofException) as e:
-			print "&&&&&& %s, %s"%(e.__class__.__name__, e)
 			self.errorFunc(self)
 			assert self.sslSock is None		# errorFunc should close the socket
 			return False
