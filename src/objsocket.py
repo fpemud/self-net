@@ -95,12 +95,10 @@ class SnPeerSocket:
 			if cb_condition & _flagError:
 				raise _CbConditionException(cb_condition)
 			sendLen = self.sslSock.send(self.sendBuffer)
-
-			print "**** objsock._onSend, %d"%(sendLen)
-
 			self.sendBuffer = self.sendBuffer[sendLen:]
 		except (socket.error, SSL.Error, _CbConditionException) as e:
 			if self.gcState == self._GC_STATE_NONE:
+				print "***** %s, %s"%(e.__class__.__name__, e)
 				self.errorFunc(self)
 				assert self.sslSock is None		# errorFunc should close the socket
 				return False
@@ -130,9 +128,6 @@ class SnPeerSocket:
 			assert False
 
 	def _onRecv(self, source, cb_condition):
-
-		print "**** objsock._onRecv, Start"
-
 		assert source == self.sslSock
 		assert self.gcState == self._GC_STATE_NONE
 
@@ -144,9 +139,9 @@ class SnPeerSocket:
 				raise _EofException()
 			self.recvBuffer += ret
 		except (socket.error, SSL.Error, _CbConditionException, _EofException) as e:
+			print "&&&&&& %s, %s"%(e.__class__.__name__, e)
 			self.errorFunc(self)
 			assert self.sslSock is None		# errorFunc should close the socket
-			print "*** debug_x2"
 			return False
 
 		i = 0
@@ -154,14 +149,12 @@ class SnPeerSocket:
 			# get packet header
 			headerLen = struct.calcsize("!I")
 			if len(self.recvBuffer) < headerLen:
-				print "*** debug1: %d"%(i)
 				return True
 
 			# get packet data
 			dataLen = struct.unpack("!I", self.recvBuffer[:headerLen])[0]
 			totalLen = headerLen + dataLen
 			if len(self.recvBuffer) < totalLen:
-				print "*** debug2: %d, %d, %d, %d"%(i, totalLen, len(self.recvBuffer), len(self.sendBuffer))
 				return True
 
 			# invoke callback function
@@ -169,7 +162,6 @@ class SnPeerSocket:
 			self.recvBuffer = self.recvBuffer[totalLen:]
 			self.recvFunc(self, dataObj)
 			if self.sslSock is None or self.gcState != self._GC_STATE_NONE:
-				print "*** debug3: %d"%(i)
 				return False
 
 			i = i + 1
