@@ -94,7 +94,13 @@ class SnPeerSocket:
 		try:
 			if cb_condition & _flagError:
 				raise _CbConditionException(cb_condition)
-			sendLen = self.sslSock.send(self.sendBuffer)
+
+			if len(self.sendBuffer) > 128:						# fixme
+				sendLen = 128
+			else:
+				sendLen = len(self.sendBuffer)
+
+			sendLen = self.sslSock.send(self.sendBuffer[:sendLen])
 			self.sendBuffer = self.sendBuffer[sendLen:]
 		except SSL.WantWriteError:
 			return True

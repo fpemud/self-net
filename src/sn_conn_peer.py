@@ -131,6 +131,7 @@ class SnPeerHandShaker:
 					ctx.set_verify(SSL.VERIFY_PEER | SSL.VERIFY_FAIL_IF_NO_PEER_CERT, _sslVerifyDummy)
 				else:
 					ctx.set_verify(SSL.VERIFY_PEER, _sslVerifyDummy)
+#				ctx.set_mode(SSL.MODE_ENABLE_PARTIAL_WRITE)					# fixme
 				ctx.use_privatekey_file(self.privkeyFile)
 				ctx.use_certificate_file(self.certFile)
 				ctx.load_verify_locations(self.caCertFile)
