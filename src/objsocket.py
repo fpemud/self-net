@@ -3,10 +3,10 @@
 
 import socket
 import errno
-import ssl
 import pickle
 import struct
 import logging
+from OpenSSL import SSL
 from gi.repository import GLib
 from sn_util import SnUtil
 
@@ -18,7 +18,6 @@ class SnPeerSocket:
 
 	def __init__(self, sslSock, recvFunc, errorFunc, gcCompleteFunc):
 		self.sslSock = sslSock
-		self.sslSock.setblocking(1)
 
 		self.peerName = SnUtil.getSslSocketPeerName(self.sslSock)
 		assert self.peerName is not None
@@ -100,7 +99,7 @@ class SnPeerSocket:
 			print "**** objsock._onSend, %d"%(sendLen)
 
 			self.sendBuffer = self.sendBuffer[sendLen:]
-		except (socket.error, ssl.SSLError, _CbConditionException) as e:
+		except (socket.error, SSL.Error, _CbConditionException) as e:
 			if self.gcState == self._GC_STATE_NONE:
 				self.errorFunc(self)
 				assert self.sslSock is None		# errorFunc should close the socket
@@ -144,10 +143,7 @@ class SnPeerSocket:
 			if len(ret) == 0:
 				raise _EofException()
 			self.recvBuffer += ret
-		except (socket.error, ssl.SSLError, _CbConditionException, _EofException) as e:
-			if isinstance(e, ssl.SSLError) and e.args[0] == ssl.SSL_ERROR_WANT_READ:
-				print "*** debug_x1"
-				return True
+		except (socket.error, SSL.Error, _CbConditionException, _EofException) as e:
 			self.errorFunc(self)
 			assert self.sslSock is None		# errorFunc should close the socket
 			print "*** debug_x2"

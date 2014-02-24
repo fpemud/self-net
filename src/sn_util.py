@@ -258,12 +258,13 @@ class SnUtil:
 
 	@staticmethod
 	def getSslSocketPeerName(sslSock):
-		cert = sslSock.getpeercert()
-		if cert is not None and "subject" in cert:
-			for item in cert["subject"]:
-				if item[0][0] == "commonName":
-					return item[0][1]
-		return None
+		cert = sslSock.get_peer_certificate()
+		if cert is None:
+			return None
+		subject = cert.get_subject()
+		if subject is None:
+			return None
+		return subject.CN
 
 	@staticmethod
 	def getPidBySocket(socketInfo):
