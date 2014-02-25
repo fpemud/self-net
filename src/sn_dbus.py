@@ -130,12 +130,7 @@ class DbusPeerObject(dbus.service.Object):
 		if opName not in [ "poweron", "poweroff", "reboot", "wakeup", "suspend", "hibernate", "hybrid-sleep" ]:
 			error_handler(Exception("invalid power operation name \"%s\""%(opName)))
 			return
-
-		try:
-			self.param.peerManager.doPeerPowerOperationAsync(self.peerName,
-				opName, reply_handler, error_handler)
-		except Exception as e:
-			error_handler(e)
+		self.param.peerManager.doPeerPowerOperationAsync(self.peerName, str(opName), reply_handler, error_handler)
 
 	@dbus.service.signal(dbus_interface='org.fpemud.SelfNet.Peer', signature='s')
 	def PowerStateChanged(self, newPowerState):
