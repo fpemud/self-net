@@ -106,13 +106,6 @@ class SnSysPacketPowerState:
 
 class SnPeerManager:
 
-	POWER_OP_POWERON = 0
-	POWER_OP_POWEROFF = 1
-	POWER_OP_RESTART = 2
-	POWER_OP_SUSPEND = 3
-	POWER_OP_HIBERNATE = 4
-	POWER_OP_HYBRID_SLEEP = 5
-
 	POWER_STATE_UNKNOWN = 0
 	POWER_STATE_RUNNING = 1
 	POWER_STATE_POWEROFF = 2
@@ -183,23 +176,21 @@ class SnPeerManager:
 		return self.peerInfoDict[peerName].powerState
 
 	def doPeerPowerOperationAsync(self, peerName, opName, okFunc, errFunc):
+		"""call okFunc when success, call errFunc when failure
+		   return True if not finished, return False if finished"""
+
+		assert opName in [ "poweron", "poweroff", "restart", "suspend", "hibernate", "hybrid-sleep" ]
+
 		if self.peerInfoDict[peerName].opArgPower is not None:
-			raise Exception("another power operation is pending")
-	
-		if opName == self.POWER_OP_POWERON:
-			pass
-		elif opName == self.POWER_OP_POWEROFF:
-			pass
-		elif opName == self.POWER_OP_RESTART:
-			pass
-		elif opName == self.POWER_OP_SUSPEND:
-			pass
-		elif opName == self.POWER_OP_HIBERNATE:
-			pass
-		elif opName == self.POWER_OP_HYBRID_SLEEP:
+			errFunc(Exception("another power operation is pending"))
+			return False
+
+		if opName == "poweron":
 			pass
 		else:
-			assert False
+			o = SnSysPacketPowerOp()
+			o.name = opName
+			self._sendObject(peerName, o)
 
 		self.peerInfoDict[peerName].opArgPower = (okFunc, errFunc)
 
@@ -373,18 +364,27 @@ class SnPeerManager:
 		self.param.localManager.onPeerChange(peerName)
 
 	def _recvPowerOp(self, peerName, powerOp):
-		if powerOp.name == "poweroff":
-			assert False
-		elif powerOp.name == "restart":
-			assert False
-		elif powerOp.name == "suspend":
-			assert False
-		elif powerOp.name == "hibernate":
-			assert False
-		elif powerOp.name == "hybrid-sleep":
-			assert False
-		else:
+		if powerOp.name not in [ "poweroff", "restart", "suspend", "hibernate", "hybrid-sleep" ]:
 			self._sendReject(peerName, "invalid power operation name \"%s\""%(powerOp.name))
+
+		try:
+			dbusObj = dbus.SystemBus().get_object('org.freedesktop.login1', '/org/freedesktop/login1')
+			if powerOp.name == "poweroff":
+				dbusObj.PowerOff(False, dbus_interface='org.freedesktop.login1.Manager')
+			elif powerOp.name == "restart":
+				dbusObj.Reboot(False, dbus_interface='org.freedesktop.login1.Manager')
+			elif powerOp.name == "suspend":
+				dbusObj.Suspend(False, dbus_interface='org.freedesktop.login1.Manager')
+			elif powerOp.name == "hibernate":
+				dbusObj.Hibernate(False, dbus_interface='org.freedesktop.login1.Manager')
+			elif powerOp.name == "hybrid-sleep":
+				dbusObj.HybridSleep(False, dbus_interface='org.freedesktop.login1.Manager')
+			else:
+				assert False
+		except Exception as e:
+			o = SnSysPacketPowerOpAck()
+			o.error_message = e.message
+			self._sendObject(peerName, o)
 
 	def _recvPowerOpAck(self, peerName, powerOpAck):
 		opArgPower = self.peerInfoDict[peerName].opArgPower

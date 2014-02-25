@@ -45,7 +45,7 @@ def parseArgs():
 	apOpHibernate.add_argument("peerName")
 
 	apOpHybridSleep = subParsers.add_parser("hybrid-sleep")
-	apOpHybridSleep.set_defaults(subcmd="hybrid_sleep")
+	apOpHybridSleep.set_defaults(subcmd="hybrid-sleep")
 	apOpHybridSleep.add_argument("peerName")
 
 	return argParser.parse_args()
@@ -62,18 +62,8 @@ elif parseResult.subcmd == "generate_cert":
 	SnSubCmdMain(param).generateCert(parseResult.hostname, parseResult.outdir, parseResult.export)
 elif parseResult.subcmd == "list_peers":
 	SnSubCmdMain(param).listPeers()
-elif parseResult.subcmd == "poweron":
-	SnSubCmdMain(param).peerPowerOperation(parseResult.peerName, SnPeerManager.POWER_OP_POWERON)
-elif parseResult.subcmd == "poweroff":
-	SnSubCmdMain(param).peerPowerOperation(parseResult.peerName, SnPeerManager.POWER_OP_POWEROFF)
-elif parseResult.subcmd == "restart":
-	SnSubCmdMain(param).peerPowerOperation(parseResult.peerName, SnPeerManager.POWER_OP_RESTART)
-elif parseResult.subcmd == "suspend":
-	SnSubCmdMain(param).peerPowerOperation(parseResult.peerName, SnPeerManager.POWER_OP_SUSPEND)
-elif parseResult.subcmd == "hibernate":
-	SnSubCmdMain(param).peerPowerOperation(parseResult.peerName, SnPeerManager.POWER_OP_HIBERNATE)
-elif parseResult.subcmd == "hybrid_sleep":
-	SnSubCmdMain(param).peerPowerOperation(parseResult.peerName, SnPeerManager.POWER_OP_HYBRID_SLEEP)
+elif parseResult.subcmd in [ "poweron", "poweroff", "restart", "suspend", "hibernate", "hybrid-sleep" ]:
+	SnSubCmdMain(param).peerPowerOperation(parseResult.peerName, parseResult.subcmd)
 else:
 	assert False
 
