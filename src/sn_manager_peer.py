@@ -5,6 +5,7 @@ import re
 import socket
 import logging
 import time
+import dbus
 from datetime import datetime
 from objsocket import SnPeerSocket
 from gi.repository import GLib
@@ -116,7 +117,7 @@ class SnPeerManager:
 
 	POWER_STATE_UNKNOWN = 0
 	POWER_STATE_POWEROFF = 1
-	POWER_STATE_RESTARTING = 2
+	POWER_STATE_REBOOTING = 2
 	POWER_STATE_SUSPEND = 3
 	POWER_STATE_HIBERNATE = 4
 	POWER_STATE_HYBRID_SLEEP = 5
@@ -189,13 +190,13 @@ class SnPeerManager:
 		"""call okFunc when success, call errFunc when failure
 		   return True if not finished, return False if finished"""
 
-		assert opName in [ "poweron", "poweroff", "restart", "suspend", "hibernate", "hybrid-sleep" ]
+		assert opName in [ "poweron", "poweroff", "reboot", "wakeup", "suspend", "hibernate", "hybrid-sleep" ]
 
 		if self.peerInfoDict[peerName].opArgPower is not None:
 			errFunc(Exception("another power operation is pending"))
 			return False
 
-		if opName == "poweron":
+		if opName == "poweron" or opName == "wakeup":
 			assert False
 		else:
 			o = SnSysPacketPowerOp()
@@ -378,7 +379,7 @@ class SnPeerManager:
 		self.param.localManager.onPeerChange(peerName)
 
 	def _recvPowerOp(self, peerName, powerOp):
-		if powerOp.name not in [ "poweroff", "restart", "suspend", "hibernate", "hybrid-sleep" ]:
+		if powerOp.name not in [ "poweroff", "reboot", "suspend", "hibernate", "hybrid-sleep" ]:
 			self._sendReject(peerName, "invalid power operation name \"%s\""%(powerOp.name))
 			return
 
@@ -386,7 +387,7 @@ class SnPeerManager:
 			dbusObj = dbus.SystemBus().get_object('org.freedesktop.login1', '/org/freedesktop/login1')
 			if powerOp.name == "poweroff":
 				dbusObj.PowerOff(False, dbus_interface='org.freedesktop.login1.Manager')
-			elif powerOp.name == "restart":
+			elif powerOp.name == "reboot":
 				dbusObj.Reboot(False, dbus_interface='org.freedesktop.login1.Manager')
 			elif powerOp.name == "suspend":
 				dbusObj.Suspend(False, dbus_interface='org.freedesktop.login1.Manager')
@@ -416,8 +417,8 @@ class SnPeerManager:
 	def _recvPowerStateWhenInactive(self, peerName, powerStateWhenInactive):
 		if powerStateWhenInactive.name == "poweroff":
 			self.peerInfoDict[peerName].powerStateWhenInactive = self.POWER_STATE_POWEROFF
-		elif powerStateWhenInactive.name == "restarting":
-			self.peerInfoDict[peerName].powerStateWhenInactive = self.POWER_STATE_RESTARTING
+		elif powerStateWhenInactive.name == "rebooting":
+			self.peerInfoDict[peerName].powerStateWhenInactive = self.POWER_STATE_REBOOTING
 		elif powerStateWhenInactive.name == "suspend":
 			self.peerInfoDict[peerName].powerStateWhenInactive = self.POWER_STATE_SUSPEND
 		elif powerStateWhenInactive.name == "hibernate":

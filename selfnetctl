@@ -62,7 +62,7 @@ elif parseResult.subcmd == "generate_cert":
 	SnSubCmdMain(param).generateCert(parseResult.hostname, parseResult.outdir, parseResult.export)
 elif parseResult.subcmd == "list_peers":
 	SnSubCmdMain(param).listPeers()
-elif parseResult.subcmd in [ "poweron", "poweroff", "restart", "suspend", "hibernate", "hybrid-sleep" ]:
+elif parseResult.subcmd in [ "poweron", "poweroff", "reboot", "suspend", "hibernate", "hybrid-sleep" ]:
 	SnSubCmdMain(param).peerPowerOperation(parseResult.peerName, parseResult.subcmd)
 else:
 	assert False

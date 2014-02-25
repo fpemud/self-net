@@ -114,7 +114,7 @@ class DbusPeerObject(dbus.service.Object):
 		powerStateDict = {
 			SnPeerManager.POWER_STATE_UNKNOWN: "unknown",
 			SnPeerManager.POWER_STATE_POWEROFF: "poweroff",
-			SnPeerManager.POWER_STATE_RESTARTING: "restarting",
+			SnPeerManager.POWER_STATE_REBOOTING: "rebooting",
 			SnPeerManager.POWER_STATE_SUSPEND: "suspend",
 			SnPeerManager.POWER_STATE_HIBERNATE: "hibernate",
 			SnPeerManager.POWER_STATE_HYBRID_SLEEP: "hybrid-sleep",
@@ -127,7 +127,7 @@ class DbusPeerObject(dbus.service.Object):
 	                     in_signature='s', out_signature='',
 	                     async_callbacks=('reply_handler', 'error_handler'))
 	def DoPowerOperation(self, opName, reply_handler, error_handler, sender=None):
-		if opName not in [ "poweron", "poweroff", "restart", "suspend", "hibernate", "hybrid-sleep" ]:
+		if opName not in [ "poweron", "poweroff", "reboot", "wakeup", "suspend", "hibernate", "hybrid-sleep" ]:
 			error_handler(Exception("invalid power operation name \"%s\""%(opName)))
 			return
 
