@@ -34,6 +34,8 @@ class SnCfgSerializationObject:
 class SnCfgHostInfo:
 	port = None						# int
 	isNexus = None					# bool
+	supportPoweron = None			# bool
+	supportWakeup = None			# bool
 
 class SnCfgModuleInfo:
 	moduleScope = None				# str, "sys" "usr"
@@ -283,6 +285,8 @@ class _HostFileXmlHandler(xml.sax.handler.ContentHandler):
 	IN_HOST = 2
 	IN_HOST_PORT = 3
 	IN_HOST_NEXUS = 4
+	IN_HOST_SUPPORT_POWERON = 5
+	IN_HOST_SUPPORT_WAKEUP = 6
 
 	def __init__(self, hostDict):
 		xml.sax.handler.ContentHandler.__init__(self)
@@ -303,6 +307,12 @@ class _HostFileXmlHandler(xml.sax.handler.ContentHandler):
 		elif name == "nexus" and self.state == self.IN_HOST:
 			self.state = self.IN_HOST_NEXUS
 			self.curHostInfo.isNexus = True
+		elif name == "support-poweron" and self.state == self.IN_HOST:
+			self.state = self.IN_HOST_SUPPORT_POWERON
+			self.curHostInfo.supportPoweron = True
+		elif name == "support-wakeup" and self.state == self.IN_HOST:
+			self.state = self.IN_HOST_SUPPORT_WAKEUP
+			self.curHostInfo.supportWakeup = True
 		else:
 			raise Exception("Failed to parse hosts file")
 
@@ -317,6 +327,10 @@ class _HostFileXmlHandler(xml.sax.handler.ContentHandler):
 		elif name == "port" and self.state == self.IN_HOST_PORT:
 			self.state = self.IN_HOST
 		elif name == "nexus" and self.state == self.IN_HOST_NEXUS:
+			self.state = self.IN_HOST
+		elif name == "support-poweron" and self.state == self.IN_HOST_SUPPORT_POWERON:
+			self.state = self.IN_HOST
+		elif name == "support-wakeup" and self.state == self.IN_HOST_SUPPORT_WAKEUP:
 			self.state = self.IN_HOST
 		else:
 			raise Exception("Failed to parse hosts file")

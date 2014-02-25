@@ -195,11 +195,27 @@ class SnPeerManager:
 			errFunc(Exception("another power operation is pending"))
 			return
 
-		if opName == "poweron" or opName == "wakeup":
+		if opName == "poweron":
+			if self.getPeerPowerState(peerName) not in [ self.POWER_STATE_UNKNOWN, self.POWER_STATE_POWEROFF ]:
+				errFunc(Exception("the current power state of peer doesn't support this power operation"))
+				return
+			if not self.param.configManager.getHostInfo(peerName).supportPoweron:
+				errFunc(Exception("peer doesn't support this power operation"))
+				return
+
+			assert False
+		elif opName == "wakeup":
+			if self.getPeerPowerState(peerName) not in [ self.POWER_STATE_UNKNOWN, self.POWER_STATE_SUSPEND, self.POWER_STATE_HIBERNATE, self.POWER_STATE_HYBRID_SLEEP ]:
+				errFunc(Exception("the current power state of peer doesn't support this power operation"))
+				return
+			if not self.param.configManager.getHostInfo(peerName).supportWakeup:
+				errFunc(Exception("peer doesn't support this power operation"))
+				return
+
 			assert False
 		else:
 			if self.peerInfoDict[peerName].fsmState != _PeerInfoInternal.STATE_FULL:
-				errFunc(Exception("peer is not active"))
+				errFunc(Exception("the current power state of peer doesn't support this power operation"))
 				return
 
 			o = SnSysPacketPowerOp()

@@ -85,7 +85,7 @@ class DbusMainObject(dbus.service.Object):
 				return po.peerId
 		return -1
 
-	@dbus.service.signal(dbus_interface='org.fpemud.SelfNet', signature='s')
+	@dbus.service.signal('org.fpemud.SelfNet', signature='s')
 	def WorkStateChanged(self, newWorkState):
 		pass
 
@@ -132,7 +132,7 @@ class DbusPeerObject(dbus.service.Object):
 			return
 		self.param.peerManager.doPeerPowerOperationAsync(self.peerName, str(opName), reply_handler, error_handler)
 
-	@dbus.service.signal(dbus_interface='org.fpemud.SelfNet.Peer', signature='s')
+	@dbus.service.signal('org.fpemud.SelfNet.Peer', signature='s')
 	def PowerStateChanged(self, newPowerState):
 		pass
 
