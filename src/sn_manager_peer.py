@@ -187,18 +187,21 @@ class SnPeerManager:
 			return self.POWER_STATE_RUNNING
 
 	def doPeerPowerOperationAsync(self, peerName, opName, okFunc, errFunc):
-		"""call okFunc when success, call errFunc when failure
-		   return True if not finished, return False if finished"""
+		"""call okFunc when success, call errFunc when failure"""
 
 		assert opName in [ "poweron", "poweroff", "reboot", "wakeup", "suspend", "hibernate", "hybrid-sleep" ]
 
 		if self.peerInfoDict[peerName].opArgPower is not None:
 			errFunc(Exception("another power operation is pending"))
-			return False
+			return
 
 		if opName == "poweron" or opName == "wakeup":
 			assert False
 		else:
+			if self.peerInfoDict[peerName].fsmState != _PeerInfoInternal.STATE_FULL:
+				errFunc(Exception("peer is not active"))
+				return
+
 			o = SnSysPacketPowerOp()
 			o.name = opName
 			self._sendObject(peerName, o)
