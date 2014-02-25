@@ -111,60 +111,35 @@ class DbusPeerObject(dbus.service.Object):
 	@dbus.service.method('org.fpemud.SelfNet.Peer', sender_keyword='sender',
 	                     in_signature='', out_signature='s')
 	def GetPowerState(self, sender=None):
-		"""powerState values:
-		     "unknown"
-		     "running"
-		     "poweroff"
-		     "restarting"
-		     "suspend"
-		     "hibernate"
-		     "hybrid-sleep"
-		"""
-	
+		powerStateDict = {
+			SnPeerManager.POWER_STATE_UNKNOWN: "unknown",
+			SnPeerManager.POWER_STATE_RUNNING: "running",
+			SnPeerManager.POWER_STATE_POWEROFF: "poweroff",
+			SnPeerManager.POWER_STATE_RESTARTING: "restarting",
+			SnPeerManager.POWER_STATE_SUSPEND: "suspend",
+			SnPeerManager.POWER_STATE_HIBERNATE: "hibernate",
+			SnPeerManager.POWER_STATE_HYBRID_SLEEP: "hybrid-sleep"
+		}
 		powerState = self.param.peerManager.getPeerPowerState(self.peerName)
-		if powerState == SnPeerManager.POWER_STATE_UNKNOWN:
-			return "unknown"
-		elif powerState == SnPeerManager.POWER_STATE_RUNNING:
-			return "running"
-		elif powerState == SnPeerManager.POWER_STATE_POWEROFF:
-			return "poweroff"
-		elif powerState == SnPeerManager.POWER_STATE_RESTARTING:
-			return "restarting"
-		elif powerState == SnPeerManager.POWER_STATE_SUSPEND:
-			return "suspend"
-		elif powerState == SnPeerManager.POWER_STATE_HIBERNATE:
-			return "hibernate"
-		elif powerState == SnPeerManager.POWER_STATE_HYBRID_SLEEP:
-			return "hybrid-sleep"
-		else:
-			assert False
+		return powerStateDict[powerState]
 
 	@dbus.service.method('org.fpemud.SelfNet.Peer', sender_keyword='sender',
-	                     in_signature='s', out_signature='')
-	def DoPowerOperation(self, opName, sender=None):
-		"""opName values:
-		     "poweron"
-		     "poweroff"
-		     "restart"
-		     "suspend"
-		     "hibernate"
-		     "hybrid-sleep"
-		"""
-
-		if opName == "poweron":
-			self.param.peerManager.peerPowerOperation(self.peerName, SnPeerManager.POWER_OP_POWERON)
-		elif opName == "poweroff":
-			self.param.peerManager.peerPowerOperation(self.peerName, SnPeerManager.POWER_OP_POWEROFF)
-		elif opName == "restart":
-			self.param.peerManager.peerPowerOperation(self.peerName, SnPeerManager.POWER_OP_RESTART)
-		elif opName == "suspend":
-			self.param.peerManager.peerPowerOperation(self.peerName, SnPeerManager.POWER_OP_SUSPEND)
-		elif opName == "hibernate":
-			self.param.peerManager.peerPowerOperation(self.peerName, SnPeerManager.POWER_OP_HIBERNATE)
-		elif opName == "hybrid-sleep":
-			self.param.peerManager.peerPowerOperation(self.peerName, SnPeerManager.POWER_OP_HYBRID_SLEEP)
-		else:
-			assert False
+	                     in_signature='s', out_signature='',
+	                     async_callbacks=('reply_handler', 'error_handler'))
+	def DoPowerOperation(self, opName, reply_handler, error_handler, sender=None):
+		powerOpNameDict = {
+			"poweron": SnPeerManager.POWER_OP_POWERON,
+			"poweroff": SnPeerManager.POWER_OP_POWEROFF,
+			"restart": SnPeerManager.POWER_OP_RESTART,
+			"suspend": SnPeerManager.POWER_OP_SUSPEND,
+			"hibernate": SnPeerManager.POWER_OP_HIBERNATE,
+			"hybrid-sleep": SnPeerManager.POWER_OP_HYBRID_SLEEP,
+		}
+		try:
+			self.param.peerManager.doPeerPowerOperationAsync(self.peerName,
+				powerOpNameDict[opName], reply_handler, error_handler)
+		except Exception as e:
+			error_handler(e)
 
 	@dbus.service.signal(dbus_interface='org.fpemud.SelfNet.Peer', signature='s')
 	def PowerStateChanged(self, newPowerState):

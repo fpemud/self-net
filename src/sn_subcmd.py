@@ -85,7 +85,8 @@ class SnSubCmdMain:
 		if peerId == -1:
 			raise Exception("peer \"%s\" does not exist"%(peerName))
 
-		assert False
+		peerObj = dbus.SystemBus().get_object('org.fpemud.SelfNet', '/org/fpemud/SelfNet/Peers/%d'%(peerId))
+		peerObj.DoPowerOperation(opName, dbus_interface='org.fpemud.SelfNet.Peer')
 
 	def _loadCertAndKey(self, certFile, keyFile):
 		cert = None

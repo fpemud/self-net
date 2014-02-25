@@ -98,8 +98,8 @@ class SnSysPacketReject:
 class SnSysPacketPowerOp:
 	name = None						# str
 
-class SnSysPacketPowerOpError:
-	message = None					# str
+class SnSysPacketPowerOpAck:
+	error_message = None			# str, None means success, not-None means failure
 
 class SnSysPacketPowerState:
 	name = None						# str
@@ -182,7 +182,10 @@ class SnPeerManager:
 	def getPeerPowerState(self, peerName):
 		return self.peerInfoDict[peerName].powerState
 
-	def peerPowerOperation(self, peerName, opName):
+	def doPeerPowerOperationAsync(self, peerName, opName, okFunc, errFunc):
+		if self.peerInfoDict[peerName].opArgPower is not None:
+			raise Exception("another power operation is pending")
+	
 		if opName == self.POWER_OP_POWERON:
 			pass
 		elif opName == self.POWER_OP_POWEROFF:
@@ -197,6 +200,8 @@ class SnPeerManager:
 			pass
 		else:
 			assert False
+
+		self.peerInfoDict[peerName].opArgPower = (okFunc, errFunc)
 
 	##### event callback ####
 
@@ -255,9 +260,9 @@ class SnPeerManager:
 			elif self._typeCheck(packetObj.data, SnSysPacketPowerOp):
 				logging.debug("SnPeerManager.onSocketRecv: _recvPowerOp")
 				self._recvPowerOp(peerName, packetObj.data)
-			elif self._typeCheck(packetObj.data, SnSysPacketPowerOpError):
-				logging.debug("SnPeerManager.onSocketRecv: _recvPowerOpError")
-				self._recvPowerOpError(peerName, packetObj.data)
+			elif self._typeCheck(packetObj.data, SnSysPacketPowerOpAck):
+				logging.debug("SnPeerManager.onSocketRecv: _recvPowerOpAck")
+				self._recvPowerOpAck(peerName, packetObj.data)
 			elif self._typeCheck(packetObj.data, SnSysPacketPowerState):
 				logging.debug("SnPeerManager.onSocketRecv: _recvPowerState")
 				self._recvPowerState(peerName, packetObj.data)
@@ -381,8 +386,18 @@ class SnPeerManager:
 		else:
 			self._sendReject(peerName, "invalid power operation name \"%s\""%(powerOp.name))
 
-	def _recvPowerOpError(self, peerName, powerOpError):
-		pass
+	def _recvPowerOpAck(self, peerName, powerOpAck):
+		opArgPower = self.peerInfoDict[peerName].opArgPower
+		if opArgPower is None:
+			self._sendReject(peerName, "invalid power operation acknowledgement received")
+			return
+
+		if powerOpAck.error_message is None:
+			opArgPower[0]()
+		else:
+			opArgPower[1](Exception(powerOpAck.error_message))
+
+		self.peerInfoDict[peerName].opArgPower = None
 
 	def _recvPowerState(self, peerName, powerState):
 		if powerState.name == "poweroff":
@@ -488,6 +503,7 @@ class _PeerInfoInternal:
 	powerState = None			# enum
 	infoObj = None				# obj, SnSysInfo
 	sock = None					# obj, peer socket
+	opArgPower = None			# (okFunc, errFunc)
 
 def _dbgmsg_peer_state_change(peerName, oldPeerState, peerState):
 	return "Peer %s, %s -> %s"%(peerName, _peer_state_to_str(oldPeerState), _peer_state_to_str(peerState))
