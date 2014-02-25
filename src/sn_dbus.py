@@ -113,12 +113,12 @@ class DbusPeerObject(dbus.service.Object):
 	def GetPowerState(self, sender=None):
 		powerStateDict = {
 			SnPeerManager.POWER_STATE_UNKNOWN: "unknown",
-			SnPeerManager.POWER_STATE_RUNNING: "running",
 			SnPeerManager.POWER_STATE_POWEROFF: "poweroff",
 			SnPeerManager.POWER_STATE_RESTARTING: "restarting",
 			SnPeerManager.POWER_STATE_SUSPEND: "suspend",
 			SnPeerManager.POWER_STATE_HIBERNATE: "hibernate",
-			SnPeerManager.POWER_STATE_HYBRID_SLEEP: "hybrid-sleep"
+			SnPeerManager.POWER_STATE_HYBRID_SLEEP: "hybrid-sleep",
+			SnPeerManager.POWER_STATE_RUNNING: "running",
 		}
 		powerState = self.param.peerManager.getPeerPowerState(self.peerName)
 		return powerStateDict[powerState]

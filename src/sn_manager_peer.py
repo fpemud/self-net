@@ -80,13 +80,22 @@ Peer FSM callback table:
 """
 
 """
-Peer FSM notes:
+Peer FSM state notes:
   Peers can do data communication in STATE_FULL.
   After a peer enters STATE_REJECT, we won't connect to it, but we still accept
 its connection. According to the protocol, both end will enter STATE_REJECT, so
 only when one end restarts the connection can be back on again. There's only one
 exception: one end enters STATE_REJECT, the other end enters STATE_NONE. Then
 the conenction will be reestablished by the STATE_NONE end.
+"""
+
+"""
+Peer power state notes:
+  Power state equals to POWER_STATE_RUNNING when peer is connected, equals to
+POWER_STATE_UNKNOWN when it is in reject.
+  Peer should send SnSysPacketPowerStateWhenInactive before it goes offline so we
+can give it a proper power state when it's inactive. If it fails to do so, it's
+power state should be POWER_STATE_UNKNOWN.
 """
 
 class SnSysPacket:
@@ -101,18 +110,18 @@ class SnSysPacketPowerOp:
 class SnSysPacketPowerOpAck:
 	error_message = None			# str, None means success, not-None means failure
 
-class SnSysPacketPowerState:
+class SnSysPacketPowerStateWhenInactive:
 	name = None						# str
 
 class SnPeerManager:
 
 	POWER_STATE_UNKNOWN = 0
-	POWER_STATE_RUNNING = 1
-	POWER_STATE_POWEROFF = 2
-	POWER_STATE_RESTARTING = 3
-	POWER_STATE_SUSPEND = 4
-	POWER_STATE_HIBERNATE = 5
-	POWER_STATE_HYBRID_SLEEP = 6
+	POWER_STATE_POWEROFF = 1
+	POWER_STATE_RESTARTING = 2
+	POWER_STATE_SUSPEND = 3
+	POWER_STATE_HIBERNATE = 4
+	POWER_STATE_HYBRID_SLEEP = 5
+	POWER_STATE_RUNNING = 6
 
 	def __init__(self, param):
 		logging.debug("SnPeerManager.__init__: Start")
@@ -126,7 +135,7 @@ class SnPeerManager:
 				continue
 			self.peerInfoDict[hn] = _PeerInfoInternal()
 			self.peerInfoDict[hn].fsmState = _PeerInfoInternal.STATE_NONE
-			self.peerInfoDict[hn].powerState = self.POWER_STATE_UNKNOWN
+			self.peerInfoDict[hn].powerStateWhenInactive = self.POWER_STATE_UNKNOWN
 
 		# create handshaker
 		self.handshaker = SnPeerHandShaker(self.param.certFile, self.param.privkeyFile, self.param.caCertFile, self.onSocketConnected)
@@ -161,7 +170,7 @@ class SnPeerManager:
 					or peerInfo.fsmState == _PeerInfoInternal.STATE_VER_MATCH
 					or peerInfo.fsmState == _PeerInfoInternal.STATE_CFG_MATCH
 					or peerInfo.fsmState == _PeerInfoInternal.STATE_FULL):
-				self._shutdownPeer(peerName, _PeerInfoInternal.STATE_NONE)
+				self._peerToShutdown(peerName)
 
 		logging.debug("SnPeerManager.dispose: End")
 		return
@@ -173,7 +182,13 @@ class SnPeerManager:
 		return self.peerInfoDict[peerName].infoObj
 
 	def getPeerPowerState(self, peerName):
-		return self.peerInfoDict[peerName].powerState
+		if self.peerInfoDict[peerName].fsmState == _PeerInfoInternal.STATE_NONE:
+			return self.peerInfoDict[peerName].powerStateWhenInactive
+		elif self.peerInfoDict[peerName].fsmState == _PeerInfoInternal.STATE_REJECT:
+			assert self.peerInfoDict[peerName].powerStateWhenInactive == self.POWER_STATE_UNKNOWN
+			return self.POWER_STATE_UNKNOWN
+		else:
+			return self.POWER_STATE_RUNNING
 
 	def doPeerPowerOperationAsync(self, peerName, opName, okFunc, errFunc):
 		"""call okFunc when success, call errFunc when failure
@@ -186,7 +201,7 @@ class SnPeerManager:
 			return False
 
 		if opName == "poweron":
-			pass
+			assert False
 		else:
 			o = SnSysPacketPowerOp()
 			o.name = opName
@@ -227,6 +242,7 @@ class SnPeerManager:
 		# record sock
 		oldFsmState = self.peerInfoDict[peerName].fsmState
 		self.peerInfoDict[peerName].fsmState = _PeerInfoInternal.STATE_INIT
+		self.peerInfoDict[peerName].powerStateWhenInactive = self.POWER_STATE_UNKNOWN
 		self.peerInfoDict[peerName].infoObj = None
 		self.peerInfoDict[peerName].sock = SnPeerSocket(sslSock, self.onSocketRecv, self.onSocketError, self._gcComplete)
 		logging.info("SnPeerManager.onSocketConnected: %s", _dbgmsg_peer_state_change(peerName, oldFsmState, self.peerInfoDict[peerName].fsmState))
@@ -254,9 +270,9 @@ class SnPeerManager:
 			elif self._typeCheck(packetObj.data, SnSysPacketPowerOpAck):
 				logging.debug("SnPeerManager.onSocketRecv: _recvPowerOpAck")
 				self._recvPowerOpAck(peerName, packetObj.data)
-			elif self._typeCheck(packetObj.data, SnSysPacketPowerState):
-				logging.debug("SnPeerManager.onSocketRecv: _recvPowerState")
-				self._recvPowerState(peerName, packetObj.data)
+			elif self._typeCheck(packetObj.data, SnSysPacketPowerStateWhenInactive):
+				logging.debug("SnPeerManager.onSocketRecv: _recvPowerStateWhenInactive")
+				self._recvPowerStateWhenInactive(peerName, packetObj.data)
 			elif self._typeCheck(packetObj.data, SnSysPacketReject):
 				self._recvReject(peerName, packetObj.data.message)
 			else:
@@ -269,8 +285,12 @@ class SnPeerManager:
 
 	def onSocketError(self, sock):
 		peerName = sock.getPeerName()
-		oldFsmState = self._shutdownPeer(peerName, _PeerInfoInternal.STATE_NONE)
-		logging.info("SnPeerManager.onSocketError: %s", _dbgmsg_peer_state_change(peerName, oldFsmState, _PeerInfoInternal.STATE_NONE))
+
+		oldFsmState = self.peerInfoDict[peerName].fsmState
+		newFsmState = _PeerInfoInternal.STATE_NONE
+		self._peerToShutdown(peerName)
+		logging.info("SnPeerManager.onSocketError: %s", _dbgmsg_peer_state_change(peerName, oldFsmState, newFsmState))
+
 		self._timerOperation()
 
 	def onPeerProbe(self):
@@ -356,7 +376,6 @@ class SnPeerManager:
 		# do operation
 		oldFsmState = self.peerInfoDict[peerName].fsmState
 		self.peerInfoDict[peerName].fsmState = _PeerInfoInternal.STATE_FULL
-		self.peerInfoDict[peerName].powerState = self.POWER_STATE_RUNNING
 		self.peerInfoDict[peerName].infoObj = peerInfo
 		logging.info("SnPeerManager._recvPeerInfo: %s", _dbgmsg_peer_state_change(peerName, oldFsmState, self.peerInfoDict[peerName].fsmState))
 
@@ -366,6 +385,7 @@ class SnPeerManager:
 	def _recvPowerOp(self, peerName, powerOp):
 		if powerOp.name not in [ "poweroff", "restart", "suspend", "hibernate", "hybrid-sleep" ]:
 			self._sendReject(peerName, "invalid power operation name \"%s\""%(powerOp.name))
+			return
 
 		try:
 			dbusObj = dbus.SystemBus().get_object('org.freedesktop.login1', '/org/freedesktop/login1')
@@ -392,42 +412,35 @@ class SnPeerManager:
 			self._sendReject(peerName, "invalid power operation acknowledgement received")
 			return
 
+		self.peerInfoDict[peerName].opArgPower = None
 		if powerOpAck.error_message is None:
 			opArgPower[0]()
 		else:
 			opArgPower[1](Exception(powerOpAck.error_message))
 
-		self.peerInfoDict[peerName].opArgPower = None
-
-	def _recvPowerState(self, peerName, powerState):
-		if powerState.name == "poweroff":
-			assert False
-		elif powerState.name == "restarting":
-			assert False
-		elif powerState.name == "suspend":
-			assert False
-		elif powerState.name == "hibernate":
-			assert False
-		elif powerState.name == "hybrid-sleep":
-			assert False
+	def _recvPowerStateWhenInactive(self, peerName, powerStateWhenInactive):
+		if powerStateWhenInactive.name == "poweroff":
+			self.peerInfoDict[peerName].powerStateWhenInactive = self.POWER_STATE_POWEROFF
+		elif powerStateWhenInactive.name == "restarting":
+			self.peerInfoDict[peerName].powerStateWhenInactive = self.POWER_STATE_RESTARTING
+		elif powerStateWhenInactive.name == "suspend":
+			self.peerInfoDict[peerName].powerStateWhenInactive = self.POWER_STATE_SUSPEND
+		elif powerStateWhenInactive.name == "hibernate":
+			self.peerInfoDict[peerName].powerStateWhenInactive = self.POWER_STATE_HIBERNATE
+		elif powerStateWhenInactive.name == "hybrid-sleep":
+			self.peerInfoDict[peerName].powerStateWhenInactive = self.POWER_STATE_HYBRID_SLEEP
 		else:
-			self._sendReject(peerName, "invalid power state name \"%s\""%(powerState.name))
+			self._sendReject(peerName, "invalid power state name \"%s\""%(powerStateWhenInactive.name))
 
 	def _recvReject(self, peerName, rejectMessage):
 		logging.error("receive reject, %s, %s", peerName, rejectMessage)
 
-		# do notify
-		if self.peerInfoDict[peerName].fsmState == _PeerInfoInternal.STATE_FULL:
-			self.param.localManager.onPeerRemove(peerName)
-
-		# remove peer
 		oldFsmState = self.peerInfoDict[peerName].fsmState
-		self.peerInfoDict[peerName].sock.close()
-		self.peerInfoDict[peerName].powerState = self.POWER_STATE_UNKNOWN
-		self.peerInfoDict[peerName].fsmState = _PeerInfoInternal.STATE_REJECT
-		self.peerInfoDict[peerName].infoObj = None
-		self.peerInfoDict[peerName].sock = None
-		logging.info("SnPeerManager._recvReject: %s", _dbgmsg_peer_state_change(peerName, oldFsmState, self.peerInfoDict[peerName].fsmState))
+		newFsmState = _PeerInfoInternal.STATE_REJECT
+		self._peerToReject(peerName)
+		logging.info("SnPeerManager._recvReject: %s", _dbgmsg_peer_state_change(peerName, oldFsmState, newFsmState))
+
+		self._timerOperation()
 
 	def _sendObject(self, peerName, obj):
 		packetObj = SnSysPacket()
@@ -448,8 +461,12 @@ class SnPeerManager:
 
 	def _gcComplete(self, sock):
 		peerName = sock.getPeerName()
-		oldFsmState = self._shutdownPeer(peerName, _PeerInfoInternal.STATE_REJECT)
-		logging.info("SnPeerManager._gcComplete: %s", _dbgmsg_peer_state_change(peerName, oldFsmState, _PeerInfoInternal.STATE_REJECT))
+
+		oldFsmState = self.peerInfoDict[peerName].fsmState
+		newFsmState = _PeerInfoInternal.STATE_REJECT
+		self._peerToReject(peerName)
+		logging.info("SnPeerManager._gcComplete: %s", _dbgmsg_peer_state_change(peerName, oldFsmState, newFsmState))
+
 		self._timerOperation()
 
 	def _sendDataObject(self, peerName, srcUserName, srcModuleName, obj):
@@ -459,22 +476,30 @@ class SnPeerManager:
 		packetObj.data = obj
 		self.peerInfoDict[peerName].sock.send(packetObj)
 
-	def _shutdownPeer(self, peerName, dstState):
-		assert dstState in [ _PeerInfoInternal.STATE_NONE, _PeerInfoInternal.STATE_REJECT ]
+	def _peerToShutdown(self, peerName):
+		# do notify
+		if self.peerInfoDict[peerName].fsmState == _PeerInfoInternal.STATE_FULL:
+			self.param.localManager.onPeerRemove(peerName)
 
+		# remove peer, don't modify powerStateWhenInactive
+		self.peerInfoDict[peerName].sock.close()
+		self.peerInfoDict[peerName].fsmState = _PeerInfoInternal.STATE_NONE
+		self.peerInfoDict[peerName].infoObj = None
+		self.peerInfoDict[peerName].sock = None
+		self.peerInfoDict[peerName].opArgPower = None
+
+	def _peerToReject(self, peerName):
 		# do notify
 		if self.peerInfoDict[peerName].fsmState == _PeerInfoInternal.STATE_FULL:
 			self.param.localManager.onPeerRemove(peerName)
 
 		# remove peer
-		oldFsmState = self.peerInfoDict[peerName].fsmState
 		self.peerInfoDict[peerName].sock.close()
-		self.peerInfoDict[peerName].powerState = self.POWER_STATE_UNKNOWN
-		self.peerInfoDict[peerName].fsmState = dstState
+		self.peerInfoDict[peerName].powerStateWhenInactive = self.POWER_STATE_UNKNOWN
+		self.peerInfoDict[peerName].fsmState = _PeerInfoInternal.STATE_REJECT
 		self.peerInfoDict[peerName].infoObj = None
 		self.peerInfoDict[peerName].sock = None
-
-		return oldFsmState
+		self.peerInfoDict[peerName].opArgPower = None
 
 	def _timerOperation(self):
 		if any(x for x in self.peerInfoDict.values() if x.sock is None):
@@ -499,11 +524,11 @@ class _PeerInfoInternal:
 	STATE_FULL = 4
 	STATE_REJECT = 5
 
-	fsmState = None				# enum
-	powerState = None			# enum
-	infoObj = None				# obj, SnSysInfo
-	sock = None					# obj, peer socket
-	opArgPower = None			# (okFunc, errFunc)
+	fsmState = None							# enum
+	powerStateWhenInactive = None			# enum
+	infoObj = None							# obj, SnSysInfo
+	sock = None								# obj, peer socket
+	opArgPower = None						# (okFunc, errFunc)
 
 def _dbgmsg_peer_state_change(peerName, oldPeerState, peerState):
 	return "Peer %s, %s -> %s"%(peerName, _peer_state_to_str(oldPeerState), _peer_state_to_str(peerState))
