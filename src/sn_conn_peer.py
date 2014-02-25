@@ -12,14 +12,15 @@ from sn_util import SnUtil
 
 class SnPeerServer:
 
-	def __init__(self, handshaker):
-		self.handshaker = handshaker
+	def __init__(self, certFile, privkeyFile, caCertFile, connectFunc):
+		self.handshaker = _HandShaker(certFile, privkeyFile, caCertFile, connectFunc)
 		self.serverSock = None
 		self.serverSourceId = None
 
 	def dispose(self):
 		if self.serverSock is not None:
 			self.stop()
+		self.handshaker.dispose()
 
 	def start(self, port):
 		assert self.serverSock is None
@@ -57,11 +58,11 @@ class SnPeerServer:
 
 class SnPeerClient:
 
-	def __init__(self, handshaker):
-		self.handshaker = handshaker
+	def __init__(self, certFile, privkeyFile, caCertFile, connectFunc):
+		self.handshaker = _HandShaker(certFile, privkeyFile, caCertFile, connectFunc)
 
 	def dispose(self):
-		pass
+		self.handshaker.dispose()
 
 	def connect(self, connectId, hostname, port):
 		logging.debug("SnPeerClient.connect: Start, %d, %s, %d", connectId, hostname, port)
@@ -84,7 +85,7 @@ class SnPeerClient:
 		logging.debug("SnPeerClient.connect: End")
 		return
 
-class SnPeerHandShaker:
+class _HandShaker:
 
 	HANDSHAKE_NONE = 0
 	HANDSHAKE_WANT_READ = 1
@@ -104,7 +105,7 @@ class SnPeerHandShaker:
 	def addSocket(self, sock, serverSide, connectId=None, hostname=None, port=None):
 		info = _HandShakerConnInfo()
 		info.serverSide = serverSide
-		info.state = SnPeerHandShaker.HANDSHAKE_NONE
+		info.state = _HandShaker.HANDSHAKE_NONE
 		info.sslSock = None
 		info.connectId = connectId
 		info.hostname = hostname
@@ -125,7 +126,7 @@ class SnPeerHandShaker:
 				raise _ConnException("Socket error, %s"%(_cb_condition_to_str(cb_condition)))
 
 			# HANDSHAKE_NONE
-			if info.state == SnPeerHandShaker.HANDSHAKE_NONE:
+			if info.state == _HandShaker.HANDSHAKE_NONE:
 				ctx = SSL.Context(SSL.SSLv3_METHOD)
 				if info.serverSide:
 					ctx.set_verify(SSL.VERIFY_PEER | SSL.VERIFY_FAIL_IF_NO_PEER_CERT, _sslVerifyDummy)
@@ -142,23 +143,23 @@ class SnPeerHandShaker:
 					info.sslSock.set_accept_state()
 				else:
 					info.sslSock.set_connect_state()
-				info.state = SnPeerHandShaker.HANDSHAKE_WANT_WRITE
+				info.state = _HandShaker.HANDSHAKE_WANT_WRITE
 
 			# HANDSHAKE_WANT_READ & HANDSHAKE_WANT_WRITE
-			if ((info.state == SnPeerHandShaker.HANDSHAKE_WANT_READ and cb_condition & GLib.IO_IN) or
-					(info.state == SnPeerHandShaker.HANDSHAKE_WANT_WRITE and cb_condition & GLib.IO_OUT)):
+			if ((info.state == _HandShaker.HANDSHAKE_WANT_READ and cb_condition & GLib.IO_IN) or
+					(info.state == _HandShaker.HANDSHAKE_WANT_WRITE and cb_condition & GLib.IO_OUT)):
 				try:
 					info.sslSock.do_handshake()
-					info.state = SnPeerHandShaker.HANDSHAKE_COMPLETE
+					info.state = _HandShaker.HANDSHAKE_COMPLETE
 				except SSL.WantReadError:
-					info.state = SnPeerHandShaker.HANDSHAKE_WANT_READ
+					info.state = _HandShaker.HANDSHAKE_WANT_READ
 				except SSL.WantWriteError:
-					info.state = SnPeerHandShaker.HANDSHAKE_WANT_WRITE
+					info.state = _HandShaker.HANDSHAKE_WANT_WRITE
 				except SSL.Error as e:
 					raise _ConnException("Handshake failed, %s"%(_handshake_info_to_str(info)), e)
 
 			# HANDSHAKE_COMPLETE
-			if info.state == SnPeerHandShaker.HANDSHAKE_COMPLETE:
+			if info.state == _HandShaker.HANDSHAKE_COMPLETE:
 				# check peer name
 				peerName = SnUtil.getSslSocketPeerName(info.sslSock)
 				if info.serverSide:
@@ -177,16 +178,16 @@ class SnPeerHandShaker:
 			del self.sockDict[source]
 			source.close()
 			if not e.hasExcObj:
-				logging.debug("SnPeerHandShaker._onEvent: %s, %s", e.message, _handshake_info_to_str(info))
+				logging.debug("_HandShaker._onEvent: %s, %s", e.message, _handshake_info_to_str(info))
 			else:
-				logging.debug("SnPeerHandShaker._onEvent: %s, %s, %s, %s", e.message, _handshake_info_to_str(info),
+				logging.debug("_HandShaker._onEvent: %s, %s, %s, %s", e.message, _handshake_info_to_str(info),
 						e.excName, e.excMessage)
 			return False
 
 		# register io watch callback again
-		if info.state == SnPeerHandShaker.HANDSHAKE_WANT_READ:
+		if info.state == _HandShaker.HANDSHAKE_WANT_READ:
 			GLib.io_add_watch(source, GLib.IO_IN | _flagError, self._onEvent)
-		elif info.state == SnPeerHandShaker.HANDSHAKE_WANT_WRITE:
+		elif info.state == _HandShaker.HANDSHAKE_WANT_WRITE:
 			GLib.io_add_watch(source, GLib.IO_OUT | _flagError, self._onEvent)
 		else:
 			assert False
@@ -232,13 +233,13 @@ def _cb_condition_to_str(cb_condition):
         return ret
 
 def _handshake_state_to_str(handshake_state):
-	if handshake_state == SnPeerHandShaker.HANDSHAKE_NONE:
+	if handshake_state == _HandShaker.HANDSHAKE_NONE:
 		return "NONE"
-	elif handshake_state == SnPeerHandShaker.HANDSHAKE_WANT_READ:
+	elif handshake_state == _HandShaker.HANDSHAKE_WANT_READ:
 		return "WANT_READ"
-	elif handshake_state == SnPeerHandShaker.HANDSHAKE_WANT_WRITE:
+	elif handshake_state == _HandShaker.HANDSHAKE_WANT_WRITE:
 		return "WANT_WRITE"
-	elif handshake_state == SnPeerHandShaker.HANDSHAKE_COMPLETE:
+	elif handshake_state == _HandShaker.HANDSHAKE_COMPLETE:
 		return "COMPLETE"
 	else:
 		assert False

@@ -13,7 +13,6 @@ from gi.repository import GObject
 from sn_util import SnUtil
 from sn_conn_peer import SnPeerServer
 from sn_conn_peer import SnPeerClient
-from sn_conn_peer import SnPeerHandShaker
 from sn_manager_config import SnVersion
 from sn_manager_config import SnCfgSerializationObject
 from sn_manager_local import SnSysInfo
@@ -137,15 +136,12 @@ class SnPeerManager:
 			self.peerInfoDict[hn].fsmState = _PeerInfoInternal.STATE_NONE
 			self.peerInfoDict[hn].powerStateWhenInactive = self.POWER_STATE_UNKNOWN
 
-		# create handshaker
-		self.handshaker = SnPeerHandShaker(self.param.certFile, self.param.privkeyFile, self.param.caCertFile, self.onSocketConnected)
-
 		# create server endpoint
-		self.serverEndPoint = SnPeerServer(self.handshaker)
+		self.serverEndPoint = SnPeerServer(self.param.certFile, self.param.privkeyFile, self.param.caCertFile, self.onSocketConnected)
 		self.serverEndPoint.start(self.param.configManager.getHostInfo("localhost").port)
 
 		# create client endpoint
-		self.clientEndPoint = SnPeerClient(self.handshaker)
+		self.clientEndPoint = SnPeerClient(self.param.certFile, self.param.privkeyFile, self.param.caCertFile, self.onSocketConnected)
 
 		# create timers
 		self.peerProbeTimer = None
@@ -163,7 +159,6 @@ class SnPeerManager:
 
 		self.clientEndPoint.dispose()
 		self.serverEndPoint.dispose()
-		self.handshaker.dispose()
 
 		for peerName, peerInfo in self.peerInfoDict.items():
 			if (peerInfo.fsmState == _PeerInfoInternal.STATE_INIT
