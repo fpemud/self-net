@@ -8,9 +8,8 @@ import struct
 import logging
 from OpenSSL import SSL
 from gi.repository import GLib
-from sn_util import SnUtil
 
-class SnPeerSocket:
+class objsocket:
 
 	_GC_STATE_NONE = 0
 	_GC_STATE_PENDING = 1
@@ -18,10 +17,6 @@ class SnPeerSocket:
 
 	def __init__(self, sslSock, recvFunc, errorFunc, gcCompleteFunc):
 		self.sslSock = sslSock
-
-		self.peerName = SnUtil.getSslSocketPeerName(self.sslSock)
-		assert self.peerName is not None
-
 		self.gcState = self._GC_STATE_NONE
 		self.recvFunc = recvFunc
 		self.errorFunc = errorFunc
@@ -31,12 +26,6 @@ class SnPeerSocket:
 		self.recvBuffer = ""
 		self.recvSourceId = GLib.io_add_watch(self.sslSock, GLib.IO_IN | _flagError, self._onRecv)
 		self.sendSourceId = None
-
-	def getPeerName(self):
-		# should be removed
-
-		assert self.sslSock is not None and self.gcState == self._GC_STATE_NONE
-		return self.peerName
 
 	def send(self, dataObj):
 		assert self.sslSock is not None and self.gcState == self._GC_STATE_NONE

@@ -7,7 +7,7 @@ import logging
 import time
 import dbus
 from datetime import datetime
-from objsocket import SnPeerSocket
+from objsocket import objsocket
 from gi.repository import GLib
 from gi.repository import GObject
 
@@ -259,7 +259,7 @@ class SnPeerManager:
 		self.peerInfoDict[peerName].fsmState = _PeerInfoInternal.STATE_INIT
 		self.peerInfoDict[peerName].powerStateWhenInactive = self.POWER_STATE_UNKNOWN
 		self.peerInfoDict[peerName].infoObj = None
-		self.peerInfoDict[peerName].sock = SnPeerSocket(sslSock, self.onSocketRecv, self.onSocketError, self._gcComplete)
+		self.peerInfoDict[peerName].sock = objsocket(sslSock, self.onSocketRecv, self.onSocketError, self._gcComplete)
 		logging.info("SnPeerManager.onSocketConnected: %s", _dbgmsg_peer_state_change(peerName, oldFsmState, self.peerInfoDict[peerName].fsmState))
 
 		# timer operation
@@ -271,7 +271,7 @@ class SnPeerManager:
 		self._sendObject(peerName, self.param.localManager.getLocalInfo())
 
 	def onSocketRecv(self, sock, packetObj):
-		peerName = sock.getPeerName()
+		peerName = self._getPeerNameBySock(sock)
 		if self._typeCheck(packetObj, SnSysPacket):
 			if self._typeCheck(packetObj.data, SnVersion):
 				self._recvVerMatch(peerName, packetObj.data)
@@ -299,7 +299,7 @@ class SnPeerManager:
 			self._sendReject(peerName, "invalid packet format, %s"%(packetObj.__class__))
 
 	def onSocketError(self, sock):
-		peerName = sock.getPeerName()
+		peerName = self._getPeerNameBySock(sock)
 
 		oldFsmState = self.peerInfoDict[peerName].fsmState
 		newFsmState = _PeerInfoInternal.STATE_NONE
@@ -316,6 +316,12 @@ class SnPeerManager:
 		return True
 
 	##### implementation ####
+
+	def _getPeerNameBySock(self, sock):
+		for pi, pv in self.peerInfoDict.items():
+			if pv.sock == sock:
+				return pi
+		assert False
 
 	def _recvVerMatch(self, peerName, peerVersion):
 		# check state
@@ -475,7 +481,7 @@ class SnPeerManager:
 		self.peerInfoDict[peerName].sock.gracefulClose()
 
 	def _gcComplete(self, sock):
-		peerName = sock.getPeerName()
+		peerName = self._getPeerNameBySock(sock)
 
 		oldFsmState = self.peerInfoDict[peerName].fsmState
 		newFsmState = _PeerInfoInternal.STATE_REJECT

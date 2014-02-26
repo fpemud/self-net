@@ -169,7 +169,7 @@ class _HandShaker:
 					if peerName is None or peerName != info.hostname:
 						raise _ConnException("Hostname incorrect, %s, %s"%(_handshake_info_to_str(info), peerName))
 
-				# create SnPeerSocket
+				# give socket to connectFunc
 				del self.sockDict[source]
 				self.connectFunc(info.sslSock)
 				return False
