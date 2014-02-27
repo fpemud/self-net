@@ -95,7 +95,7 @@ class objsocket:
 			return True
 		except (socket.error, SSL.Error, _CbConditionException) as e:
 			if self.gcState == self._GC_STATE_NONE:
-				self.errorFunc(self)
+				self.errorFunc(self, "")
 				assert self.sslSock is None		# errorFunc should close the socket
 				return False
 			elif self.gcState == self._GC_STATE_PENDING:
@@ -137,7 +137,7 @@ class objsocket:
 		except (SSL.WantReadError, SSL.WantWriteError):
 			return True
 		except (socket.error, SSL.Error, _CbConditionException, _EofException) as e:
-			self.errorFunc(self)
+			self.errorFunc(self, "")
 			assert self.sslSock is None		# errorFunc should close the socket
 			return False
 

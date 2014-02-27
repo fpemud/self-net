@@ -298,7 +298,7 @@ class SnPeerManager:
 		else:
 			self._sendReject(peerName, "invalid packet format, %s"%(packetObj.__class__))
 
-	def onSocketError(self, sock):
+	def onSocketError(self, sock, errMsg):
 		peerName = self._getPeerNameBySock(sock)
 
 		oldFsmState = self.peerInfoDict[peerName].fsmState
