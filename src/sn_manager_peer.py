@@ -401,7 +401,7 @@ class SnPeerManager:
 		logging.info("SnPeerManager._recvPeerInfo: %s", _dbgmsg_peer_state_change(peerName, oldFsmState, self.peerInfoDict[peerName].fsmState))
 
 		# do notify
-		self.param.localManager.onPeerChange(peerName)
+		self.param.localManager.onPeerChange(peerName, peerInfo)
 
 	def _recvPowerOp(self, peerName, powerOp):
 		if powerOp.name not in [ "poweroff", "reboot", "suspend", "hibernate", "hybrid-sleep" ]:

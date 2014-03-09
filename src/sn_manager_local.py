@@ -62,12 +62,19 @@ class SnLocalManager:
 		self.moduleObjDict = self._getModuleObjDict()
 		self.sleepNotifier = SnSleepNotifier(self.onBeforeSleep, self.onAfterResume)
 
+		GLib.idle_add(self._idleLocalPeerActive)
+
 		logging.debug("SnLocalManager.__init__: End")
 		return
 
 	def dispose(self):
 		logging.debug("SnLocalManager.dispose: Start")
 
+		# set modules of local peer to inactive state
+		if socket.gethostname() in self.moduleObjDict:
+			self.onPeerRemove(socket.gethostname())
+
+		# check modules' state
 		for peerName, moduleObjList in self.moduleObjDict.items():
 			for mo in moduleObjList:
 				assert mo.getState() in [ SnModuleInstance.STATE_INIT_FAILED, SnModuleInstance.STATE_INACTIVE ]
@@ -87,12 +94,10 @@ class SnLocalManager:
 
 	##### event callback ####
 
-	def onPeerChange(self, peerName):
+	def onPeerChange(self, peerName, peerInfo):
 		logging.debug("SnLocalManager.onPeerChange: Start, %s", peerName)
 
-		peerInfo = self.param.peerManager.getPeerInfo(peerName)
-
-		# process module inactive
+		# module inactive
 		for mo in self.moduleObjDict[peerName]:
 			if not self._matchPeerModuleList(peerInfo, mo):
 				if mo.getState() == SnModuleInstance.STATE_INIT_FAILED:
@@ -111,9 +116,8 @@ class SnLocalManager:
 					logging.debug("SnLocalManager.onPeerChange: mo reject -> inactive end")
 				else:
 					assert False
-			
 
-		# process module active
+		# module active
 		for mio in peerInfo.moduleList:
 			mo = self._findModuleList(self.moduleObjDict[peerName], mio)
 			if mo is not None:
@@ -161,7 +165,7 @@ class SnLocalManager:
 	def onPacketRecv(self, peerName, userName, srcModuleName, data):
 		logging.debug("SnLocalManager.onPacketRecv: Start, %s, %s, %s", peerName, userName, srcModuleName)
 
-		moduleName = self._getModuleNameByPeerModuleName(srcModuleName)
+		moduleName = self._getMappedModuleName(srcModuleName)
 		for mo in self.moduleObjDict[peerName]:
 			if mo.getUserName() == userName and mo.getModuleName() == moduleName:
 				assert mo.getState() == SnModuleInstance.STATE_ACTIVE
@@ -187,7 +191,10 @@ class SnLocalManager:
 	##### implementation ####
 
 	def _sendObject(self, peerName, userName, moduleName, obj):
-		self.param.peerManager._sendDataObject(peerName, userName, moduleName, obj)
+		if peerName == socket.gethostname():
+			GLib.idle_add(self._idleLocalPeerRecv, peerName, userName, moduleName, obj)
+		else:
+			self.param.peerManager._sendDataObject(peerName, userName, moduleName, obj)
 
 	def _sendReject(self, peerName, userName, moduleName, rejectMessage):
 		# record to log
@@ -196,9 +203,11 @@ class SnLocalManager:
 		# send reject message
 		rejectObj = SnDataPacketReject()
 		rejectObj.message = rejectMessage
-		self.param.peerManager._sendDataObject(peerName, userName, moduleName, rejectObj)
+		if peerName == socket.gethostname():
+			GLib.idle_add(self._idleLocalPeerRecv, peerName, userName, moduleName, rejectObj)
+		else:
+			self.param.peerManager._sendDataObject(peerName, userName, moduleName, rejectObj)
 
-		# add module graceful close callback
 		GLib.idle_add(self._gcComplete, peerName, userName, moduleName)
 
 	def _gcComplete(self, peerName, userName, moduleName):
@@ -211,6 +220,15 @@ class SnLocalManager:
 				mo.setState(SnModuleInstance.STATE_REJECT)
 				return False
 		assert False
+
+	def _idleLocalPeerActive(self):
+		if socket.gethostname() in self.moduleObjDict:
+			self.onPeerChange(socket.gethostname(), self.localInfo)
+		return False
+
+	def _idleLocalPeerRecv(self, peerName, userName, moduleName, data):
+		self.onPacketRecv(peerName, userName, moduleName, data)
+		return False
 
 	def _getLocalInfo(self):
 		pgs = strict_pgs.PasswdGroupShadow("/")
@@ -257,11 +275,9 @@ class SnLocalManager:
 			for mname in self.param.configManager.getModuleNameList():
 				minfo = self.param.configManager.getModuleInfo(mname)
 
-				if pname == socket.gethostname():
+				if (pname == socket.gethostname() and
+						not minfo.moduleObj.getPropDict().get("allow-local-peer", False)):
 					continue
-#					propDict = minfo.getPropDict()
-#					if not propDict.get("allow-local-peer", False):
-#						continue
 
 				exec("from %s import ModuleInstanceObject"%(mname.replace("-", "_")))
 				if minfo.moduleScope == "sys":
@@ -314,17 +330,17 @@ class SnLocalManager:
 
 	def _matchPeerModuleList(self, peerInfo, mo):
 		for mio in peerInfo.moduleList:
-			if mo.getUserName() == mio.userName and mo.getModuleName() == self._getModuleNameByPeerModuleName(mio.moduleName):
+			if mo.getUserName() == mio.userName and mo.getModuleName() == self._getMappedModuleName(mio.moduleName):
 				return True
 		return False
 
 	def _findModuleList(self, moduleObjList, mio):
 		for mo in moduleObjList:
-			if mo.getUserName() == mio.userName and mo.getModuleName() == self._getModuleNameByPeerModuleName(mio.moduleName):
+			if mo.getUserName() == mio.userName and mo.getModuleName() == self._getMappedModuleName(mio.moduleName):
 				return mo
 		return None
 
-	def _getModuleNameByPeerModuleName(self, moduleName):
+	def _getMappedModuleName(self, moduleName):
 		strList = moduleName.split("-")
 		if strList[1] == "server":
 			strList[1] = "client"

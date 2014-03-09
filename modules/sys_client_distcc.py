@@ -14,7 +14,7 @@ class ModuleObject(SnModule):
 
 	def getPropDict(self):
 		ret = dict()
-		ret["allow-local-peer"] = True
+		ret["allow-local-peer"] = False
 		ret["suid"] = False
 		return ret
 
