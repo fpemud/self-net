@@ -296,14 +296,7 @@ class SnLocalManager:
 
 				exec("from %s import ModuleInstanceObject"%(mname.replace("-", "_")))
 				if minfo.moduleScope == "sys":
-					initParam = SnModuleInstanceInitParam()
-					initParam.coreObj = self
-					initParam.classObj = minfo.moduleObj
-					initParam.paramDict = minfo.moduleParamDict
-					initParam.peerName = pname
-					initParam.userName = None
-					initParam.tmpDir = os.path.join(self.param.tmpDir, mname)
-					mo = ModuleInstanceObject(initParam)
+					mo = ModuleInstanceObject(self._newInitParamSys(mname, minfo, pname))
 					logging.debug("SnLocalManager._getModuleObjDict: mo init, %s, %s", pname, mo.getModuleName())
 					try:
 						SnUtil.euidInvoke(mo.getUserName(), mo.onInit)
@@ -319,14 +312,7 @@ class SnLocalManager:
 						if uname in self.param.configManager.getUserBlackList():
 							continue
 
-						initParam = SnModuleInstanceInitParam()
-						initParam.coreObj = self
-						initParam.classObj = minfo.moduleObj
-						initParam.paramDict = minfo.moduleParamDict
-						initParam.peerName = pname
-						initParam.userName = uname
-						initParam.tmpDir = os.path.join(self.param.tmpDir, "%s-%s"%(mname, uname))
-						mo = ModuleInstanceObject(initParam)
+						mo = ModuleInstanceObject(self._newInitParamUsr(mname, minfo, pname, uname))
 						logging.debug("SnLocalManager._getModuleObjDict: mo init, %s, %s, %s", pname, uname, mo.getModuleName())
 						try:
 							SnUtil.euidInvoke(mo.getUserName(), mo.onInit)
@@ -354,6 +340,26 @@ class SnLocalManager:
 			if mo.getUserName() == mio.userName and mo.getModuleName() == self._getMappedModuleName(mio.moduleName):
 				return mo
 		return None
+
+	def _newInitParamSys(self, mname, minfo, pname):
+		ret = SnModuleInstanceInitParam()
+		ret.coreObj = self
+		ret.classObj = minfo.moduleObj
+		ret.paramDict = minfo.moduleParamDict
+		ret.peerName = pname
+		ret.userName = None
+		ret.tmpDir = os.path.join(self.param.tmpDir, mname)
+		return ret
+
+	def _newInitParamUsr(self, mname, minfo, pname, uname):
+		ret = SnModuleInstanceInitParam()
+		ret.coreObj = self
+		ret.classObj = minfo.moduleObj
+		ret.paramDict = minfo.moduleParamDict
+		ret.peerName = pname
+		ret.userName = uname
+		ret.tmpDir = os.path.join(self.param.tmpDir, "%s-%s"%(mname, uname))
+		return ret
 
 	def _getMappedModuleName(self, moduleName):
 		strList = moduleName.split("-")
