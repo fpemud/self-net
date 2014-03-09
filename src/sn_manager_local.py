@@ -199,7 +199,11 @@ class SnLocalManager:
 		pass
 
 	def onLoSockRecv(self, sock, packetObj):
-		pass
+		if self._typeCheck(packetObj, _LoSockCall):
+		elif self._typeCheck(packetObj, _LoSockRetn):
+		elif self._typeCheck(packetObj, _LoSockExcp):
+		else:
+			assert False
 
 	def onLoSockError(self, sock, errMsg):
 		pass
@@ -371,4 +375,28 @@ class SnLocalManager:
 
 	def _typeCheck(self, obj, typeobj):
 		return str(obj.__class__) == str(typeobj)
+
+class _ModuleInfoInternal:
+	CALLING_NONE = 0
+	CALLING_INIT = 1
+	CALLING_ACTIVE = 2
+	CALLING_INACTIVE = 3
+	CALLING_REJECT = 4
+	CALLING_RECV = 5
+
+	minst = None							# obj, SnModuleInstance
+	proc = None								# obj, None means not-standalone module
+	callingState = None						# enum
+
+class _LoSockCall:
+	funcName = None							# str
+	funcArgs = None							# list<obj>
+
+class _LoSockRetn:
+	funcName = None							# str
+	retVal = None							# obj, None means no return value
+
+class _LoSockExcp:
+	funcName = None							# str
+	excpMessage = None						# str
 
