@@ -17,6 +17,7 @@ class ModuleObject(SnModule):
 		ret = dict()
 		ret["allow-local-peer"] = True
 		ret["suid"] = False
+		ret["standalone"] = False
 		return ret
 
 class ModuleInstanceObject(SnModuleInstance):

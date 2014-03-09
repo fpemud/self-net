@@ -7,6 +7,7 @@ import subprocess
 import pwd
 import socket
 import re
+from gi.repository import GLib
 
 class SnUtil:
 
@@ -285,6 +286,23 @@ class SnUtil:
 			return None
 		uid = connection.get_unix_user(sender)
 		return pwd.getpwuid(uid).pw_name
+
+	@staticmethod
+	def cbConditionToStr(cb_condition):
+	    ret = ""
+	    if cb_condition & GLib.IO_IN:
+	            ret += "IN "
+	    if cb_condition & GLib.IO_OUT:
+	            ret += "OUT "
+	    if cb_condition & GLib.IO_PRI:
+	            ret += "PRI "
+	    if cb_condition & GLib.IO_ERR:
+	            ret += "ERR "
+	    if cb_condition & GLib.IO_HUP:
+	            ret += "HUP "
+	    if cb_condition & GLib.IO_NVAL:
+	            ret += "NVAL "
+	    return ret
 
 class SnSleepNotifier:
 

@@ -23,6 +23,7 @@ class SnParam:
 		self.modulesFile = os.path.join(self.cfgDir, "modules.xml") 
 
 		self.pidFile = os.path.join(self.runDir, "selfnetd.pid")
+		self.socketFile = os.path.join(self.runDir, "selfnetd.socket")
 		self.logFile = os.path.join(self.logDir, "selfnetd.log")
 
 		# to be set

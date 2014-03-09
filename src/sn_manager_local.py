@@ -10,6 +10,7 @@ from gi.repository import GLib
 
 from sn_util import SnUtil
 from sn_util import SnSleepNotifier
+from sn_conn_local import SnLocalServer
 from sn_module import SnModuleInstance
 from sn_module import SnModuleInstanceInitParam
 from sn_module import SnModuleInstanceInitException
@@ -57,11 +58,17 @@ class SnLocalManager:
 	def __init__(self, param):
 		logging.debug("SnLocalManager.__init__: Start")
 
+		# variables
 		self.param = param
 		self.localInfo = self._getLocalInfo()
 		self.moduleObjDict = self._getModuleObjDict()
 		self.sleepNotifier = SnSleepNotifier(self.onBeforeSleep, self.onAfterResume)
 
+		# create server endpoint
+		self.serverEndPoint = SnLocalServer(self.onLoSockConnected)
+		self.serverEndPoint.start(self.param.socketFile)
+
+		# active local peers
 		GLib.idle_add(self._idleLocalPeerActive)
 
 		logging.debug("SnLocalManager.__init__: End")
@@ -188,6 +195,15 @@ class SnLocalManager:
 	def onAfterResume(self, sleepType):
 		pass
 
+	def onLoSockConnected(self, sock):
+		pass
+
+	def onLoSockRecv(self, sock, packetObj):
+		pass
+
+	def onLoSockError(self, sock, errMsg):
+		pass
+
 	##### implementation ####
 
 	def _sendObject(self, peerName, userName, moduleName, obj):
@@ -275,8 +291,7 @@ class SnLocalManager:
 			for mname in self.param.configManager.getModuleNameList():
 				minfo = self.param.configManager.getModuleInfo(mname)
 
-				if (pname == socket.gethostname() and
-						not minfo.moduleObj.getPropDict().get("allow-local-peer", False)):
+				if pname == socket.gethostname() and not minfo.moduleObj.getPropDict()["allow-local-peer"]:
 					continue
 
 				exec("from %s import ModuleInstanceObject"%(mname.replace("-", "_")))

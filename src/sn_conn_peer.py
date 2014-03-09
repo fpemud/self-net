@@ -3,8 +3,6 @@
 
 import socket
 import errno
-import pickle
-import struct
 import logging
 from OpenSSL import SSL
 from gi.repository import GLib
@@ -41,7 +39,7 @@ class SnPeerServer:
 		self.serverSock = None
 
 	def _onServerAccept(self, source, cb_condition):
-		logging.debug("SnPeerServer._onServerAccept: Start, %s", _cb_condition_to_str(cb_condition))
+		logging.debug("SnPeerServer._onServerAccept: Start, %s", SnUtil.cbConditionToStr(cb_condition))
 
 		assert not (cb_condition & _flagError)
 		assert source == self.serverSock
@@ -123,7 +121,7 @@ class _HandShaker:
 		try:
 			# check error
 			if cb_condition & _flagError:
-				raise _ConnException("Socket error, %s"%(_cb_condition_to_str(cb_condition)))
+				raise _ConnException("Socket error, %s"%(SnUtil.cbConditionToStr(cb_condition)))
 
 			# HANDSHAKE_NONE
 			if info.state == _HandShaker.HANDSHAKE_NONE:
@@ -215,22 +213,6 @@ class _HandShakerConnInfo:
 	hostname = None				# str
 	port = None					# int
 	spname = None				# str
-
-def _cb_condition_to_str(cb_condition):
-        ret = ""
-        if cb_condition & GLib.IO_IN:
-                ret += "IN "
-        if cb_condition & GLib.IO_OUT:
-                ret += "OUT "
-        if cb_condition & GLib.IO_PRI:
-                ret += "PRI "
-        if cb_condition & GLib.IO_ERR:
-                ret += "ERR "
-        if cb_condition & GLib.IO_HUP:
-                ret += "HUP "
-        if cb_condition & GLib.IO_NVAL:
-                ret += "NVAL "
-        return ret
 
 def _handshake_state_to_str(handshake_state):
 	if handshake_state == _HandShaker.HANDSHAKE_NONE:

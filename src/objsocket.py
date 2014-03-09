@@ -8,6 +8,7 @@ import struct
 import logging
 from OpenSSL import SSL
 from gi.repository import GLib
+from sn_util import SnUtil
 
 class objsocket:
 
@@ -171,28 +172,12 @@ class objsocket:
 
 class _CbConditionException(Exception):
 	def __init__(self, cb_condition):
-		s = _cb_condition_to_str(cb_condition)
+		s = SnUtil.cbConditionToStr(cb_condition)
 		super(_CbConditionException, self).__init__(s)
 
 class _EofException(Exception):
 	def __init__(self):
 		super(_EofException, self).__init__("EOF encountered")
-
-def _cb_condition_to_str(cb_condition):
-        ret = ""
-        if cb_condition & GLib.IO_IN:
-                ret += "IN "
-        if cb_condition & GLib.IO_OUT:
-                ret += "OUT "
-        if cb_condition & GLib.IO_PRI:
-                ret += "PRI "
-        if cb_condition & GLib.IO_ERR:
-                ret += "ERR "
-        if cb_condition & GLib.IO_HUP:
-                ret += "HUP "
-        if cb_condition & GLib.IO_NVAL:
-                ret += "NVAL "
-        return ret
 
 _flagError = GLib.IO_PRI | GLib.IO_ERR | GLib.IO_HUP | GLib.IO_NVAL
 
