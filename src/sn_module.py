@@ -92,6 +92,9 @@ class SnModuleInstance:
 	def getModuleName(self):
 		return self.classObj.getModuleName()
 
+	def isLocalPeer(self):
+		return self.peerName == socket.gethostname()
+
 	def getTmpDir(self):
 		"""Temp directory is created when being used for the first time, deleted
 		   before change to inactive state"""

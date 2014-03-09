@@ -51,14 +51,27 @@ class ModuleInstanceObject(SnModuleInstance):
 				self.sendReject("invalid SshServerObject received")
 				return
 
+			nameList = [ self.getPeerName() ]
+			if self.isLocalPeer():
+				nameList.append("localhost")
+				nameList += dataObj.addrList
+				for i in range(1, 256):
+					nameList.append("127.0.0.%d"%(i))
+			else:
+				nameList += dataObj.addrList
+
 			cfgf = _CfgFileKnownHosts(self.knownHostsFile)
-			cfgf.addHost(self.getPeerName(), dataObj.addrList, dataObj.hostPubkeyEcdsa)
+			cfgf.load()
+			cfgf.addHost(nameList, dataObj.hostPubkeyEcdsa)
+			cfgf.save()
 		else:
 			self.sendReject("invalid client data received")
 
 	def _cleanup(self):
 		cfgf = _CfgFileKnownHosts(self.knownHostsFile)
+		cfgf.load()
 		cfgf.removeHost(self.getPeerName())
+		cfgf.save()
 
 class _SshClientObject:
 	userPubkey = None				# str
@@ -70,52 +83,12 @@ class _CfgFileKnownHosts:
 		self.lineList = []
 
 	def touch(self):
-		self._open()
-		self._close()
+		self.load()
+		self.save()
 
-	def addHost(self, hostName, addrList, pubkey):
-		self._open()
+	def load(self):
+		"""load/save is not open/close, no need to put them in try block"""
 
-		prefix = "%s,%s"%(hostName, ",".join(addrList))
-		strList = pubkey.split()
-		assert len(strList) == 3
-		line = "%s %s %s\n"%(prefix, strList[0], strList[1])
-
-		for i in range(0, len(self.lineList)):
-			if self.lineList[i] == "# selfnet usr-server-ssh\n":
-				self.lineList.insert(i + 1, line)
-				break
-
-		self._close()
-
-	def removeHost(self, hostName):
-		self._open()
-
-		i = 0
-		while i < len(self.lineList):
-			if self.lineList[i] == "# selfnet usr-server-ssh\n":
-				i = i + 1
-				break
-
-		while i < len(self.lineList):
-			line = self.lineList[i]
-			if line == "# selfnet usr-server-ssh end\n":
-				break
-			if line.startswith("#"):
-				i = i + 1
-				continue
-			strList = line.split()
-			if len(strList) != 3:
-				i = i + 1
-				continue
-			if strList[0].split(",")[0] != hostName:
-				i = i + 1
-				continue
-			self.lineList.pop(i)
-
-		self._close()
-
-	def _open(self):
 		if not os.path.exists(self.filename):
 			return
 
@@ -133,9 +106,43 @@ class _CfgFileKnownHosts:
 			self.lineList.append("# selfnet usr-server-ssh end\n")
 			self.lineList.append("\n")
 
-	def _close(self):
+	def save(self):
 		with open(self.filename, "wt") as f:
 			for line in self.lineList:
 				f.write(line)
 		self.lineList = []
+
+	def addHost(self, nameList, pubkey):
+		prefix = ",".join(nameList)
+		strList = pubkey.split()
+		assert len(strList) == 3
+		line = "%s %s %s\n"%(prefix, strList[0], strList[1])
+
+		for i in range(0, len(self.lineList)):
+			if self.lineList[i] == "# selfnet usr-server-ssh\n":
+				self.lineList.insert(i + 1, line)
+				break
+
+	def removeHost(self, firstName):
+		i = 0
+		while i < len(self.lineList):
+			if self.lineList[i] == "# selfnet usr-server-ssh\n":
+				i = i + 1
+				break
+
+		while i < len(self.lineList):
+			line = self.lineList[i]
+			if line == "# selfnet usr-server-ssh end\n":
+				break
+			if line.startswith("#"):
+				i = i + 1
+				continue
+			strList = line.split()
+			if len(strList) != 3:
+				i = i + 1
+				continue
+			if strList[0].split(",")[0] != firstName:
+				i = i + 1
+				continue
+			self.lineList.pop(i)
 
