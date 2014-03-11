@@ -200,8 +200,11 @@ class SnLocalManager:
 
 	def onLoSockRecv(self, sock, packetObj):
 		if self._typeCheck(packetObj, _LoSockCall):
+			assert False
 		elif self._typeCheck(packetObj, _LoSockRetn):
+			assert False
 		elif self._typeCheck(packetObj, _LoSockExcp):
+			assert False
 		else:
 			assert False
 

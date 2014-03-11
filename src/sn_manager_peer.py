@@ -4,7 +4,6 @@
 import re
 import socket
 import logging
-import time
 import dbus
 from datetime import datetime
 from objsocket import objsocket
@@ -309,10 +308,9 @@ class SnPeerManager:
 		self._timerOperation()
 
 	def onPeerProbe(self):
-		connectId = time.time()
 		for pname, pinfo in self.peerInfoDict.items():
 			if pinfo.fsmState == _PeerInfoInternal.STATE_NONE:
-				self.clientEndPoint.connect(connectId, pname, self.param.configManager.getHostInfo(pname).port)
+				self.clientEndPoint.connect(pname, self.param.configManager.getHostInfo(pname).port)
 		return True
 
 	##### implementation ####

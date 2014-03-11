@@ -4,6 +4,7 @@
 import socket
 import errno
 import logging
+import libasyncns
 from OpenSSL import SSL
 from gi.repository import GLib
 from sn_util import SnUtil
@@ -58,30 +59,55 @@ class SnPeerClient:
 
 	def __init__(self, certFile, privkeyFile, caCertFile, connectFunc):
 		self.handshaker = _HandShaker(certFile, privkeyFile, caCertFile, connectFunc)
+		self.asyncns = libasyncns.Asyncns()
 
 	def dispose(self):
 		self.handshaker.dispose()
 
-	def connect(self, connectId, hostname, port):
-		logging.debug("SnPeerClient.connect: Start, %d, %s, %d", connectId, hostname, port)
+	def connect(self, hostname, port):
+		resq = self.asyncns.getaddrinfo(hostname, None)
+		resq.userdata = { "hostname":hostname, "port":port }
+		self.asyncns.wait(False)
+		GLib.io_add_watch(self.asyncns.get_fd(), GLib.IO_IN | _flagError, self._onResolveComplete)
 
+	def _onResolveComplete(self, source, cb_condition):
+		logging.debug("SnPeerClient._onResolveComplete: Start, %s", SnUtil.cbConditionToStr(cb_condition))
+
+		assert not (cb_condition & _flagError)
+		assert source == self.asyncns.get_fd()
+
+		# get resolve result
+		hostname = None
+		port = None
+		hostaddr = None
+		try:
+			resq = self.asyncns.get_next()
+			assert type(resq) == libasyncns.AddrInfoQuery
+			hostname = resq.userdata["hostname"]
+			port = resq.userdata["port"]
+			hostaddr, dummy = resq.get_done()[0]
+		except Exception as e:
+			logging.debug("SnPeerClient._onResolveComplete: Failed, %s, %s", e.__class__, e)
+			return False
+
+		# do connect
 		sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
 		sock.setblocking(0)
-
 		try:
-			sock.connect((hostname, port))
+			sock.connect((hostaddr, port))
 		except socket.error as e:
 			if e.errno == errno.EAGAIN or e.errno == errno.EINPROGRESS:
 				pass
 			else:
-				logging.debug("SnPeerClient.connect: Failed, %s, %s", e.__class__, e)
+				logging.debug("SnPeerClient._onResolveComplete: Failed, %s, %s", e.__class__, e)
 				sock.close()
-				return
+				return False
 
-		self.handshaker.addSocket(sock, False, connectId, hostname, port)
+		# give socket to _HandShaker
+		self.handshaker.addSocket(sock, False, hostname, port)
 
-		logging.debug("SnPeerClient.connect: End")
-		return
+		logging.debug("SnPeerClient._onResolveComplete: End")
+		return False
 
 class _HandShaker:
 
@@ -100,12 +126,11 @@ class _HandShaker:
 	def dispose(self):
 		pass
 
-	def addSocket(self, sock, serverSide, connectId=None, hostname=None, port=None):
+	def addSocket(self, sock, serverSide, hostname=None, port=None):
 		info = _HandShakerConnInfo()
 		info.serverSide = serverSide
 		info.state = _HandShaker.HANDSHAKE_NONE
 		info.sslSock = None
-		info.connectId = connectId
 		info.hostname = hostname
 		info.port = port
 		info.spname = None					# value of socket.getpeername()
@@ -209,7 +234,6 @@ class _HandShakerConnInfo:
 	serverSide = None			# bool
 	state = None				# enum
 	sslSock = None				# obj
-	connectId = None			# int
 	hostname = None				# str
 	port = None					# int
 	spname = None				# str
@@ -230,7 +254,7 @@ def _handshake_info_to_str(info):
 	if info.serverSide:
 		return info.spname
 	else:
-		return "%d, %s, %d"%(info.connectId, info.hostname, info.port)
+		return "%s, %d"%(info.hostname, info.port)
 
 _flagError = GLib.IO_PRI | GLib.IO_ERR | GLib.IO_HUP | GLib.IO_NVAL
 
