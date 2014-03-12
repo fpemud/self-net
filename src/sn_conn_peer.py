@@ -85,7 +85,7 @@ class SnPeerClient:
 			assert type(resq) == libasyncns.AddrInfoQuery
 			hostname = resq.userdata["hostname"]
 			port = resq.userdata["port"]
-			hostaddr, dummy = resq.get_done()[0]
+			hostaddr, dummy = resq.get_done()[0][4]
 		except Exception as e:
 			logging.debug("SnPeerClient._onResolveComplete: Failed, %s, %s", e.__class__, e)
 			return False
