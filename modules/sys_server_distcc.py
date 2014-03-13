@@ -22,7 +22,7 @@ class ModuleInstanceObject(SnModuleInstance):
 	def onInit(self):
 		self.cfgDir = "/etc/distcc"
 		if not os.path.isdir(self.cfgDir):
-			raise SnModuleInstanceInitException("distcc configuration directory does not exist")
+			raise SnModuleInstanceException("distcc configuration directory does not exist")
 
 		return
 

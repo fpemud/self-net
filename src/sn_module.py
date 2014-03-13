@@ -160,6 +160,9 @@ class SnModuleInstanceInitParam:
 	userName = None		# str
 	tmpDir = None		# str
 
-class SnModuleInstanceInitException(Exception):
-	pass
+class SnModuleInstanceException(Exception):
+
+	def __init__(self, message, reject=False):
+		super(self, SnModuleInstanceException).__init__(self, message)
+		self.reject = reject
 

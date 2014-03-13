@@ -6,7 +6,7 @@ import netifaces
 from sn_util import SnUtil
 from sn_module import SnModule
 from sn_module import SnModuleInstance
-from sn_module import SnModuleInstanceInitException
+from sn_module import SnModuleInstanceException
 
 class ModuleObject(SnModule):
 
@@ -78,31 +78,31 @@ class ModuleInstanceObject(SnModuleInstance):
 
 	def _checkServerCfg(self):
 		if not os.path.exists(self.sshSysRsaPrivFile):
-			raise SnModuleInstanceInitException("server rsa private key file does not exist")
+			raise SnModuleInstanceException("server rsa private key file does not exist")
 		if not os.path.exists(self.sshSysRsaPubFile):
-			raise SnModuleInstanceInitException("server rsa public key file does not exist")
+			raise SnModuleInstanceException("server rsa public key file does not exist")
 		with open(self.sshSysRsaPubFile, "rt") as f:
 			pubkey = f.read()
 			if not SnUtil.checkSshPubKey(pubkey, "rsa", "root", self.getHostName()):
-				raise SnModuleInstanceInitException("server rsa public key file is invalid")
+				raise SnModuleInstanceException("server rsa public key file is invalid")
 				
 		if not os.path.exists(self.sshSysDsaPrivFile):
-			raise SnModuleInstanceInitException("server dsa private key file does not exist")
+			raise SnModuleInstanceException("server dsa private key file does not exist")
 		if not os.path.exists(self.sshSysDsaPubFile):
-			raise SnModuleInstanceInitException("server dsa private key file does not exist")
+			raise SnModuleInstanceException("server dsa private key file does not exist")
 		with open(self.sshSysDsaPubFile, "rt") as f:
 			pubkey = f.read()
 			if not SnUtil.checkSshPubKey(pubkey, "dsa", "root", self.getHostName()):
-				raise SnModuleInstanceInitException("server dsa public key file is invalid")
+				raise SnModuleInstanceException("server dsa public key file is invalid")
 
 		if not os.path.exists(self.sshSysEcdsaPrivFile):
-			raise SnModuleInstanceInitException("server ecdsa private key file does not exist")
+			raise SnModuleInstanceException("server ecdsa private key file does not exist")
 		if not os.path.exists(self.sshSysEcdsaPubFile):
-			raise SnModuleInstanceInitException("server ecdsa private key file does not exist")
+			raise SnModuleInstanceException("server ecdsa private key file does not exist")
 		with open(self.sshSysEcdsaPubFile, "rt") as f:
 			pubkey = f.read()
 			if not SnUtil.checkSshPubKey(pubkey, "ecdsa", "root", self.getHostName()):
-				raise SnModuleInstanceInitException("server ecdsa public key file is invalid")
+				raise SnModuleInstanceException("server ecdsa public key file is invalid")
 
 	def _getAddrList(self):
 		ret = []

@@ -13,7 +13,7 @@ from sn_util import SnSleepNotifier
 from sn_conn_local import SnLocalServer
 from sn_module import SnModuleInstance
 from sn_module import SnModuleInstanceInitParam
-from sn_module import SnModuleInstanceInitException
+from sn_module import SnModuleInstanceException
 
 # fixme: needs to consider user change, both local user change and user change received by peer
 
@@ -309,7 +309,8 @@ class SnLocalManager:
 						SnUtil.euidInvoke(mo.getUserName(), mo.onInit)
 						mo.setState(SnModuleInstance.STATE_INACTIVE)
 						logging.debug("SnLocalManager._getModuleObjDict: mo init end")
-					except SnModuleInstanceInitException as e:
+					except SnModuleInstanceException as e:
+						assert not e.reject
 						mo.setState(SnModuleInstance.STATE_INIT_FAILED)
 						mo.setInitFailMessage(e.message)
 						logging.debug("SnLocalManager._getModuleObjDict: mo init failed, %s", e.message)
@@ -325,7 +326,8 @@ class SnLocalManager:
 							SnUtil.euidInvoke(mo.getUserName(), mo.onInit)
 							mo.setState(SnModuleInstance.STATE_INACTIVE)
 							logging.debug("SnLocalManager._getModuleObjDict: mo init end")
-						except SnModuleInstanceInitException as e:
+						except SnModuleInstanceException as e:
+							assert not e.reject
 							mo.setState(SnModuleInstance.STATE_INIT_FAILED)
 							mo.setInitFailMessage(e.message)
 							logging.debug("SnLocalManager._getModuleObjDict: mo init failed, %s", e.message)
