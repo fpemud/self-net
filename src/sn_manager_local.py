@@ -109,64 +109,77 @@ class SnLocalManager:
 
 		# no peer module
 		for mo in self.moduleObjDict[peerName]:
-			if not self._matchPeerModuleList(peerInfo, mo):
-				if mo.getState() == SnModuleInstance.STATE_ACTIVE:
-					logging.debug("SnLocalManager.onPeerChange: mo active -> inactive start, %s, %s, %s", peerName, mo.getUserName(), mo.getModuleName())
-					try:
-						SnUtil.euidInvoke(mo.getUserName(), mo.onInactive)
-						shutil.rmtree(mo.getInitParam().tmpDir, True)
-						mo.setState(SnModuleInstance.STATE_INACTIVE)
-						logging.debug("SnLocalManager.onPeerChange: mo active -> inactive end")
-					except Exception as e:
-						mo.setFailMessage(e.message)
-						mo.setState(SnModuleInstance.STATE_EXCEPT)
-						logging.debug("SnLocalManager.onPeerChange: mo onInactive failed, %s, %s", e.__class__, e)
-				elif mo.getState() == SnModuleInstance.STATE_INACTIVE:
-					pass
-				elif mo.getState() == SnModuleInstance.STATE_REJECT:
-					logging.debug("SnLocalManager.onPeerChange: mo reject -> inactive start, %s, %s, %s", peerName, mo.getUserName(), mo.getModuleName())
-					mo.setFailMessage("")
+			# find module in peerInfo
+			match = False
+			for mio in peerInfo.moduleList:
+				if mo.getUserName() == mio.userName and mo.getModuleName() == self._getMappedModuleName(mio.moduleName):
+					match = True
+					break
+			if match:
+				continue
+
+			# found none
+			if mo.getState() == SnModuleInstance.STATE_ACTIVE:
+				logging.debug("SnLocalManager.onPeerChange: mo active -> inactive start, %s, %s, %s", peerName, mo.getUserName(), mo.getModuleName())
+				try:
 					mo.setState(SnModuleInstance.STATE_INACTIVE)
-					logging.debug("SnLocalManager.onPeerChange: mo reject -> inactive end")
-				elif mo.getState() == SnModuleInstance.STATE_PEER_REJECT:
-					logging.debug("SnLocalManager.onPeerChange: mo peer_reject -> inactive start, %s, %s, %s", peerName, mo.getUserName(), mo.getModuleName())
-					mo.setFailMessage("")
-					mo.setState(SnModuleInstance.STATE_INACTIVE)
-					logging.debug("SnLocalManager.onPeerChange: mo peer_reject -> inactive end")
-				elif mo.getState() == SnModuleInstance.STATE_EXCEPT:
-					pass
-				elif mo.getState() == SnModuleInstance.STATE_PEER_EXCEPT:
-					logging.debug("SnLocalManager.onPeerChange: mo peer_except -> inactive start, %s, %s, %s", peerName, mo.getUserName(), mo.getModuleName())
-					mo.setFailMessage("")
-					mo.setState(SnModuleInstance.STATE_INACTIVE)
-					logging.debug("SnLocalManager.onPeerChange: mo peer_except -> inactive end")
-				else:
-					assert False
+					SnUtil.euidInvoke(mo.getUserName(), mo.onInactive)
+					shutil.rmtree(mo.getInitParam().tmpDir, True)
+					logging.debug("SnLocalManager.onPeerChange: mo active -> inactive end")
+				except Exception as e:
+					mo.setFailMessage(e.message)
+					mo.setState(SnModuleInstance.STATE_EXCEPT)
+					logging.debug("SnLocalManager.onPeerChange: mo onInactive failed, %s, %s", e.__class__, e)
+			elif mo.getState() == SnModuleInstance.STATE_INACTIVE:
+				pass
+			elif mo.getState() == SnModuleInstance.STATE_REJECT:
+				logging.debug("SnLocalManager.onPeerChange: mo reject -> inactive start, %s, %s, %s", peerName, mo.getUserName(), mo.getModuleName())
+				mo.setFailMessage("")
+				mo.setState(SnModuleInstance.STATE_INACTIVE)
+				logging.debug("SnLocalManager.onPeerChange: mo reject -> inactive end")
+			elif mo.getState() == SnModuleInstance.STATE_PEER_REJECT:
+				logging.debug("SnLocalManager.onPeerChange: mo peer_reject -> inactive start, %s, %s, %s", peerName, mo.getUserName(), mo.getModuleName())
+				mo.setFailMessage("")
+				mo.setState(SnModuleInstance.STATE_INACTIVE)
+				logging.debug("SnLocalManager.onPeerChange: mo peer_reject -> inactive end")
+			elif mo.getState() == SnModuleInstance.STATE_EXCEPT:
+				pass
+			elif mo.getState() == SnModuleInstance.STATE_PEER_EXCEPT:
+				logging.debug("SnLocalManager.onPeerChange: mo peer_except -> inactive start, %s, %s, %s", peerName, mo.getUserName(), mo.getModuleName())
+				mo.setFailMessage("")
+				mo.setState(SnModuleInstance.STATE_INACTIVE)
+				logging.debug("SnLocalManager.onPeerChange: mo peer_except -> inactive end")
+			else:
+				assert False
 
 		# has peer module
 		for mio in peerInfo.moduleList:
-			mo = self._findModuleList(self.moduleObjDict[peerName], mio)
-			if mo is not None:
-				if mo.getState() == SnModuleInstance.STATE_ACTIVE:
-					pass
-				elif mo.getState() == SnModuleInstance.STATE_INACTIVE:
-					logging.debug("SnLocalManager.onPeerChange: mo inactive -> active start, %s, %s, %s", peerName, mo.getUserName(), mo.getModuleName())
-					try:
-						mo.setState(SnModuleInstance.STATE_ACTIVE)
-						SnUtil.euidInvoke(mo.getUserName(), mo.onActive)
-						logging.debug("SnLocalManager.onPeerChange: mo inactive -> active end")
-					except Exception as e:
-						self._sendExcept(peerName, mo.getUserName(), mo.getModuleName(), e.message)				# fixme 这里有一个设计缺陷，应该将模块状态通过PeerInfo通知对端
-				elif mo.getState() == SnModuleInstance.STATE_REJECT:
-					pass
-				elif mo.getState() == SnModuleInstance.STATE_PEER_REJECT:
-					pass
-				elif mo.getState() == SnModuleInstance.STATE_EXCEPT:
-					pass
-				elif mo.getState() == SnModuleInstance.STATE_PEER_EXCEPT:
-					pass
-				else:
-					assert False
+			mo = self._findModuleMapped(peerName, mio.userName, mio.moduleName)
+			if mo is None:
+				continue
+
+			# found module
+			if mo.getState() == SnModuleInstance.STATE_ACTIVE:
+				pass
+			elif mo.getState() == SnModuleInstance.STATE_INACTIVE:
+				logging.debug("SnLocalManager.onPeerChange: mo inactive -> active start, %s, %s, %s", peerName, mo.getUserName(), mo.getModuleName())
+				try:
+					mo.setState(SnModuleInstance.STATE_ACTIVE)
+					SnUtil.euidInvoke(mo.getUserName(), mo.onActive)
+					logging.debug("SnLocalManager.onPeerChange: mo inactive -> active end")
+				except Exception as e:
+					self._toExceptWithMessage(peerName, mo, e.message)
+					logging.debug("SnLocalManager.onPeerChange: mo onActive failed, %s, %s", e.__class__, e)
+			elif mo.getState() == SnModuleInstance.STATE_REJECT:
+				pass
+			elif mo.getState() == SnModuleInstance.STATE_PEER_REJECT:
+				pass
+			elif mo.getState() == SnModuleInstance.STATE_EXCEPT:
+				pass
+			elif mo.getState() == SnModuleInstance.STATE_PEER_EXCEPT:
+				pass
+			else:
+				assert False
 
 		logging.debug("SnLocalManager.onPeerChange: End")
 		return
@@ -178,9 +191,9 @@ class SnLocalManager:
 			if mo.getState() == SnModuleInstance.STATE_ACTIVE:
 				logging.debug("SnLocalManager.onPeerRemove: mo active -> inactive start, %s, %s, %s", peerName, mo.getUserName(), mo.getModuleName())
 				try:
+					mo.setState(SnModuleInstance.STATE_INACTIVE)
 					SnUtil.euidInvoke(mo.getUserName(), mo.onInactive)
 					shutil.rmtree(mo.getInitParam().tmpDir, True)
-					mo.setState(SnModuleInstance.STATE_INACTIVE)
 					logging.debug("SnLocalManager.onPeerRemove: mo active -> inactive end")
 				except Exception as e:
 					mo.setFailMessage(e.message)
@@ -214,37 +227,39 @@ class SnLocalManager:
 	def onPacketRecv(self, peerName, userName, srcModuleName, data):
 		logging.debug("SnLocalManager.onPacketRecv: Start, %s, %s, %s", peerName, userName, srcModuleName)
 
-		moduleName = self._getMappedModuleName(srcModuleName)
-		for mo in self.moduleObjDict[peerName]:
-			if mo.getUserName() == userName and mo.getModuleName() == moduleName:
-				assert mo.getState() == SnModuleInstance.STATE_ACTIVE
+		mo = self._getModuleMapped(peerName, userName, srcModuleName)
+		assert mo.getState() == SnModuleInstance.STATE_ACTIVE
 
-				if self._typeCheck(data, SnDataPacketReject):
-					try:
-						SnUtil.euidInvoke(mo.getUserName(), mo.onInactive)
-						shutil.rmtree(mo.getInitParam().tmpDir, True)
-						mo.setFailMessage(data.message)
-						mo.setState(SnModuleInstance.STATE_PEER_REJECT)
-					except Exception as e:
-						self._sendExcept(peerName, mo.getUserName(), mo.getModuleName(), e.message)
-				elif self._typeCheck(data, SnDataPacketExcept):
-					try:
-						SnUtil.euidInvoke(mo.getUserName(), mo.onInactive)
-						shutil.rmtree(mo.getInitParam().tmpDir, True)
-						mo.setState(SnModuleInstance.STATE_PEER_EXCEPT)
-					except Exception as e:
-						self._sendExcept(peerName, mo.getUserName(), mo.getModuleName(), e.message)
-				else:
-					try:
-						SnUtil.euidInvoke(mo.getUserName(), mo.onRecv, data)
-					except SnRejectException as e:
-						self._sendReject(peerName, mo.getUserName(), mo.getModuleName(), e.message)
-					except Exception as e:
-						self._sendExcept(peerName, mo.getUserName(), mo.getModuleName(), e.message)
+		if self._typeCheck(data, SnDataPacketReject):
+			try:
+				mo.setFailMessage(data.message)
+				mo.setState(SnModuleInstance.STATE_PEER_REJECT)
+				SnUtil.euidInvoke(mo.getUserName(), mo.onInactive)
+				shutil.rmtree(mo.getInitParam().tmpDir, True)
+			except Exception as e:
+				mo.setFailMessage(e.message)
+				mo.setState(SnModuleInstance.STATE_EXCEPT)
+				logging.debug("SnLocalManager.onPacketRecv: mo onInactive failed, %s, %s", e.__class__, e)
+		elif self._typeCheck(data, SnDataPacketExcept):
+			try:
+				mo.setState(SnModuleInstance.STATE_PEER_EXCEPT)
+				SnUtil.euidInvoke(mo.getUserName(), mo.onInactive)
+				shutil.rmtree(mo.getInitParam().tmpDir, True)
+			except Exception as e:
+				mo.setFailMessage(e.message)
+				mo.setState(SnModuleInstance.STATE_EXCEPT)
+				logging.debug("SnLocalManager.onPacketRecv: mo onInactive failed, %s, %s", e.__class__, e)
+		else:
+			try:
+				SnUtil.euidInvoke(mo.getUserName(), mo.onRecv, data)
+			except SnRejectException as e:
+				self._toRejectWithMessage(peerName, mo, e.message)
+				logging.debug("SnLocalManager.onPacketRecv: mo onRecv failed, %s, %s", e.__class__, e)
+			except Exception as e:
+				self._toExceptWithMessage(peerName, mo, e.message)
+				logging.debug("SnLocalManager.onPacketRecv: mo onRecv failed, %s, %s", e.__class__, e)
 
-				logging.debug("SnLocalManager.onPacketRecv: End")
-				return
-		assert False
+		logging.debug("SnLocalManager.onPacketRecv: End")
 
 	def onBeforeSleep(self, sleepType):
 		pass
@@ -276,49 +291,42 @@ class SnLocalManager:
 		else:
 			self.param.peerManager._sendDataObject(peerName, userName, moduleName, obj)
 
-	def _sendReject(self, peerName, userName, moduleName, rejectMessage):
-		# record to log
-		logging.warning("send reject, module closing gracefully, %s, %s, %s, %s", peerName, userName, moduleName, rejectMessage)
+	def _toRejectWithMessage(self, peerName, mo, failMessage):
+		try:
+			mo.setFailMessage(failMessage)
+			mo.setState(SnModuleInstance.STATE_REJECT)
+			SnUtil.euidInvoke(mo.getUserName(), mo.onInactive)
+			shutil.rmtree(mo.getInitParam().tmpDir, True)
+			self._sendReject(peerName, mo.getUserName(), mo.getModuleName(), failMessage)
+		except Exception as e:
+			mo.setFailMessage(e.message)
+			mo.setState(SnModuleInstance.STATE_EXCEPT)
+			logging.debug("SnLocalManager._toReject: mo onInactive failed, %s, %s", e.__class__, e)
+			self._sendExcept(peerName, mo.getUserName(), mo.getModuleName())
 
-		# send reject message
-		rejectObj = SnDataPacketReject()
-		rejectObj.message = rejectMessage
+	def _toExceptWithMessage(self, peerName, mo, failMessage):
+		mo.setFailMessage(failMessage)
+		mo.setState(SnModuleInstance.STATE_EXCEPT)
+		self._sendExcept(peerName, mo.getUserName(), mo.getModuleName())
+
+	def _sendReject(self, peerName, userName, moduleName, failMessage):
+		logging.warning("send reject, %s, %s, %s, %s", peerName, userName, moduleName, failMessage)
+
+		messageObj = SnDataPacketReject()
+		messageObj.message = failMessage
 		if peerName == socket.gethostname():
-			GLib.idle_add(self._idleLocalPeerRecv, peerName, userName, moduleName, rejectObj)
+			GLib.idle_add(self._idleLocalPeerRecv, peerName, userName, moduleName, messageObj)
 		else:
-			self.param.peerManager._sendDataObject(peerName, userName, moduleName, rejectObj)
+			self.param.peerManager._sendDataObject(peerName, userName, moduleName, messageObj)
 
-		GLib.idle_add(self._gcComplete, peerName, userName, moduleName, SnModuleInstance.STATE_REJECT, rejectMessage)
+	def _sendExcept(self, peerName, userName, moduleName):
+		logging.warning("send except, %s, %s, %s, %s", peerName, userName, moduleName, failMessage)
 
-	def _sendExcept(self, peerName, userName, moduleName, exceptMessage):
-		# record to log
-		logging.warning("send except, module closing gracefully, %s, %s, %s", peerName, userName, moduleName)
-
-		# send except message
-		exceptObj = SnDataPacketExcept()
+		messageObj = SnDataPacketExcept()
 		if peerName == socket.gethostname():
-			GLib.idle_add(self._idleLocalPeerRecv, peerName, userName, moduleName, exceptObj)
+			GLib.idle_add(self._idleLocalPeerRecv, peerName, userName, moduleName, messageObj)
 		else:
-			self.param.peerManager._sendDataObject(peerName, userName, moduleName, exceptObj)
-
-		GLib.idle_add(self._gcComplete, peerName, userName, moduleName, SnModuleInstance.STATE_EXCEPT, exceptMessage)
-
-	def _gcComplete(self, peerName, userName, moduleName, newState, failMessage):
-		logging.warning("module graceful close complete, %s, %s, %s", peerName, userName, moduleName)
-
-		for mo in self.moduleObjDict[peerName]:
-			if mo.getUserName() == userName and mo.getModuleName() == moduleName:
-				try:
-					SnUtil.euidInvoke(mo.getUserName(), mo.onInactive)
-					shutil.rmtree(mo.getInitParam().tmpDir, True)
-					mo.setFailMessage(failMessage)
-					mo.setState(newState)
-				except Exception as e:
-					mo.setFailMessage(e.message)
-					mo.setState(SnModuleInstance.STATE_EXCEPT)
-					logging.debug("SnLocalManager._gcComplete: mo onInactive failed, %s, %s", e.__class__, e)
-				return False
-		assert False
+			self.param.peerManager._sendDataObject(peerName, userName, moduleName, messageObj)
 
 	def _idleLocalPeerActive(self):
 		if socket.gethostname() in self.moduleObjDict:
@@ -412,17 +420,27 @@ class SnLocalManager:
 
 		return ret
 
-	def _matchPeerModuleList(self, peerInfo, mo):
-		for mio in peerInfo.moduleList:
-			if mo.getUserName() == mio.userName and mo.getModuleName() == self._getMappedModuleName(mio.moduleName):
-				return True
-		return False
+	def _getModule(self, peerName, userName, moduleName):
+		for mo in self.moduleObjDict[peerName]:
+			if mo.getUserName() == userName and mo.getModuleName() == moduleName:
+				return mo
+		assert False
 
-	def _findModuleList(self, moduleObjList, mio):
-		for mo in moduleObjList:
-			if mo.getUserName() == mio.userName and mo.getModuleName() == self._getMappedModuleName(mio.moduleName):
+	def _findModuleMapped(self, peerName, userName, srcModuleName):
+		for mo in self.moduleObjDict[peerName]:
+			if mo.getUserName() == userName and mo.getModuleName() == self._getMappedModuleName(srcModuleName)::
 				return mo
 		return None
+
+	def _matchModuleMapped(self, peerName, userName, srcModuleName):
+		ret = self._findModuleMapped(peerName, userName, srcModuleName)
+		return ret is not None
+
+	def _getModuleMapped(self, peerName, userName, srcModuleName):
+		ret = self._findModuleMapped(peerName, userName, srcModuleName)
+		assert ret is not None
+		return ret
+
 
 	def _newInitParamSys(self, mname, minfo, pname):
 		ret = SnModuleInstanceInitParam()

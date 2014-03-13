@@ -33,16 +33,17 @@ ModuleInstance FSM trigger table:
 """
 
 """
-ModuleInstance FSM callback table:
+ModuleInstance FSM event callback table:
 
-  STATE_NONE     -> STATE_INACTIVE    : call onInit
-  STATE_INACTIVE -> STATE_ACTIVE      : call onActive
-  STATE_ACTIVE   -> STATE_INACTIVE    : call onInactive
-  STATE_ACTIVE   -> STATE_REJECT      : call onInactive
-  STATE_ACTIVE   -> STATE_PEER_REJECT : call onInactive
-  STATE_ACTIVE   -> STATE_EXCEPT      : call onInactive
-  STATE_ACTIVE   -> STATE_PEER_EXCEPT : call onInactive
-  STATE_ACTIVE                        : call onRecv when data received
+  STATE_NONE     -> STATE_INACTIVE    : call onInit        BEFORE state change
+  STATE_INACTIVE -> STATE_ACTIVE      : call onActive      AFTER state change
+  STATE_ACTIVE   -> STATE_INACTIVE    : call onInactive    AFTER state change
+  STATE_ACTIVE   -> STATE_REJECT      : call onInactive    AFTER state change
+  STATE_ACTIVE   -> STATE_PEER_REJECT : call onInactive    AFTER state change
+  STATE_ACTIVE   -> STATE_EXCEPT      : call onInactive    AFTER state change
+  STATE_ACTIVE   -> STATE_PEER_EXCEPT : call onInactive    AFTER state change
+
+The concept is: module has no way to control the state change, it can only respond to it.
 """
 
 import os
