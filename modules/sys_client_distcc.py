@@ -5,7 +5,7 @@ import os
 from sn_util import SnUtil
 from sn_module import SnModule
 from sn_module import SnModuleInstance
-from sn_module import SnModuleInstanceException
+from sn_module import SnRejectException
 
 class ModuleObject(SnModule):
 
@@ -27,7 +27,7 @@ class ModuleInstanceObject(SnModuleInstance):
 
 		# check distcc config
 		if not os.path.isdir(self.cfgDir):
-			raise SnModuleInstanceException("distcc configuration directory does not exist")
+			raise Exception("distcc configuration directory does not exist")
 
 		# initialize distcc hosts file
 		if not os.path.exists(self.hostsFile):
@@ -40,16 +40,13 @@ class ModuleInstanceObject(SnModuleInstance):
 	def onInactive(self):
 		self._cleanup()
 
-	def onReject(self, rejectMessage):
-		return
-
 	def onRecv(self, dataObj):
 		if dataObj.__class__.__name__ == "_DistccServerObject":
 			# add peer to distcc configuration file
 			cfgFile = ConfigFile(self.hostsFile)
 			cfgFile.addHost(ConfigFile.Host(self.getPeerName(), dataObj.jobNumber))
 		else:
-			self.sendReject("invalid data received")
+			raise SnRejectException("invalid data received")
 
 	def _cleanup(self):
 		cfgFile = ConfigFile(self.hostsFile)

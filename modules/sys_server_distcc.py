@@ -22,7 +22,7 @@ class ModuleInstanceObject(SnModuleInstance):
 	def onInit(self):
 		self.cfgDir = "/etc/distcc"
 		if not os.path.isdir(self.cfgDir):
-			raise SnModuleInstanceException("distcc configuration directory does not exist")
+			raise Exception("distcc configuration directory does not exist")
 
 		return
 
@@ -35,12 +35,8 @@ class ModuleInstanceObject(SnModuleInstance):
 	def onInactive(self):
 		return
 
-	def onReject(self, rejectMessage):
-		return
-
 	def onRecv(self, dataObj):
-		self.sendReject("receive client data")
-
+		raise SnRejectException("receive client data")
 
 class _DistccServerObject:
 	jobNumber = None				# int

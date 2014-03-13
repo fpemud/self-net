@@ -16,12 +16,20 @@ ModuleInstance FSM trigger table:
 
   STATE_NONE is the initial state.
 
-  STATE_NONE     -> STATE_INIT_FAILED : initializing failed
-  STATE_NONE     -> STATE_INACTIVE    : initialized
-  STATE_INACTIVE -> STATE_ACTIVE      : peer added, peer module added
-  STATE_ACTIVE   -> STATE_INACTIVE    : peer removed, peer module removed
-  STATE_ACTIVE   -> STATE_REJECT      : reject sent, reject received
-  STATE_REJECT   -> STATE_INACTIVE    : peer removed, peer module removed
+  STATE_NONE        -> STATE_INACTIVE    : initialized
+  STATE_INACTIVE    -> STATE_ACTIVE      : peer added, peer module added
+  STATE_ACTIVE      -> STATE_INACTIVE    : peer removed, peer module removed
+
+  STATE_ACTIVE      -> STATE_REJECT      : onRecv raise SnRejectException
+  STATE_ACTIVE      -> STATE_PEER_REJECT : reject received
+  STATE_REJECT      -> STATE_INACTIVE    : peer removed, peer module removed
+  STATE_PEER_REJECT -> STATE_INACTIVE    : peer removed, peer module removed
+
+  STATE_NONE        -> STATE_EXCEPT      : onInit raise exception
+  STATE_INACTIVE    -> STATE_EXCEPT      : onActive raise exception
+  STATE_ACTIVE      -> STATE_EXCEPT      : onRecv / onInactive raise exception
+  STATE_ACTIVE      -> STATE_PEER_EXCEPT : except received
+  STATE_PEER_EXCEPT -> STATE_INACTIVE    : peer removed, peer module removed
 """
 
 """
@@ -31,8 +39,10 @@ ModuleInstance FSM callback table:
   STATE_INACTIVE -> STATE_ACTIVE      : call onActive
   STATE_ACTIVE   -> STATE_INACTIVE    : call onInactive
   STATE_ACTIVE   -> STATE_REJECT      : call onInactive
+  STATE_ACTIVE   -> STATE_PEER_REJECT : call onInactive
+  STATE_ACTIVE   -> STATE_EXCEPT      : call onInactive
+  STATE_ACTIVE   -> STATE_PEER_EXCEPT : call onInactive
   STATE_ACTIVE                        : call onRecv when data received
-  STATE_ACTIVE                        : call onReject when reject received
 """
 
 import os
@@ -51,10 +61,12 @@ class SnModule:
 class SnModuleInstance:
 
 	STATE_NONE = 0
-	STATE_INIT_FAILED = 1
-	STATE_INACTIVE = 2
-	STATE_ACTIVE = 3
-	STATE_REJECT = 4
+	STATE_INACTIVE = 1
+	STATE_ACTIVE = 2
+	STATE_REJECT = 3
+	STATE_PEER_REJECT = 4
+	STATE_EXCEPT = 5
+	STATE_PEER_EXCEPT = 6
 
 	WORK_STATE_IDLE = 0
 	WORK_STATE_WORKING = 1
@@ -73,7 +85,7 @@ class SnModuleInstance:
 
 		self.state = self.STATE_NONE
 		self.workState = self.WORK_STATE_IDLE
-		self.initFailMessage = ""
+		self.failMessage = ""					# reject / except message
 
 	##### provide to subclass ####
 
@@ -106,9 +118,6 @@ class SnModuleInstance:
 	def sendObject(self, obj):
 		self.coreObj._sendObject(self.peerName, self.userName, self.classObj.getModuleName(), obj)
 
-	def sendReject(self, rejectMessage):
-		self.coreObj._sendReject(self.peerName, self.userName, self.classObj.getModuleName(), rejectMessage)
-
 	def setWorkState(self, workState):
 		self.workState = workState
 
@@ -126,11 +135,11 @@ class SnModuleInstance:
 	def getWorkState(self):
 		return self.workState
 
-	def getInitFailMessage(self):
-		return self.initFailMessage
+	def getFailMessage(self):
+		return self.failMessage
 
-	def setInitFailMessage(self, initFailMessage):
-		self.initFailMessage = initFailMessage
+	def setFailMessage(self, failMessage):
+		self.failMessage = failMessage
 
 	def onInit(self):
 		"""Called after the module instance object is created"""
@@ -142,10 +151,6 @@ class SnModuleInstance:
 
 	def onInactive(self):
 		"""Called before the peer changes to inactive state"""
-		assert False			# implement by subclass
-
-	def onReject(self, rejectMessage):
-		"""Called when rejection is received from the peer"""
 		assert False			# implement by subclass
 
 	def onRecv(self, dataObj):
@@ -160,9 +165,6 @@ class SnModuleInstanceInitParam:
 	userName = None		# str
 	tmpDir = None		# str
 
-class SnModuleInstanceException(Exception):
-
-	def __init__(self, message, reject=False):
-		super(self, SnModuleInstanceException).__init__(self, message)
-		self.reject = reject
+class SnRejectException(Exception):
+	pass
 

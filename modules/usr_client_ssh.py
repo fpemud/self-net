@@ -43,14 +43,10 @@ class ModuleInstanceObject(SnModuleInstance):
 	def onInactive(self):
 		self._cleanup()
 
-	def onReject(self, rejectMessage):
-		return
-
 	def onRecv(self, dataObj):
 		if dataObj.__class__.__name__ == "_SshServerObject":
 			if not SnUtil.checkSshPubKey(dataObj.hostPubkeyEcdsa, "ecdsa", "root", self.getPeerName()):
-				self.sendReject("invalid SshServerObject received")
-				return
+				raise SnRejectException("invalid SshServerObject received")
 
 			nameList = [ self.getPeerName() ]
 			if self.isLocalPeer():
@@ -66,7 +62,7 @@ class ModuleInstanceObject(SnModuleInstance):
 			cfgf.addHost(nameList, dataObj.hostPubkeyEcdsa)
 			cfgf.save()
 		else:
-			self.sendReject("invalid client data received")
+			raise SnRejectException("invalid client data received")
 
 	def _cleanup(self):
 		cfgf = _CfgFileKnownHosts(self.knownHostsFile)
