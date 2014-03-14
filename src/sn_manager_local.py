@@ -441,7 +441,6 @@ class SnLocalManager:
 		assert ret is not None
 		return ret
 
-
 	def _newInitParamSys(self, mname, minfo, pname):
 		ret = SnModuleInstanceInitParam()
 		ret.coreObj = self

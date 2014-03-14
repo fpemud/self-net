@@ -14,9 +14,9 @@ Replace "-" with "_" can selfnet module name be converted to python module name.
 """
 ModuleInstance FSM trigger table:
 
-  STATE_NONE is the initial state.
+  STATE_INIT is the initial state.
 
-  STATE_NONE        -> STATE_INACTIVE    : initialized
+  STATE_INIT        -> STATE_INACTIVE    : initialized
   STATE_INACTIVE    -> STATE_ACTIVE      : peer added, peer module added
   STATE_ACTIVE      -> STATE_INACTIVE    : peer removed, peer module removed
 
@@ -25,7 +25,7 @@ ModuleInstance FSM trigger table:
   STATE_REJECT      -> STATE_INACTIVE    : peer removed, peer module removed
   STATE_PEER_REJECT -> STATE_INACTIVE    : peer removed, peer module removed
 
-  STATE_NONE        -> STATE_EXCEPT      : onInit raise exception
+  STATE_INIT        -> STATE_EXCEPT      : onInit raise exception
   STATE_INACTIVE    -> STATE_EXCEPT      : onActive raise exception
   STATE_ACTIVE      -> STATE_EXCEPT      : onRecv / onInactive raise exception
   STATE_ACTIVE      -> STATE_PEER_EXCEPT : except received
@@ -35,7 +35,7 @@ ModuleInstance FSM trigger table:
 """
 ModuleInstance FSM event callback table:
 
-  STATE_NONE     -> STATE_INACTIVE    : call onInit        BEFORE state change
+  STATE_INIT     -> STATE_INACTIVE    : call onInit        BEFORE state change
   STATE_INACTIVE -> STATE_ACTIVE      : call onActive      AFTER state change
   STATE_ACTIVE   -> STATE_INACTIVE    : call onInactive    AFTER state change
   STATE_ACTIVE   -> STATE_REJECT      : call onInactive    AFTER state change
@@ -61,7 +61,7 @@ class SnModule:
 
 class SnModuleInstance:
 
-	STATE_NONE = 0
+	STATE_INIT = 0
 	STATE_INACTIVE = 1
 	STATE_ACTIVE = 2
 	STATE_REJECT = 3
@@ -84,7 +84,7 @@ class SnModuleInstance:
 		self.userName = initParam.userName
 		self.tmpDir = initParam.tmpDir
 
-		self.state = self.STATE_NONE
+		self.state = self.STATE_INIT
 		self.workState = self.WORK_STATE_IDLE
 		self.failMessage = ""					# reject / except message
 
