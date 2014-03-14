@@ -9,6 +9,7 @@ from gi.repository import GObject
 from sn_util import SnUtil
 from sn_manager_local import SnLocalManager
 from sn_manager_peer import SnPeerManager
+from sn_module import SnModuleInstance
 
 ################################################################################
 # DBus API Docs
@@ -20,9 +21,11 @@ from sn_manager_peer import SnPeerManager
 # Object path           /
 #
 # Methods:
-# str               GetWorkState()
-# array<peerId:int> GetPeerList()
-# peerId:int        GetPeerByName(peerName:str)
+# str                 GetWorkState()
+# array<peerId:int>   GetPeerList()
+# peerId:int          GetPeer(peerName:str)
+# array<moduleId:int> GetModuleList()
+# moduleId:int        GetModule(peerName:str, userName:str, moduleName:str)
 #
 # Signals:
 # WorkStateChanged(newWorkState:str)
@@ -40,18 +43,39 @@ from sn_manager_peer import SnPeerManager
 # Signals:
 # PowerStateChanged(newPowerState:str)
 #
+# ==== Module ====
+# Service               org.fpemud.SelfNet
+# Interface             org.fpemud.SelfNet.Module
+# Object path           /Modules/{moduleId:int}
+#
+# Methods:
+# str:str:str       GetKey()
+# str:str           GetState()
+#
+# Signals:
+# ModuleStateChanged(newModuleState:str)
+#
 
 class DbusMainObject(dbus.service.Object):
 
 	def __init__(self, param):
 		self.param = param
 		self.peerList = []
+		self.moduleList = []
 
 		# initialize peer list
 		i = 0
 		for pn in self.param.peerManager.getPeerNameList():
 			po = DbusPeerObject(self.param, i, pn)
 			self.peerList.append(po)
+			i = i + 1
+
+		# initialize module list
+		i = 0
+		for mk in self.param.localManager.getModuleKeyList():
+			peerName, userName, moduleName = mk
+			mo = DbusModuleObject(self.param, i, peerName, userName, moduleName)
+			self.moduleList.append(mo)
 			i = i + 1
 
 		# register dbus object path
@@ -79,10 +103,25 @@ class DbusMainObject(dbus.service.Object):
 		return ret
 
 	@dbus.service.method('org.fpemud.SelfNet', in_signature='s', out_signature='i')
-	def GetPeerByName(self, peerName):
+	def GetPeer(self, peerName):
 		for po in self.peerList:
 			if peerName == po.peerName:
 				return po.peerId
+		return -1
+
+	@dbus.service.method('org.fpemud.SelfNet', in_signature='', out_signature='ai')
+	def GetModuleList(self):
+		ret = []
+		for mo in self.moduleList:
+			ret.append(mo.moduleId)
+		return ret
+
+	@dbus.service.method('org.fpemud.SelfNet', in_signature='sss', out_signature='i')
+	def GetModule(self, peerName, userName, moduleName):
+		for mo in self.moduleList:
+			if (peerName == mo.peerName and moduleName == mo.moduleName and
+					(userName == mo.userName or (usrName == "" and mo.userName is None))):
+				return mo.moduleId
 		return -1
 
 	@dbus.service.signal('org.fpemud.SelfNet', signature='s')
@@ -98,7 +137,7 @@ class DbusPeerObject(dbus.service.Object):
 
 		# register dbus object path
 		bus_name = dbus.service.BusName('org.fpemud.SelfNet', bus=dbus.SystemBus())
-		dbus.service.Object.__init__(self, bus_name, '/org/fpemud/SelfNet/Peer/%d'%(self.peerId))
+		dbus.service.Object.__init__(self, bus_name, '/org/fpemud/SelfNet/Peers/%d'%(self.peerId))
 
 	def release(self):
 		self.remove_from_connection()
@@ -135,4 +174,44 @@ class DbusPeerObject(dbus.service.Object):
 	@dbus.service.signal('org.fpemud.SelfNet.Peer', signature='s')
 	def PowerStateChanged(self, newPowerState):
 		pass
+
+class DbusModuleObject(dbus.service.Object):
+	"""For sys module, userName == '' """
+
+	def __init__(self, param, moduleId, peerName, userName, moduleName):
+		self.param = param
+		self.moduleId = moduleId
+		self.peerName = peerName
+		self.userName = userName
+		self.moduleName = moduleName
+
+		# register dbus object path
+		bus_name = dbus.service.BusName('org.fpemud.SelfNet', bus=dbus.SystemBus())
+		dbus.service.Object.__init__(self, bus_name, '/org/fpemud/SelfNet/Modules/%d'%(self.moduleId))
+
+	def release(self):
+		self.remove_from_connection()
+
+	@dbus.service.method('org.fpemud.SelfNet.Module', sender_keyword='sender',
+	                     in_signature='', out_signature='(sss)')
+	def GetKey(self, sender=None):
+		userName = ""
+		if self.userName is not None:
+			userName = self.userName
+		return (self.peerName, userName, self.moduleName)
+
+	@dbus.service.method('org.fpemud.SelfNet.Module', sender_keyword='sender',
+	                     in_signature='', out_signature='(ss)')
+	def GetState(self, sender=None):
+		moduleStateDict = {
+			SnModuleInstance.STATE_INIT: "init",
+			SnModuleInstance.STATE_INACTIVE: "inactive",
+			SnModuleInstance.STATE_ACTIVE: "active",
+			SnModuleInstance.STATE_REJECT: "reject",
+			SnModuleInstance.STATE_PEER_REJECT: "peer-reject",
+			SnModuleInstance.STATE_EXCEPT: "except",
+			SnModuleInstance.STATE_PEER_EXCEPT: "peer-except",
+		}
+		state, failMessage = self.param.localManager.getModuleState(self.peerName, self.userName, self.moduleName)
+		return (moduleStateDict[state], failMessage)
 

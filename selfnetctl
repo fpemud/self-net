@@ -48,6 +48,9 @@ def parseArgs():
 	apOpHybridSleep.set_defaults(subcmd="hybrid-sleep")
 	apOpHybridSleep.add_argument("peerName")
 
+	apListModule = subParsers.add_parser("list-modules")
+	apListModule.set_defaults(subcmd="list_modules")
+
 	return argParser.parse_args()
 
 ################################################################################
@@ -64,6 +67,8 @@ elif parseResult.subcmd == "list_peers":
 	SnSubCmdMain(param).listPeers()
 elif parseResult.subcmd in [ "poweron", "poweroff", "reboot", "suspend", "hibernate", "hybrid-sleep" ]:
 	SnSubCmdMain(param).peerPowerOperation(parseResult.peerName, parseResult.subcmd)
+elif parseResult.subcmd == "list_modules":
+	SnSubCmdMain(param).listModules()
 else:
 	assert False
 

@@ -196,10 +196,10 @@ class SnConfigManager:
 			if re.match("[A-Za-z0-9_]+", moduleId) is None:
 				raise Exception("Invalid module id for module name \"%s\""%(m))
 
-			try:
-				exec("from %s import ModuleObject"%(m.replace("-", "_")))
-			except ImportError:
-				raise Exception("Module \"%s\" does not exists"%(m))
+#			try:
+			exec("from %s import ModuleObject"%(m.replace("-", "_")))
+#			except ImportError:
+#				raise Exception("Module \"%s\" does not exists"%(m))
 
 			moduleObj = ModuleObject()
 			if m != moduleObj.getModuleName():

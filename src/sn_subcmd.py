@@ -76,7 +76,7 @@ class SnSubCmdMain:
 			peerName = peerObj.GetName(dbus_interface='org.fpemud.SelfNet.Peer')
 			peerPowerState = peerObj.GetPowerState(dbus_interface='org.fpemud.SelfNet.Peer')
 			print "%s:"%(peerName)
-			print "\tPowerState:\t%s"%(peerPowerState)
+			print "\tPowerState: %s"%(peerPowerState)
 			print ""
 
 	def peerPowerOperation(self, peerName, opName):
@@ -87,6 +87,29 @@ class SnSubCmdMain:
 
 		peerObj = dbus.SystemBus().get_object('org.fpemud.SelfNet', '/org/fpemud/SelfNet/Peers/%d'%(peerId))
 		peerObj.DoPowerOperation(opName, dbus_interface='org.fpemud.SelfNet.Peer')
+
+	def listModules(self):
+		dbusObj = dbus.SystemBus().get_object('org.fpemud.SelfNet', '/org/fpemud/SelfNet')
+		moduleIdList = dbusObj.GetModuleList(dbus_interface='org.fpemud.SelfNet')
+
+		for moduleId in moduleIdList:
+			moduleObj = dbus.SystemBus().get_object('org.fpemud.SelfNet', '/org/fpemud/SelfNet/Modules/%d'%(moduleId))
+			peerName, userName, moduleName = moduleObj.GetKey(dbus_interface='org.fpemud.SelfNet.Module')
+			moduleState, moduleFailMessage = moduleObj.GetState(dbus_interface='org.fpemud.SelfNet.Module')
+
+			if userName != "":
+				print "%s, %s, %s:"%(peerName, userName, moduleName)
+			else:
+				print "%s, %s:"%(peerName, moduleName)
+
+			print "\tState: %s"%(moduleState)
+			if moduleState == "reject" or moduleState == "peer-reject":
+				print "\tReject Message: %s"%(moduleFailMessage)
+			elif moduleState == "except":
+				print "\tTraceback Message:"
+				print SnUtil.addLinePrefix(moduleFailMessage, "\t\t")
+
+			print ""
 
 	def _loadCertAndKey(self, certFile, keyFile):
 		cert = None

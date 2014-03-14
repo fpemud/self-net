@@ -12,6 +12,10 @@ from gi.repository import GLib
 class SnUtil:
 
 	@staticmethod
+	def addLinePrefix(tstr, prefix):
+		return prefix + ("\n" + prefix).join(tstr.split("\n"))
+
+	@staticmethod
 	def getSysctl(name):
 		msg = SnUtil.shell("/sbin/sysctl -n %s"%(name), "stdout")
 		return msg.rstrip('\n')

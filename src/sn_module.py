@@ -138,11 +138,11 @@ class SnModuleInstance:
 		self.state = state
 		self.failMessage = failMessage
 
-	def getWorkState(self):
-		return self.workState
-
 	def getFailMessage(self):
 		return self.failMessage
+
+	def getWorkState(self):
+		return self.workState
 
 	def onInit(self):
 		"""Called after the module instance object is created"""
