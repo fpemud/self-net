@@ -130,17 +130,19 @@ class SnModuleInstance:
 	def getState(self):
 		return self.state
 
-	def setState(self, state):
+	def setState(self, state, failMessage=""):
+		if state in [ self.STATE_REJECT, self.STATE_PEER_REJECT, self.STATE_EXCEPT ]:
+			assert failMessage != ""
+		else:
+			assert failMessage == ""
 		self.state = state
+		self.failMessage = failMessage
 
 	def getWorkState(self):
 		return self.workState
 
 	def getFailMessage(self):
 		return self.failMessage
-
-	def setFailMessage(self, failMessage):
-		self.failMessage = failMessage
 
 	def onInit(self):
 		"""Called after the module instance object is created"""
