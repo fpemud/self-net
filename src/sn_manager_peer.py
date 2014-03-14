@@ -246,11 +246,11 @@ class SnPeerManager:
 			logging.debug("SnPeerManager.onSocketConnected: Fail, error3")
 			return
 
-		# send keep-alive packet for every second, close the connection after 5 failure
+		# send keep-alive packet for every second
 		assert sslSock.getsockopt(socket.SOL_SOCKET, socket.SO_KEEPALIVE) == 0
 		sslSock.setsockopt(socket.IPPROTO_TCP, socket.TCP_KEEPIDLE, 1)
 		sslSock.setsockopt(socket.IPPROTO_TCP, socket.TCP_KEEPINTVL, 1)
-		sslSock.setsockopt(socket.IPPROTO_TCP, socket.TCP_KEEPCNT, 1)
+		sslSock.setsockopt(socket.IPPROTO_TCP, socket.TCP_KEEPCNT, 100)
 		sslSock.setsockopt(socket.SOL_SOCKET, socket.SO_KEEPALIVE, 1)
 
 		# record sock
@@ -303,7 +303,7 @@ class SnPeerManager:
 		oldFsmState = self.peerInfoDict[peerName].fsmState
 		newFsmState = _PeerInfoInternal.STATE_NONE
 		self._peerToShutdown(peerName)
-		logging.info("SnPeerManager.onSocketError: %s", _dbgmsg_peer_state_change(peerName, oldFsmState, newFsmState))
+		logging.info("SnPeerManager.onSocketError: %s, %s", errMsg, _dbgmsg_peer_state_change(peerName, oldFsmState, newFsmState))
 
 		self._timerOperation()
 

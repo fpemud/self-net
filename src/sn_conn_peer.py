@@ -60,34 +60,36 @@ class SnPeerClient:
 	def __init__(self, certFile, privkeyFile, caCertFile, connectFunc):
 		self.handshaker = _HandShaker(certFile, privkeyFile, caCertFile, connectFunc)
 		self.asyncns = libasyncns.Asyncns()
+		self.sockSet = set()
 
 	def dispose(self):
 		self.handshaker.dispose()
 
 	def connect(self, hostname, port):
+		# don't do repeat connect
+		if (hostname, port) in self.sockSet:
+			return
+		self.sockSet.add((hostname, port))
+
+		# do operation
+		logging.debug("SnPeerClient.connect: Start, %s, %d", hostname, port)
 		resq = self.asyncns.getaddrinfo(hostname, None)
-		resq.userdata = { "hostname":hostname, "port":port }
 		self.asyncns.wait(False)
-		GLib.io_add_watch(self.asyncns.get_fd(), GLib.IO_IN | _flagError, self._onResolveComplete)
+		GLib.io_add_watch(self.asyncns.get_fd(), GLib.IO_IN | _flagError, self._onResolveComplete, hostname, port)
 
-	def _onResolveComplete(self, source, cb_condition):
-		logging.debug("SnPeerClient._onResolveComplete: Start, %s", SnUtil.cbConditionToStr(cb_condition))
-
+	def _onResolveComplete(self, source, cb_condition, hostname, port):
 		assert not (cb_condition & _flagError)
 		assert source == self.asyncns.get_fd()
 
 		# get resolve result
-		hostname = None
-		port = None
 		hostaddr = None
 		try:
 			resq = self.asyncns.get_next()
 			assert type(resq) == libasyncns.AddrInfoQuery
-			hostname = resq.userdata["hostname"]
-			port = resq.userdata["port"]
 			hostaddr, dummy = resq.get_done()[0][4]
 		except Exception as e:
-			logging.debug("SnPeerClient._onResolveComplete: Failed, %s, %s", e.__class__, e)
+			self.sockSet.remove((hostname, port))
+			logging.debug("SnPeerClient.connect: Resolve failed, %s, %d, %s, %s", hostname, port, e.__class__, e)
 			return False
 
 		# do connect
@@ -99,14 +101,25 @@ class SnPeerClient:
 			if e.errno == errno.EAGAIN or e.errno == errno.EINPROGRESS:
 				pass
 			else:
-				logging.debug("SnPeerClient._onResolveComplete: Failed, %s, %s", e.__class__, e)
+				self.sockSet.remove((hostname, port))
+				logging.debug("SnPeerClient.connect: Resolve failed, %s, %d, %s, %s", hostname, port, e.__class__, e)
 				sock.close()
 				return False
 
-		# give socket to _HandShaker
-		self.handshaker.addSocket(sock, False, hostname, port)
+		GLib.io_add_watch(sock, GLib.IO_IN | GLib.IO_OUT | _flagError, self._onConnect, hostname, port)
+		return False
 
-		logging.debug("SnPeerClient._onResolveComplete: End")
+	def _onConnect(self, source, cb_condition, hostname, port):
+		self.sockSet.remove((hostname, port))
+
+		if cb_condition & _flagError:
+			source.close()
+			logging.debug("SnPeerClient.connect: Connect failed, %s, %d, %s", hostname, port, SnUtil.cbConditionToStr(cb_condition))
+			return False
+
+		# give socket to _HandShaker
+		self.handshaker.addSocket(source, False, hostname, port)
+		logging.debug("SnPeerClient.connect: Success, %s, %d", hostname, port)
 		return False
 
 class _HandShaker:

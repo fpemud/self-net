@@ -120,7 +120,7 @@ class DbusMainObject(dbus.service.Object):
 	def GetModule(self, peerName, userName, moduleName):
 		for mo in self.moduleList:
 			if (peerName == mo.peerName and moduleName == mo.moduleName and
-					(userName == mo.userName or (usrName == "" and mo.userName is None))):
+					(userName == mo.userName or (userName == "" and mo.userName is None))):
 				return mo.moduleId
 		return -1
 
