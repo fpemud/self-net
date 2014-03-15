@@ -2,22 +2,31 @@
 # -*- coding: utf-8; tab-width: 4; indent-tabs-mode: t -*-
 
 import os
-import sys
-import logging
 import traceback
 import multiprocessing
+from objsocket import objsocket
 from gi.repository import GLib
 
-sys.path.append('/usr/lib/selfnetd')
-sys.path.append('/usr/lib/selfnetd/modules')		# fixme
-from objsocket import objsocket
 from sn_util import SnUtil
 from sn_param import SnParam
 from sn_module import SnRejectException
-from sn_manager_local import _LoSockSendObj
-from sn_manager_local import _LoSockCall
-from sn_manager_local import _LoSockRetn
-from sn_manager_local import _LoSockExcp
+
+class LocalSockSendObj:
+	peerName = None							# str
+	userName = None							# str
+	moduleName = None						# str
+	dataObj = None							# obj
+
+class LocalSockCall:
+	funcName = None							# str
+	funcArgs = None							# list<obj>
+
+class LocalSockRetn:
+	retVal = None							# obj, None means no return value
+
+class LocalSockExcp:
+	excObj = None							# str
+	excInfo = None							# str
 
 class SnSubProcess:
 
@@ -44,7 +53,7 @@ class SnSubProcess:
 
 	def onConnRecv(self, sock, packetObj):
 		assert sock == self.pipeConn
-		self.recvFunc(self, self.peerName, self.userName, self.moduleName, packetObj):
+		self.recvFunc(self, self.peerName, self.userName, self.moduleName, packetObj)
 
 	def onConnError(self, sock, errMsg):
 		assert sock == self.pipeConn
@@ -54,18 +63,18 @@ class SnSubProcess:
 		assert sock == self.pipeConn
 		assert False
 
-def _subproc_main(peerName, userName, moduleName, pipeConn):
+def _subproc_main(peerName, userName, moduleName, tmpDir, pipeConn):
 	# drop priviledge
 	if userName is not None:
 		SnUtil.dropPriviledgeTo(userName)
 
 	mlobj = GLib.MainLoop()
-	_SubprocObject(peerName, userName, moduleName, pipeConn)
+	_SubprocObject(peerName, userName, moduleName, tmpDir, pipeConn)
 	mlobj.run()
 
 class _SubprocObject:
 
-	def __init__(self, peerName, userName, moduleName, pipeConn, tmpDir):
+	def __init__(self, peerName, userName, moduleName, tmpDir, pipeConn):
 		self.peerName = peerName
 		self.userName = userName
 		self.moduleName = moduleName
@@ -79,7 +88,7 @@ class _SubprocObject:
 
 	def onConnRecv(self, sock, packetObj):
 		assert sock == self.connSock
-		assert self._typeCheck(packetObj, _LoSockCall)
+		assert self._typeCheck(packetObj, LocalSockCall)
 
 		if packetObj.funcName in [ "onInit", "onActive", "onInactive" ]:
 			assert len(packetObj.funcArgs) == 0
@@ -107,22 +116,22 @@ class _SubprocObject:
 		assert False
 
 	def _sendRetn(self, retVal):
-		packetObj = _LoSockRetn()
+		packetObj = LocalSockRetn()
 		packetObj.retVal = retVal
 		self.connSock.send(packetObj)
 
 	def _sendExcp(self, excObj, excInfo):
-		packetObj = _LoSockExcp()
+		packetObj = LocalSockExcp()
 		packetObj.excObj = excObj
 		packetObj.excInfo = excInfo
 		self.connSock.send(packetObj)
 
 	def _sendObject(self, peerName, userName, moduleName, obj):
-		packetObj = _LoSockSendObj()
+		packetObj = LocalSockSendObj()
 		packetObj.peerName = peerName
 		packetObj.userName = userName
 		packetObj.moduleName = moduleName
-		packatObj.dataObj = obj
+		packetObj.dataObj = obj
 		self.connSock.send(packetObj)
 
 	def _typeCheck(self, obj, typeobj):

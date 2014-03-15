@@ -73,7 +73,7 @@ class SnPeerClient:
 
 		# do operation
 		logging.debug("SnPeerClient.connect: Start, %s, %d", hostname, port)
-		resq = self.asyncns.getaddrinfo(hostname, None)
+		self.asyncns.getaddrinfo(hostname, None)
 		self.asyncns.wait(False)
 		GLib.io_add_watch(self.asyncns.get_fd(), GLib.IO_IN | _flagError, self._onResolveComplete, hostname, port)
 
@@ -154,7 +154,6 @@ class _HandShaker:
 
 	def _onEvent(self, source, cb_condition):
 		info = self.sockDict[source]
-		oldState = info.state
 
 		try:
 			# check error
@@ -209,7 +208,6 @@ class _HandShaker:
 				del self.sockDict[source]
 				self.connectFunc(info.sslSock)
 				return False
-
 		except _ConnException as e:
 			del self.sockDict[source]
 			source.close()

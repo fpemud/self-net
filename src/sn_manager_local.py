@@ -12,7 +12,10 @@ from gi.repository import GLib
 from sn_util import SnUtil
 from sn_util import SnSleepNotifier
 from sn_sub_proc import SnSubProcess
-from sn_conn_local import SnLocalServer
+from sn_sub_proc import LocalSockSendObj
+from sn_sub_proc import LocalSockCall
+from sn_sub_proc import LocalSockRetn
+from sn_sub_proc import LocalSockExcp
 from sn_module import SnRejectException
 
 """
@@ -113,10 +116,10 @@ class SnLocalManager:
 		# variables
 		self.param = param
 		self.localInfo = self._getLocalInfo()
-		self.moduleObjDict = self._getModuleObjDict()
+		self.moiList = self._getMoiList()
 		self.sleepNotifier = SnSleepNotifier(self.onBeforeSleep, self.onAfterResume)
 
-		# active local peers
+		GLib.idle_add(self._idleInitMoiList)
 		GLib.idle_add(self._idleLocalPeerActive)
 
 		logging.debug("SnLocalManager.__init__: End")
@@ -125,14 +128,8 @@ class SnLocalManager:
 	def dispose(self):
 		logging.debug("SnLocalManager.dispose: Start")
 
-		# set modules of local peer to inactive state
-		if socket.gethostname() in self.moduleObjDict:
-			self.onPeerRemove(socket.gethostname())
-
-		# check modules' state
-		for moiList in self.moduleObjDict.values():
-			for moi in moiList:
-				assert moi.state in [ _ModuleInfoInternal.STATE_EXCEPT, _ModuleInfoInternal.STATE_INACTIVE ]
+		self.onPeerRemove(socket.gethostname())
+		assert all(x for x in self.moiList if x.state in [ _ModuleInfoInternal.STATE_EXCEPT, _ModuleInfoInternal.STATE_INACTIVE ])
 
 		logging.debug("SnLocalManager.dispose: End")
 		return
@@ -141,17 +138,15 @@ class SnLocalManager:
 		return self.localInfo
 
 	def getWorkState(self):
-		for moiList in self.moduleObjDict.values():
-			for moi in moiList:
-				if moi.workState == _ModuleInfoInternal.WORK_STATE_WORKING:
-					return SnLocalManager.WORK_STATE_WORKING
+		for moi in self.moiList:
+			if moi.workState == _ModuleInfoInternal.WORK_STATE_WORKING:
+				return SnLocalManager.WORK_STATE_WORKING
 		return SnLocalManager.WORK_STATE_IDLE
 
 	def getModuleKeyList(self):
 		ret = []
-		for moiList in self.moduleObjDict.values():
-			for moi in moiList:
-				ret.append((moi.peerName, moi.userName, moi.moduleName))
+		for moi in self.moiList:
+			ret.append((moi.peerName, moi.userName, moi.moduleName))
 		return ret
 
 	def getModuleState(self, peerName, userName, moduleName):
@@ -163,7 +158,7 @@ class SnLocalManager:
 	def onPeerChange(self, peerName, peerInfo):
 		logging.debug("SnLocalManager.onPeerChange: Start, %s", peerName)
 
-		for moi in self.moduleObjDict[peerName]:
+		for moi in self.moiList:
 			self._moiPeerUpdate(peerName, peerInfo, moi)
 
 		logging.debug("SnLocalManager.onPeerChange: End")
@@ -172,7 +167,7 @@ class SnLocalManager:
 	def onPeerRemove(self, peerName):
 		logging.debug("SnLocalManager.onPeerRemove: Start, %s", peerName)
 
-		for moi in self.moduleObjDict[peerName]:
+		for moi in self.moiList:
 			self._moiPeerUpdate(peerName, None, moi)
 
 		logging.debug("SnLocalManager.onPeerRemove: End")
@@ -194,11 +189,11 @@ class SnLocalManager:
 
 	def onLocalSockRecv(self, peerName, userName, moduleName, packetObj):
 		moi = self._getMoi(peerName, userName, moduleName)
-		if self._typeCheck(packetObj, _LoSockSendObj):
+		if self._typeCheck(packetObj, LocalSockSendObj):
 			self._sendObject(packetObj.peerName, packetObj.userName, packetObj.moduleName, packetObj.dataObj)
-		elif self._typeCheck(packetObj, _LoSockRetn):
+		elif self._typeCheck(packetObj, LocalSockRetn):
 			self._moiCallFuncReturn(moi, packetObj.retVal)
-		elif self._typeCheck(packetObj, _LoSockExcp):
+		elif self._typeCheck(packetObj, LocalSockExcp):
 			self._moiCallFuncExcept(packetObj, packetObj.excObj, packetObj.excInfo)
 		else:
 			assert False
@@ -244,6 +239,18 @@ class SnLocalManager:
 		self.onPeerSockRecv(peerName, userName, moduleName, data)
 		return False
 
+	def _idleInitMoiList(self):
+		for moi in self.moiList:
+			if not moi.propDict["standalone"]:
+				exec("from %s import ModuleInstanceObject"%(moi.moduleName.replace("-", "_")))
+				moi.mo = ModuleInstanceObject(self, moi.peerName, moi.userName, moi.moduleName, moi.tmpDir)
+			else:
+				moi.proc = SnSubProcess(moi.peerName, moi.userName, moi.moduleName, moi.tmpDir, self.onLocalSockRecv, None)
+				moi.proc.start()
+			moi.state = _ModuleInfoInternal.STATE_INIT
+			moi.failMessage = ""
+			self._moiCallFunc(moi, "onInit")
+
 	def _getLocalInfo(self):
 		pgs = strict_pgs.PasswdGroupShadow("/")
 		ret = SnSysInfo()
@@ -277,15 +284,12 @@ class SnLocalManager:
 
 		return ret
 
-	def _getModuleObjDict(self):
+	def _getMoiList(self):
 		"""Create a full module object collection"""
 
 		pgs = strict_pgs.PasswdGroupShadow("/")
-		ret = dict()
-
-		# create self.moduleObjDict
+		moiList = []
 		for pname in self.param.configManager.getHostNameList():
-			moiList = []
 			for mname in self.param.configManager.getModuleNameList():
 				minfo = self.param.configManager.getModuleInfo(mname)
 				if pname == socket.gethostname() and not minfo.moduleObj.getPropDict()["allow-local-peer"]:
@@ -313,30 +317,16 @@ class SnLocalManager:
 						moi.moduleType = minfo.moduleType
 						moi.moduleId = minfo.moduleId
 						moi.propDict = minfo.moduleObj.getPropDict()
-						moi.tmpDir = os.path.join(self.param.tmpDir, "%s-%s"%(mname, uname)
+						moi.tmpDir = os.path.join(self.param.tmpDir, "%s-%s"%(mname, uname))
 						moiList.append(moi)
 				else:
 					assert False
-			ret[pname] = moiList
-
-		# create SnModuleInstance
-		for moiList in ret.values():
-			for moi in moiList:
-				if not moi.propDict["standalone"]:
-					exec("from %s import ModuleInstanceObject"%(moi.moduleName.replace("-", "_")))
-					moi.mo = ModuleInstanceObject(self, moi.peerName, moi.userName, moi.moduleName, moi.tmpDir)
-				else:
-					moi.proc = SnSubProcess(moi.peerName, moi.userName, moi.moduleName, moi.tmpDir, self.onLocalSockRecv, None)
-					moi.proc.start()
-				moi.state = _ModuleInfoInternal.STATE_INIT
-				moi.failMessage = ""
-				self._moiCallFunc(moi, "onInit")
-
-		return ret
+		return moiList
 
 	def _getMoi(self, peerName, userName, moduleName):
-		for moi in self.moduleObjDict[peerName]:
-			if moi.userName == userName and moi.moduleName == moduleName:
+		for moi in self.moiList:
+			if (moi.peerName == peerName and moi.userName == userName
+					and moi.moduleName == moduleName):
 				return moi
 		assert False
 
@@ -346,8 +336,9 @@ class SnLocalManager:
 		return moi
 
 	def _findMoiMapped(self, peerName, userName, srcModuleName):
-		for moi in self.moduleObjDict[peerName]:
-			if moi.userName == userName and moi.moduleName == self._mapModuleName(srcModuleName):
+		for moi in self.moiList:
+			if (moi.peerName == peerName and moi.userName == userName
+					and moi.moduleName == self._mapModuleName(srcModuleName)):
 				return moi
 		return None
 
@@ -389,13 +380,13 @@ class SnLocalManager:
 	def _moiCallFunc(self, moi, funcName, *args):
 		assert moi.calling is None
 
-		logging.debug("SnLocalManager.moiCallFunc: call, %s, %s", _dbgmsg_moi_key(moi), funcName)
+		logging.debug("SnLocalManager.moiCallFunc: %s, call, %s", funcName, _dbgmsg_moi_key(moi))
 		moi.calling = funcName
 
 		if moi.mo is not None:
-			GLib.idle_add(self._idleMoiCallFuncImpl, moi, args)
+			GLib.idle_add(self._idleMoiCallFuncImpl, moi, *args)
 		elif moi.proc is not None:
-			p = _LoSockCall()
+			p = LocalSockCall()
 			p.funcName = funcName
 			p.funcArgs = args
 			moi.proc.get_pipe().send(p)
@@ -405,9 +396,9 @@ class SnLocalManager:
 	def _idleMoiCallFuncImpl(self, moi, *args):
 		ret = None
 		try:
-			ret = exec("SnUtil.euidInvoke(moi.userName, moi.mo.%s, args)"%(moi.calling))
+			exec("ret = SnUtil.euidInvoke(moi.userName, moi.mo.%s, *args)"%(moi.calling))
 		except Exception as e:
-			self._moiCallFuncExcept(moi, e, traceback.exc_info())
+			self._moiCallFuncExcept(moi, e, traceback.format_exc())
 			return
 		shutil.rmtree(moi.tmpDir, True)
 		self._moiCallFuncReturn(moi, ret)
@@ -415,7 +406,7 @@ class SnLocalManager:
 	def _moiCallFuncReturn(self, moi, retVal):
 		# finish function call
 		funcName = moi.calling
-		logging.debug("SnLocalManager.moiCallFunc: return, %s, %s", _dbgmsg_moi_key(moi), moi.calling)
+		logging.debug("SnLocalManager.moiCallFunc: %s, return, %s", moi.calling, _dbgmsg_moi_key(moi))
 		moi.calling = None
 
 		# do post call operation
@@ -432,14 +423,17 @@ class SnLocalManager:
 			assert False
 
 		# do peer update
-		peerInfo = self.param.peerManager.getPeerInfo(moi.peerName)
-		self._moiPeerUpdate(moi.peerName, peerInfo, moi)
+		if moi.peerName == socket.gethostname():
+			self._moiPeerUpdate(moi.peerName, self.localInfo, moi)
+		else:
+			peerInfo = self.param.peerManager.getPeerInfo(moi.peerName)
+			self._moiPeerUpdate(moi.peerName, peerInfo, moi)
 		
 	def _moiCallFuncExcept(self, moi, excObj, excInfo):
 		# finish function call
 		funcName = moi.calling
-		logging.debug("SnLocalManager.moiCallFunc: except, %s, %s, %s, %s", _dbgmsg_moi_key(moi),
-				moi.calling, excObj.__class__, excObj)
+		logging.debug("SnLocalManager.moiCallFunc: %s, except, %s, %s, %s", moi.calling, 
+				_dbgmsg_moi_key(moi), excObj.__class__, excObj)
 		moi.calling = None
 
 		# do post call operation
@@ -453,7 +447,7 @@ class SnLocalManager:
 			self._moiChangeState(moi, _ModuleInfoInternal.STATE_EXCEPT, excInfo)
 			self._sendExcept(moi.peerName, moi.userName, moi.moduleName)
 		elif funcName == "onRecv":
-			if _typeCheck(excObj, SnRejectException):
+			if self._typeCheck(excObj, SnRejectException):
 				self._moiChangeState(moi, _ModuleInfoInternal.STATE_REJECT, excObj.message)
 				self._moiCallFunc(moi, "onInactive")
 			else:
@@ -463,8 +457,11 @@ class SnLocalManager:
 			assert False
 
 		# do peer update
-		peerInfo = self.param.peerManager.getPeerInfo(moi.peerName)
-		self._moiPeerUpdate(moi.peerName, peerInfo, moi)
+		if moi.peerName == socket.gethostname():
+			self._moiPeerUpdate(moi.peerName, self.localInfo, moi)
+		else:
+			peerInfo = self.param.peerManager.getPeerInfo(moi.peerName)
+			self._moiPeerUpdate(moi.peerName, peerInfo, moi)
 
 	def _moiPeerUpdate(self, peerName, peerInfo, moi):
 		if moi.calling is not None:
@@ -535,23 +532,6 @@ class _ModuleInfoInternal:
 	failMessage = None						# str
 	calling = None							# str
 	workState = None						# enum
-
-class _LoSockSendObj:
-	peerName = None							# str
-	userName = None							# str
-	moduleName = None						# str
-	dataObj = None							# obj
-
-class _LoSockCall:
-	funcName = None							# str
-	funcArgs = None							# list<obj>
-
-class _LoSockRetn:
-	retVal = None							# obj, None means no return value
-
-class _LoSockExcp:
-	excObj = None							# str
-	excInfo = None							# str
 
 def _dbgmsg_moi_key(moi):
 	if moi.userName is None:

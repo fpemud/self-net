@@ -2,10 +2,8 @@
 # -*- coding: utf-8; tab-width: 4; indent-tabs-mode: t -*-
 
 import socket
-import errno
 import pickle
 import struct
-import logging
 from OpenSSL import SSL
 from gi.repository import GLib
 from sn_util import SnUtil
@@ -17,7 +15,7 @@ class objsocket:
 	_GC_STATE_COMPLETE = 2
 
 	def __init__(self, mySock, recvFunc, errorFunc, gcCompleteFunc):
-		assert self._checkSock(mySock)
+#		assert self._checkSock(mySock)
 
 		self.mySock = mySock
 		self.gcState = self._GC_STATE_NONE
@@ -98,7 +96,7 @@ class objsocket:
 			return True
 		except (socket.error, SSL.Error, _CbConditionException) as e:
 			if self.gcState == self._GC_STATE_NONE:
-				self.errorFunc(self, "")
+				self.errorFunc(self, str(e))
 				assert self.mySock is None		# errorFunc should close the socket
 				return False
 			elif self.gcState == self._GC_STATE_PENDING:
@@ -140,7 +138,7 @@ class objsocket:
 		except (SSL.WantReadError, SSL.WantWriteError):
 			return True
 		except (socket.error, SSL.Error, _CbConditionException, _EofException) as e:
-			self.errorFunc(self, "")
+			self.errorFunc(self, str(e))
 			assert self.mySock is None		# errorFunc should close the socket
 			return False
 
@@ -172,11 +170,12 @@ class objsocket:
 		assert self.mySock is None			# gcCompleteFunc should close the socket
 		return False
 
-	def _checkSock(mySock):
+	def _checkSock(self, mySock):
 		# fixme: should check if the socket is in non-blocking state, but there's no API to get that info
+
 		if isinstance(mySock, SSL.Connection):
 			return True
-		elif isinstance(mySock, socket):
+		elif isinstance(mySock, socket.socket):
 			if mySock.type != socket.SOCK_STREAM:
 				return False
 			return True
