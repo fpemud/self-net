@@ -231,19 +231,19 @@ class SnPeerManager:
 		# need peer name
 		if peerName is None:
 			sslSock.close()
-			logging.debug("SnPeerManager.onSocketConnected: Fail, error1")
+			logging.debug("SnPeerManager.onSocketConnected: Fail, no peer name")
 			return
 
 		# only peer in self-net is allowed
 		if peerName not in self.peerInfoDict:
 			sslSock.close()
-			logging.debug("SnPeerManager.onSocketConnected: Fail, error2")
+			logging.debug("SnPeerManager.onSocketConnected: Fail, foreign peer, %s"%(peerName))
 			return
 
 		# only one connection between a pair of hosts
 		if self.peerInfoDict[peerName].fsmState != _PeerInfoInternal.STATE_NONE:
 			sslSock.close()
-			logging.debug("SnPeerManager.onSocketConnected: Fail, error3")
+			logging.debug("SnPeerManager.onSocketConnected: Fail, duplicate connection")
 			return
 
 		# send keep-alive packet for every second
