@@ -56,23 +56,11 @@ class SnModule:
 
 	def getPropDict(self):
 		"""Property list: allow-local-peer: true | false
-		                  suid: true | false"""
+		                  suid: true | false
+		                  standalone: true | false"""
 		assert False			# implement by subclass
 
 class SnModuleInstance:
-
-	STATE_INIT = 0
-	STATE_INACTIVE = 1
-	STATE_ACTIVE = 2
-	STATE_REJECT = 3
-	STATE_PEER_REJECT = 4
-	STATE_EXCEPT = 5
-	STATE_PEER_EXCEPT = 6
-
-	WORK_STATE_IDLE = 0
-	WORK_STATE_WORKING = 1
-	
-	##### hidden to subclass ####
 
 	def __init__(self, coreObj, peerName, userName, moduleName, tmpDir):
 		self.coreObj = coreObj
@@ -81,11 +69,25 @@ class SnModuleInstance:
 		self.moduleName = moduleName
 		self.tmpDir = tmpDir
 
-		self.state = self.STATE_INIT
-		self.workState = self.WORK_STATE_IDLE
-		self.failMessage = ""					# reject / except message
+	##### callback functions ####
 
-	##### provide to subclass ####
+	def onInit(self):
+		"""Called after the module instance object is created"""
+		assert False			# implement by subclass
+
+	def onActive(self):
+		"""Called after the peer changes to active state"""
+		assert False			# implement by subclass
+
+	def onInactive(self):
+		"""Called before the peer changes to inactive state"""
+		assert False			# implement by subclass
+
+	def onRecv(self, dataObj):
+		"""Called when data is received from the peer"""
+		assert False			# implement by subclass
+
+	##### assistant functions ####
 
 	def getPeerName(self):
 		return self.peerName
@@ -112,47 +114,6 @@ class SnModuleInstance:
 
 	def sendObject(self, obj):
 		self.coreObj._sendObject(self.peerName, self.userName, self.moduleName, obj)
-
-	def setWorkState(self, workState):
-		self.workState = workState
-
-	##### provide to coreObj only ####
-
-	def getTmpDir2(self):
-		return self.tmpDir
-
-	def getState(self):
-		return self.state
-
-	def setState(self, state, failMessage=""):
-		if state in [ self.STATE_REJECT, self.STATE_PEER_REJECT, self.STATE_EXCEPT ]:
-			assert failMessage != ""
-		else:
-			assert failMessage == ""
-		self.state = state
-		self.failMessage = failMessage
-
-	def getFailMessage(self):
-		return self.failMessage
-
-	def getWorkState(self):
-		return self.workState
-
-	def onInit(self):
-		"""Called after the module instance object is created"""
-		assert False			# implement by subclass
-
-	def onActive(self):
-		"""Called after the peer changes to active state"""
-		assert False			# implement by subclass
-
-	def onInactive(self):
-		"""Called before the peer changes to inactive state"""
-		assert False			# implement by subclass
-
-	def onRecv(self, dataObj):
-		"""Called when data is received from the peer"""
-		assert False			# implement by subclass
 
 class SnRejectException(Exception):
 	pass
