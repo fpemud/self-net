@@ -163,48 +163,8 @@ class SnLocalManager:
 	def onPeerChange(self, peerName, peerInfo):
 		logging.debug("SnLocalManager.onPeerChange: Start, %s", peerName)
 
-		# no peer module
 		for moi in self.moduleObjDict[peerName]:
-			if not self._matchPmi(peerName, peerInfo, moi):
-				if moi.state == _ModuleInfoInternal.STATE_INIT:
-					pass
-				elif moi.state == _ModuleInfoInternal.STATE_ACTIVE:
-					self._moiChangeState(moi, _ModuleInfoInternal.STATE_INACTIVE)
-					self._moiCallFunc(moi, "onInactive")
-				elif moi.state == _ModuleInfoInternal.STATE_INACTIVE:
-					pass
-				elif moi.state == _ModuleInfoInternal.STATE_REJECT:
-					self._moiChangeState(moi, _ModuleInfoInternal.STATE_INACTIVE)
-				elif moi.state == _ModuleInfoInternal.STATE_PEER_REJECT:
-					self._moiChangeState(moi, _ModuleInfoInternal.STATE_INACTIVE)
-				elif moi.state == _ModuleInfoInternal.STATE_EXCEPT:
-					pass
-				elif moi.state == _ModuleInfoInternal.STATE_PEER_EXCEPT:
-					self._moiChangeState(moi, _ModuleInfoInternal.STATE_INACTIVE)
-				else:
-					assert False
-
-		# has peer module
-		for pmi in peerInfo.moduleList:
-			moi = self._findMoiMapped(peerName, pmi.userName, pmi.moduleName)
-			if moi is not None:
-				if moi.state == _ModuleInfoInternal.STATE_INIT:
-					pass
-				elif moi.state == _ModuleInfoInternal.STATE_ACTIVE:
-					pass
-				elif moi.state == _ModuleInfoInternal.STATE_INACTIVE:
-					self._moiChangeState(moi, _ModuleInfoInternal.STATE_ACTIVE)
-					self._moiCallFunc(moi, "onActive")
-				elif moi.state == _ModuleInfoInternal.STATE_REJECT:
-					pass
-				elif moi.state == _ModuleInfoInternal.STATE_PEER_REJECT:
-					pass
-				elif moi.state == _ModuleInfoInternal.STATE_EXCEPT:
-					pass
-				elif moi.state == _ModuleInfoInternal.STATE_PEER_EXCEPT:
-					pass
-				else:
-					assert False
+			self._moiPeerUpdate(peerName, peerInfo, moi)
 
 		logging.debug("SnLocalManager.onPeerChange: End")
 		return
@@ -213,23 +173,7 @@ class SnLocalManager:
 		logging.debug("SnLocalManager.onPeerRemove: Start, %s", peerName)
 
 		for moi in self.moduleObjDict[peerName]:
-			if moi.state == _ModuleInfoInternal.STATE_INIT:
-				pass
-			elif moi.state == _ModuleInfoInternal.STATE_ACTIVE:
-				self._moiChangeState(moi, _ModuleInfoInternal.STATE_INACTIVE)
-				self._moiCallFunc(moi, "onInactive")
-			elif moi.state == _ModuleInfoInternal.STATE_INACTIVE:
-				pass
-			elif moi.state == _ModuleInfoInternal.STATE_REJECT:
-				self._moiChangeState(moi, _ModuleInfoInternal.STATE_INACTIVE)
-			elif moi.state == _ModuleInfoInternal.STATE_PEER_REJECT:
-				self._moiChangeState(moi, _ModuleInfoInternal.STATE_INACTIVE)
-			elif moi.state == _ModuleInfoInternal.STATE_EXCEPT:
-				pass
-			elif moi.state == _ModuleInfoInternal.STATE_PEER_EXCEPT:
-				self._moiChangeState(moi, _ModuleInfoInternal.STATE_INACTIVE)
-			else:
-				assert False
+			self._moiPeerUpdate(peerName, None, moi)
 
 		logging.debug("SnLocalManager.onPeerRemove: End")
 		return
@@ -469,17 +413,14 @@ class SnLocalManager:
 		self._moiCallFuncReturn(moi, ret)
 
 	def _moiCallFuncReturn(self, moi, retVal):
+		# finish function call
 		funcName = moi.calling
 		logging.debug("SnLocalManager.moiCallFunc: return, %s, %s", _dbgmsg_moi_key(moi), moi.calling)
 		moi.calling = None
 
+		# do post call operation
 		if funcName == "onInit":
-			peerInfo = self.param.peerManager.getPeerInfo(moi.peerName)
-			if peerInfo is not None and self._matchPmi(moi.peerName, self.param.peerManager.getPeerInfo(moi.peerName), moi):
-				self._moiChangeState(moi, _ModuleInfoInternal.STATE_ACTIVE)
-				self._moiCallFunc(moi, "onActive")
-			else:
-				self._moiChangeState(moi, _ModuleInfoInternal.STATE_INACTIVE)
+			self._moiChangeState(moi, _ModuleInfoInternal.STATE_INACTIVE)
 		elif funcName == "onInactive":
 			if moi.state == _ModuleInfoInternal.STATE_REJECT:
 				self._sendReject(moi.peerName, moi.userName, moi.moduleName, moi.failMessage)
@@ -489,13 +430,19 @@ class SnLocalManager:
 			pass
 		else:
 			assert False
+
+		# do peer update
+		peerInfo = self.param.peerManager.getPeerInfo(moi.peerName)
+		self._moiPeerUpdate(moi.peerName, peerInfo, moi)
 		
 	def _moiCallFuncExcept(self, moi, excObj, excInfo):
+		# finish function call
 		funcName = moi.calling
 		logging.debug("SnLocalManager.moiCallFunc: except, %s, %s, %s, %s", _dbgmsg_moi_key(moi),
 				moi.calling, excObj.__class__, excObj)
 		moi.calling = None
 
+		# do post call operation
 		if funcName == "onInit":
 			self._moiChangeState(moi, _ModuleInfoInternal.STATE_EXCEPT, excInfo)
 		elif funcName == "onInactive":
@@ -514,6 +461,53 @@ class SnLocalManager:
 				self._sendExcept(moi.peerName, moi.userName, moi.moduleName)
 		else:
 			assert False
+
+		# do peer update
+		peerInfo = self.param.peerManager.getPeerInfo(moi.peerName)
+		self._moiPeerUpdate(moi.peerName, peerInfo, moi)
+
+	def _moiPeerUpdate(self, peerName, peerInfo, moi):
+		if moi.calling is not None:
+			return
+
+		if peerInfo is not None and self._matchPmi(peerName, peerInfo, moi):
+			# peer exist
+			if moi.state == _ModuleInfoInternal.STATE_INIT:
+				pass
+			elif moi.state == _ModuleInfoInternal.STATE_ACTIVE:
+				pass
+			elif moi.state == _ModuleInfoInternal.STATE_INACTIVE:
+				self._moiChangeState(moi, _ModuleInfoInternal.STATE_ACTIVE)
+				self._moiCallFunc(moi, "onActive")
+			elif moi.state == _ModuleInfoInternal.STATE_REJECT:
+				pass
+			elif moi.state == _ModuleInfoInternal.STATE_PEER_REJECT:
+				pass
+			elif moi.state == _ModuleInfoInternal.STATE_EXCEPT:
+				pass
+			elif moi.state == _ModuleInfoInternal.STATE_PEER_EXCEPT:
+				pass
+			else:
+				assert False
+		else:
+			# peer not exist
+			if moi.state == _ModuleInfoInternal.STATE_INIT:
+				pass
+			elif moi.state == _ModuleInfoInternal.STATE_ACTIVE:
+				self._moiChangeState(moi, _ModuleInfoInternal.STATE_INACTIVE)
+				self._moiCallFunc(moi, "onInactive")
+			elif moi.state == _ModuleInfoInternal.STATE_INACTIVE:
+				pass
+			elif moi.state == _ModuleInfoInternal.STATE_REJECT:
+				self._moiChangeState(moi, _ModuleInfoInternal.STATE_INACTIVE)
+			elif moi.state == _ModuleInfoInternal.STATE_PEER_REJECT:
+				self._moiChangeState(moi, _ModuleInfoInternal.STATE_INACTIVE)
+			elif moi.state == _ModuleInfoInternal.STATE_EXCEPT:
+				pass
+			elif moi.state == _ModuleInfoInternal.STATE_PEER_EXCEPT:
+				self._moiChangeState(moi, _ModuleInfoInternal.STATE_INACTIVE)
+			else:
+				assert False
 
 class _ModuleInfoInternal:
 	STATE_INIT = 0
