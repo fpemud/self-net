@@ -203,14 +203,21 @@ class SnUtil:
 		return 32 - (netmask ^ 0xFFFFFFFF).bit_length()
 
 	@staticmethod
+	def dropPriviledgeTo(userName):
+		assert os.getuid() == 0
+		pwobj = pwd.getpwnam(userName)
+	    os.setgid(pwobj.pw_gid)
+	    os.setuid(pwobj.pw_uid)
+
+	@staticmethod
 	def euidInvoke(userName, func, *args):
 		if userName is not None:
 			oldeuid = os.geteuid()
 			oldegid = os.getegid()
 			pwobj = pwd.getpwnam(userName)
 			try:
-				os.setegid(pwobj.pw_uid)
-				os.seteuid(pwobj.pw_gid)
+				os.setegid(pwobj.pw_gid)
+				os.seteuid(pwobj.pw_uid)
 
 				func(*args)
 			finally:

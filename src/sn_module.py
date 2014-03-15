@@ -74,24 +74,18 @@ class SnModuleInstance:
 	
 	##### hidden to subclass ####
 
-	def __init__(self, initParam):
-		self.initParam = initParam
-
-		self.coreObj = initParam.coreObj		# for convience
-		self.classObj = initParam.classObj
-		self.paramDict = initParam.paramDict
-		self.peerName = initParam.peerName
-		self.userName = initParam.userName
-		self.tmpDir = initParam.tmpDir
+	def __init__(self, coreObj, peerName, userName, moduleName, tmpDir):
+		self.coreObj = coreObj
+		self.peerName = peerName
+		self.userName = userName
+		self.moduleName = moduleName
+		self.tmpDir = tmpDir
 
 		self.state = self.STATE_INIT
 		self.workState = self.WORK_STATE_IDLE
 		self.failMessage = ""					# reject / except message
 
 	##### provide to subclass ####
-
-	def getParamDict(self):
-		return self.paramDict
 
 	def getHostName(self):
 		return socket.gethostname()
@@ -103,7 +97,7 @@ class SnModuleInstance:
 		return self.userName
 
 	def getModuleName(self):
-		return self.classObj.getModuleName()
+		return self.moduleName
 
 	def isLocalPeer(self):
 		return self.peerName == socket.gethostname()
@@ -117,15 +111,15 @@ class SnModuleInstance:
 		return self.tmpDir
 
 	def sendObject(self, obj):
-		self.coreObj._sendObject(self.peerName, self.userName, self.classObj.getModuleName(), obj)
+		self.coreObj._sendObject(self.peerName, self.userName, self.moduleName, obj)
 
 	def setWorkState(self, workState):
 		self.workState = workState
 
 	##### provide to coreObj only ####
 
-	def getInitParam(self):
-		return self.initParam
+	def getTmpDir2(self):
+		return self.tmpDir
 
 	def getState(self):
 		return self.state
@@ -159,14 +153,6 @@ class SnModuleInstance:
 	def onRecv(self, dataObj):
 		"""Called when data is received from the peer"""
 		assert False			# implement by subclass
-
-class SnModuleInstanceInitParam:
-	coreObj = None		# obj, SnLocalManager
-	classObj = None		# obj, SnModule
-	paramDict = None	# dict
-	peerName = None		# str
-	userName = None		# str
-	tmpDir = None		# str
 
 class SnRejectException(Exception):
 	pass

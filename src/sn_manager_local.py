@@ -13,7 +13,6 @@ from sn_util import SnUtil
 from sn_util import SnSleepNotifier
 from sn_conn_local import SnLocalServer
 from sn_module import SnModuleInstance
-from sn_module import SnModuleInstanceInitParam
 from sn_module import SnRejectException
 
 # fixme: needs to consider user change, both local user change and user change received by peer
@@ -67,10 +66,6 @@ class SnLocalManager:
 		self.localInfo = self._getLocalInfo()
 		self.moduleObjDict = self._getModuleObjDict()
 		self.sleepNotifier = SnSleepNotifier(self.onBeforeSleep, self.onAfterResume)
-
-		# create server endpoint
-		self.serverEndPoint = SnLocalServer(self.onLoSockConnected)
-		self.serverEndPoint.start(self.param.socketFile)
 
 		# active local peers
 		GLib.idle_add(self._idleLocalPeerActive)
@@ -137,7 +132,7 @@ class SnLocalManager:
 				try:
 					mo.setState(SnModuleInstance.STATE_INACTIVE)
 					SnUtil.euidInvoke(mo.getUserName(), mo.onInactive)
-					shutil.rmtree(mo.getInitParam().tmpDir, True)
+					shutil.rmtree(mo.getTmpDir2(), True)
 					logging.debug("SnLocalManager.onPeerChange: mo active -> inactive end")
 				except Exception as e:
 					mo.setState(SnModuleInstance.STATE_EXCEPT, traceback.format_exc())
@@ -203,7 +198,7 @@ class SnLocalManager:
 				try:
 					mo.setState(SnModuleInstance.STATE_INACTIVE)
 					SnUtil.euidInvoke(mo.getUserName(), mo.onInactive)
-					shutil.rmtree(mo.getInitParam().tmpDir, True)
+					shutil.rmtree(mo.getTmpDir2(), True)
 					logging.debug("SnLocalManager.onPeerRemove: mo active -> inactive end")
 				except Exception as e:
 					mo.setState(SnModuleInstance.STATE_EXCEPT, traceback.format_exc())
@@ -240,7 +235,7 @@ class SnLocalManager:
 			try:
 				mo.setState(SnModuleInstance.STATE_PEER_REJECT, data.message)
 				SnUtil.euidInvoke(mo.getUserName(), mo.onInactive)
-				shutil.rmtree(mo.getInitParam().tmpDir, True)
+				shutil.rmtree(mo.getTmpDir2(), True)
 			except Exception as e:
 				mo.setState(SnModuleInstance.STATE_EXCEPT, traceback.format_exc())
 				logging.debug("SnLocalManager.onPacketRecv: mo onInactive failed, %s, %s", e.__class__, e)
@@ -248,7 +243,7 @@ class SnLocalManager:
 			try:
 				mo.setState(SnModuleInstance.STATE_PEER_EXCEPT)
 				SnUtil.euidInvoke(mo.getUserName(), mo.onInactive)
-				shutil.rmtree(mo.getInitParam().tmpDir, True)
+				shutil.rmtree(mo.getTmpDir2(), True)
 			except Exception as e:
 				mo.setState(SnModuleInstance.STATE_EXCEPT, traceback.format_exc())
 				logging.debug("SnLocalManager.onPacketRecv: mo onInactive failed, %s, %s", e.__class__, e)
@@ -299,7 +294,7 @@ class SnLocalManager:
 		try:
 			mo.setState(SnModuleInstance.STATE_REJECT, rejectMessage)
 			SnUtil.euidInvoke(mo.getUserName(), mo.onInactive)
-			shutil.rmtree(mo.getInitParam().tmpDir, True)
+			shutil.rmtree(mo.getTmpDir2(), True)
 			self._sendReject(peerName, mo.getUserName(), mo.getModuleName(), rejectMessage)
 		except Exception as e:
 			mo.setState(SnModuleInstance.STATE_EXCEPT, traceback.format_exc())
@@ -384,7 +379,8 @@ class SnLocalManager:
 
 				exec("from %s import ModuleInstanceObject"%(mname.replace("-", "_")))
 				if minfo.moduleScope == "sys":
-					mo = ModuleInstanceObject(self._newInitParamSys(mname, minfo, pname))
+					mo = ModuleInstanceObject(self, pname, None, mname,
+							os.path.join(self.param.tmpDir, mname))
 					logging.debug("SnLocalManager._getModuleObjDict: mo init, %s, %s", pname, mo.getModuleName())
 					try:
 						SnUtil.euidInvoke(mo.getUserName(), mo.onInit)
@@ -399,7 +395,8 @@ class SnLocalManager:
 						if uname in self.param.configManager.getUserBlackList():
 							continue
 
-						mo = ModuleInstanceObject(self._newInitParamUsr(mname, minfo, pname, uname))
+						mo = ModuleInstanceObject(self, pname, uname, mname,
+								os.path.join(self.param.tmpDir, "%s-%s"%(mname, uname)))
 						logging.debug("SnLocalManager._getModuleObjDict: mo init, %s, %s, %s", pname, uname, mo.getModuleName())
 						try:
 							SnUtil.euidInvoke(mo.getUserName(), mo.onInit)
@@ -435,26 +432,6 @@ class SnLocalManager:
 	def _matchModuleMapped(self, peerName, userName, srcModuleName):
 		ret = self._findModuleMapped(peerName, userName, srcModuleName)
 		return ret is not None
-
-	def _newInitParamSys(self, mname, minfo, pname):
-		ret = SnModuleInstanceInitParam()
-		ret.coreObj = self
-		ret.classObj = minfo.moduleObj
-		ret.paramDict = minfo.moduleParamDict
-		ret.peerName = pname
-		ret.userName = None
-		ret.tmpDir = os.path.join(self.param.tmpDir, mname)
-		return ret
-
-	def _newInitParamUsr(self, mname, minfo, pname, uname):
-		ret = SnModuleInstanceInitParam()
-		ret.coreObj = self
-		ret.classObj = minfo.moduleObj
-		ret.paramDict = minfo.moduleParamDict
-		ret.peerName = pname
-		ret.userName = uname
-		ret.tmpDir = os.path.join(self.param.tmpDir, "%s-%s"%(mname, uname))
-		return ret
 
 	def _getMappedModuleName(self, moduleName):
 		strList = moduleName.split("-")

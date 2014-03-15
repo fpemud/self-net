@@ -41,7 +41,6 @@ class SnCfgModuleInfo:
 	moduleScope = None				# str, "sys" "usr"
 	moduleType = None				# str, "server" "client" "peer"
 	moduleId = None					# str
-	moduleParamDict = None			# dict
 	moduleObj = None				# obj, SnModule
 
 class SnConfigManager:
@@ -349,14 +348,12 @@ class _ModuleFileXmlHandler(xml.sax.handler.ContentHandler):
 	INIT = 0
 	IN_MODULES = 1
 	IN_MODULE = 2
-	IN_MODULE_PARAMETER = 3
 
 	def __init__(self, moduleDict):
 		xml.sax.handler.ContentHandler.__init__(self)
 		self.moduleDict = moduleDict
 		self.curModuleName = None
 		self.curModuleInfo = None
-		self.curParam = None
 		self.state = self.INIT
 
 	def startElement(self, name, attrs):
@@ -366,9 +363,6 @@ class _ModuleFileXmlHandler(xml.sax.handler.ContentHandler):
 			self.state = self.IN_MODULE
 			self.curModuleName = attrs["name"]
 			self.curModuleInfo = _newSnCfgModuleInfo()
-		elif name == "parameter" and self.state == self.IN_MODULE:
-			self.state = self.IN_MODULE_PARAMETER
-			self.curParam = attrs["name"]
 		else:
 			raise Exception("Failed to parse modules file")
 
@@ -380,17 +374,11 @@ class _ModuleFileXmlHandler(xml.sax.handler.ContentHandler):
 			self.curModuleName = None
 			self.curModuleInfo = None
 			self.state = self.IN_MODULES
-		elif name == "parameter" and self.state == self.IN_MODULE_PARAMETER:
-			self.state = self.IN_MODULE
-			self.curParam = None
 		else:
 			raise Exception("Failed to parse modules file")
 
 	def characters(self, content):
-		if self.state == self.IN_MODULE_PARAMETER:
-			self.curModuleInfo.moduleParamDict[self.curParam] = content
-		else:
-			pass
+		pass
 
 def _newSnCfgGlobal():
 	"""create new object, set default values"""
@@ -415,6 +403,5 @@ def _newSnCfgModuleInfo():
 	"""create new object, set default values"""
 
 	curModuleInfo = SnCfgModuleInfo()
-	curModuleInfo.moduleParamDict = dict()
 	return curModuleInfo
 
