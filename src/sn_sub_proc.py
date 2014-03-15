@@ -14,10 +14,11 @@ from objsocket import objsocket
 from sn_util import SnUtil
 from sn_param import SnParam
 from sn_module import SnRejectException
+from sn_manager_local import _LoSockInitComplete
+from sn_manager_local import _LoSockSendObj
 from sn_manager_local import _LoSockCall
 from sn_manager_local import _LoSockRetn
 from sn_manager_local import _LoSockExcp
-from sn_manager_local import _LoSockSendObj
 
 class SnSubProcess:
 
@@ -59,29 +60,20 @@ class _SubprocObject:
 		self.connSock = objsocket(pipeConn, self.onConnRecv, self.onConnError, self._gcComplete)
 		self.mo = None
 
-		# create module object, init module object
+		# create module object
 		exec("from %s import ModuleInstanceObject"%(self.moduleName.replace("-", "_")))
 		self.mo = ModuleInstanceObject(self, self.peerName, self.userName, self.moduleName, self.tmpDir)
-		try:
-			self.mo.onInit()
-		except Exception as e:
-			self.mo.setState(SnModuleInstance.STATE_EXCEPT, traceback.format_exc())
+
+		self._sendInitComplete()
 
 	def onConnRecv(self, sock, packetObj):
 		assert sock == self.connSock
 		assert self._typeCheck(packetObj, _LoSockCall)
-		
-		if packetObj.funcName == "onActive":
+
+		if packetObj.funcName in [ "onInit", "onActive", "onInactive" ]:
 			assert len(packetObj.funcArgs) == 0
 			try:
-				self.mo.onActive()
-				self._sendRetn(None)
-			except Exception as e:
-				self._sendExcp(e, traceback.format_exc())
-		elif packetObj.funcName == "onInactive":
-			assert len(packetObj.funcArgs) == 0
-			try:
-				self.mo.onInactive()
+				exec("self.mo.%s()"%(packetObj.funcName))
 				self._sendRetn(None)
 			except Exception as e:
 				self._sendExcp(e, traceback.format_exc())
@@ -103,13 +95,8 @@ class _SubprocObject:
 	def _gcComplete(self):
 		assert False
 
-	def _sendObject(self, peerName, userName, moduleName, obj):
-		packetObj = _LoSockSendObj()
-		packetObj.peerName = peerName
-		packetObj.userName = userName
-		packetObj.moduleName = moduleName
-		packatObj.dataObj = obj
-		self.connSock.send(packetObj)
+	def _sendInitComplete(self):
+		self.connSock.send(_LoSockInitComplete())
 
 	def _sendRetn(self, retVal):
 		packetObj = _LoSockRetn()
@@ -120,6 +107,14 @@ class _SubprocObject:
 		packetObj = _LoSockExcp()
 		packetObj.excObj = excObj
 		packetObj.excInfo = excInfo
+		self.connSock.send(packetObj)
+
+	def _sendObject(self, peerName, userName, moduleName, obj):
+		packetObj = _LoSockSendObj()
+		packetObj.peerName = peerName
+		packetObj.userName = userName
+		packetObj.moduleName = moduleName
+		packatObj.dataObj = obj
 		self.connSock.send(packetObj)
 
 	def _typeCheck(self, obj, typeobj):

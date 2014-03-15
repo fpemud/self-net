@@ -447,16 +447,39 @@ class SnLocalManager:
 		return str(obj.__class__) == str(typeobj)
 
 class _ModuleInfoInternal:
-	CALLING_NONE = 0
-	CALLING_INIT = 1
-	CALLING_ACTIVE = 2
-	CALLING_INACTIVE = 3
-	CALLING_REJECT = 4
-	CALLING_RECV = 5
+	STATE_INIT = 0
+	STATE_INACTIVE = 1
+	STATE_ACTIVE = 2
+	STATE_REJECT = 3
+	STATE_PEER_REJECT = 4
+	STATE_EXCEPT = 5
+	STATE_PEER_EXCEPT = 6
+
+	WORK_STATE_IDLE = 0
+	WORK_STATE_WORKING = 1
+
+	CALLING_STATE_NONE = 0
+	CALLING_STATE_INIT = 1
+	CALLING_STATE_ACTIVE = 2
+	CALLING_STATE_INACTIVE = 3
+	CALLING_STATE_RECV = 4
 
 	minst = None							# obj, SnModuleInstance
+	tmpDir = None							# str
 	proc = None								# obj, None means not-standalone module
+	state = None							# enum
+	failMessage = None						# str
 	callingState = None						# enum
+	workState = None						# enum
+
+class _LoSockInitComplete:
+	pass
+
+class _LoSockSendObj:
+	peerName = None							# str
+	userName = None							# str
+	moduleName = None						# str
+	dataObj = None							# obj
 
 class _LoSockCall:
 	funcName = None							# str
@@ -468,10 +491,4 @@ class _LoSockRetn:
 class _LoSockExcp:
 	excObj = None							# str
 	excInfo = None							# str
-
-class _LoSockSendObj:
-	peerName = None							# str
-	userName = None							# str
-	moduleName = None						# str
-	dataObj = None							# obj
-
+	
