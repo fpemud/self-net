@@ -118,16 +118,9 @@ class SnLocalManager:
 
 		# no peer module
 		for moi in self.moduleObjDict[peerName]:
-			# find module in peerInfo
-			match = False
-			for pmi in peerInfo.moduleList:
-				if moi.userName == pmi.userName and moi.moduleName == self._mapModuleName(pmi.moduleName):
-					match = True
-					break
-			if match:
+			if self._matchPmi(peerName, peerInfo, moi):
 				continue
 
-			# found none
 			if moi.state == _ModuleInfoInternal.STATE_ACTIVE:
 				logging.debug("SnLocalManager.onPeerChange: mo active -> inactive start, %s", _dbgmsg_moi_key(moi))
 				try:
@@ -179,9 +172,7 @@ class SnLocalManager:
 					SnUtil.euidInvoke(moi.userName, moi.mo.onActive)
 					logging.debug("SnLocalManager.onPeerChange: mo inactive -> active end")
 				except Exception as e:
-					moi.state = _ModuleInfoInternal.STATE_EXCEPT
-					moi.failMessage = traceback.format_exc()
-					self._sendExcept(moi.peerName, moi.userName, moi.moduleName)
+					self._toExceptWithMessage(moi, traceback.format_exc())
 					logging.debug("SnLocalManager.onPeerChange: mo onActive failed, %s, %s", e.__class__, e)
 			elif moi.state == _ModuleInfoInternal.STATE_REJECT:
 				pass
@@ -271,9 +262,7 @@ class SnLocalManager:
 				self._toRejectWithMessage(moi, e.message)
 				logging.debug("SnLocalManager.onPacketRecv: mo onRecv failed, %s, %s", e.__class__, e)
 			except Exception as e:
-				moi.state = _ModuleInfoInternal.STATE_EXCEPT
-				moi.failMessage = traceback.format_exc()
-				self._sendExcept(moi.peerName, moi.userName, moi.moduleName)
+				self._toExceptWithMessage(moi, traceback.format_exc())
 				logging.debug("SnLocalManager.onPacketRecv: mo onRecv failed, %s, %s", e.__class__, e)
 
 		logging.debug("SnLocalManager.onPacketRecv: End")
@@ -284,22 +273,60 @@ class SnLocalManager:
 	def onAfterResume(self, sleepType):
 		pass
 
-	def onLoSockRecv(self, sock, packetObj):
+	def onLoSockRecv(self, peerName, userName, moduleName, packetObj):
+		moi = self._getMoi(peerName, userName, moduleName)
+
 		if self._typeCheck(packetObj, _LoSockInitComplete):
-			pass
+			assert moi.state == _ModuleInfoInternal.STATE_INIT
+			p = _LoSockCall()
+			p.funcName = "onInit"
+			p.funcArgs = []
+			moi.proc.get_pipe().send(p)
+			moi.calling = _ModuleInfoInternal.CALLING_ON_INIT
 		elif self._typeCheck(packetObj, _LoSockSendObj):
+			assert moi.state == _ModuleInfoInternal.STATE_ACTIVE:
 			self._sendObject(packetObj.peerName, packetObj.userName, packetObj.moduleName, packetObj.dataObj)
-		elif self._typeCheck(packetObj, _LoSockCall):
-			assert False
 		elif self._typeCheck(packetObj, _LoSockRetn):
-			pass
+			if moi.calling == _ModuleInfoInternal.CALLING_NONE:
+				assert False
+			elif moi.calling == _ModuleInfoInternal.CALLING_ON_INIT:
+				peerInfo = self.param.peerManager.getPeerInfo(moi.peerName)
+				if peerInfo is not None and self._matchPmi(moi.peerName, self.param.peerManager.getPeerInfo(moi.peerName), moi):
+					moi.state = _ModuleInfoInternal.STATE_ACTIVE
+					moi.failMessage = ""
+					p = _LoSockCall()
+					p.funcName = "onActive"
+					p.funcArgs = []
+					moi.proc.get_pipe().send(p)
+					moi.calling = _ModuleInfoInternal.CALLING_ON_ACTIVE
+				else:
+					moi.state = _ModuleInfoInternal.STATE_INACTIVE
+					moi.failMessage = ""
+			elif moi.calling == _ModuleInfoInternal.CALLING_ON_INACTIVE:
+				pass
+			elif moi.calling == _ModuleInfoInternal.CALLING_ON_ACTIVE:
+				pass
+			elif moi.calling == _ModuleInfoInternal.CALLING_ON_RECV:
+				pass
+			else:
+				assert False
 		elif self._typeCheck(packetObj, _LoSockExcp):
-			pass
+			if moi.calling == _ModuleInfoInternal.CALLING_NONE:
+				assert False
+			elif moi.calling in [ _ModuleInfoInternal.CALLING_ON_INIT, _ModuleInfoInternal.CALLING_ON_INACTIVE ]:
+				moi.state = _ModuleInfoInternal.STATE_EXCEPT
+				moi.failMessage = packetObj.excInfo
+			elif moi.calling == _ModuleInfoInternal.CALLING_ON_ACTIVE:
+				self._toExceptWithMessage(moi, packetObj.excInfo)
+			elif moi.calling == _ModuleInfoInternal.CALLING_ON_RECV:
+				if _typeCheck(packetObj.excObj, SnRejectException):
+					self._toRejectWithMessage(moi, packetObj.excObj.message)
+				else:
+					self._toExceptWithMessage(moi, packetObj.excInfo)
+			else:
+				assert False
 		else:
 			assert False
-
-	def onLoSockError(self, sock, errMsg):
-		assert False
 
 	##### implementation ####
 
@@ -309,6 +336,11 @@ class SnLocalManager:
 		else:
 			self.param.peerManager._sendDataObject(peerName, userName, moduleName, obj)
 
+	def _toExceptWithMessage(self, moi, exceptMessage):
+		moi.state = _ModuleInfoInternal.STATE_EXCEPT
+		moi.failMessage = exceptMessage
+		self._sendExcept(moi.peerName, moi.userName, moi.moduleName)
+
 	def _toRejectWithMessage(self, moi, rejectMessage):
 		try:
 			moi.state = _ModuleInfoInternal.STATE_REJECT
@@ -317,10 +349,8 @@ class SnLocalManager:
 			shutil.rmtree(moi.tmpDir, True)
 			self._sendReject(moi.peerName, moi.userName, moi.moduleName, rejectMessage)
 		except Exception as e:
-			moi.state = _ModuleInfoInternal.STATE_EXCEPT
-			moi.failMessage = traceback.format_exc()
+			self._toExceptWithMessage(moi, traceback.format_exc())
 			logging.debug("SnLocalManager._toReject: mo onInactive failed, %s, %s", e.__class__, e)
-			self._sendExcept(moi.peerName, moi.userName, moi.moduleName)
 
 	def _sendReject(self, peerName, userName, moduleName, rejectMessage):
 		logging.warning("send reject, %s, %s, %s, %s", peerName, userName, moduleName, rejectMessage)
@@ -429,6 +459,7 @@ class SnLocalManager:
 				moi.mo = ModuleInstanceObject(self, moi.peerName, moi.userName, moi.moduleName, moi.tmpDir)
 				moi.state = _ModuleInfoInternal.STATE_INIT
 				moi.failMessage = ""
+				moi.calling = _ModuleInfoInternal.CALLING_NONE
 
 		return ret
 
@@ -467,6 +498,15 @@ class SnLocalManager:
 		moi = self._findMoiMapped(peerName, userName, srcModuleName)
 		return moi is not None
 
+	def _matchPmi(self, peerName, peerInfo, moi):
+		"""pmi stands for peer-module-info"""
+
+		for pmi in peerInfo.moduleList:
+			if (moi.peerName == peerName and moi.userName == pmi.userName
+					and moi.moduleName == self._mapModuleName(pmi.moduleName)):
+				return True
+		return False
+
 	def _mapModuleName(self, moduleName):
 		strList = moduleName.split("-")
 		if strList[1] == "server":
@@ -490,11 +530,11 @@ class _ModuleInfoInternal:
 	WORK_STATE_IDLE = 0
 	WORK_STATE_WORKING = 1
 
-	CALL_STATE_NONE = 0
-	CALL_STATE_INIT = 1
-	CALL_STATE_ACTIVE = 2
-	CALL_STATE_INACTIVE = 3
-	CALL_STATE_RECV = 4
+	CALLING_NONE = 0
+	CALLING_ON_INIT = 1
+	CALLING_ON_ACTIVE = 2
+	CALLING_ON_INACTIVE = 3
+	CALLING_ON_RECV = 4
 
 	peerName = None							# str
 	userName = None							# str, can be None
@@ -507,7 +547,7 @@ class _ModuleInfoInternal:
 	proc = None								# obj, not-standalone module: None
 	state = None							# enum
 	failMessage = None						# str
-	callState = None						# enum
+	calling = None							# enum
 	workState = None						# enum
 
 class _LoSockInitComplete:

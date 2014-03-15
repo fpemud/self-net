@@ -22,16 +22,18 @@ from sn_manager_local import _LoSockExcp
 
 class SnSubProcess:
 
-	def __init__(self, peerName, userName, moduleName, tmpDir, stopFunc):
+	def __init__(self, peerName, userName, moduleName, tmpDir, recvFunc, stopFunc):
 		self.peerName = peerName
 		self.userName = userName
 		self.moduleName = moduleName
 		self.tmpDir = tmpDir
+		self.recvFunc = recvFunc
 		self.stopFunc = stopFunc
 		self.pipeConn = None
 
 	def start(self):
-		self.pipeConn, child_conn = multiprocessing.Pipe()
+		parent_conn, child_conn = multiprocessing.Pipe()
+		self.pipeConn = objsocket(parent_conn, self.onConnRecv, self.onConnError, self._gcComplete)
 		pargs = (self.peerName, self.userName, self.moduleName, self.tmpDir, child_conn,)
 		multiprocessing.Process(target=_subproc_main, args=pargs)
 
@@ -39,7 +41,19 @@ class SnSubProcess:
 		pass
 
 	def get_pipe(self):
-		return self.parent_conn
+		return self.pipeConn
+
+	def onConnRecv(self, sock, packetObj):
+		assert sock == self.pipeConn
+		self.recvFunc(self, self.peerName, self.userName, self.moduleName, packetObj):
+
+	def onConnError(self, sock, errMsg):
+		assert sock == self.pipeConn
+		assert False
+
+	def _gcComplete(self, sock):
+		assert sock == self.pipeConn
+		assert False
 
 def _subproc_main(peerName, userName, moduleName, pipeConn):
 	# drop priviledge
