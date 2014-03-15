@@ -463,12 +463,11 @@ class _LoSockCall:
 	funcArgs = None							# list<obj>
 
 class _LoSockRetn:
-	funcName = None							# str
 	retVal = None							# obj, None means no return value
 
 class _LoSockExcp:
-	funcName = None							# str
-	excpMessage = None						# str
+	excObj = None							# str
+	excInfo = None							# str
 
 class _LoSockSendObj:
 	peerName = None							# str

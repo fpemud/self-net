@@ -13,6 +13,7 @@ sys.path.append('/usr/lib/selfnetd/modules')		# fixme
 from objsocket import objsocket
 from sn_util import SnUtil
 from sn_param import SnParam
+from sn_module import SnRejectException
 from sn_manager_local import _LoSockCall
 from sn_manager_local import _LoSockRetn
 from sn_manager_local import _LoSockExcp
@@ -72,13 +73,27 @@ class _SubprocObject:
 		
 		if packetObj.funcName == "onActive":
 			assert len(packetObj.funcArgs) == 0
-			self.mo.onActive()
+			try:
+				self.mo.onActive()
+				self._sendRetn(None)
+			except Exception as e:
+				self._sendExcp(e, traceback.format_exc())
 		elif packetObj.funcName == "onInactive":
 			assert len(packetObj.funcArgs) == 0
-			self.mo.onInactive()
+			try:
+				self.mo.onInactive()
+				self._sendRetn(None)
+			except Exception as e:
+				self._sendExcp(e, traceback.format_exc())
 		elif packetObj.funcName == "onRecv":
 			assert len(packetObj.funcArgs) == 1
-			self.mo.onRecv(packetObj.funcArgs[0])
+			try:
+				self.mo.onRecv(packetObj.funcArgs[0])
+				self._sendRetn(None)
+			except SnRejectException as e:
+				self._sendExcp(e, None)			# no traceback needed for reject exception
+			except Exception as e:
+				self._sendExcp(e, traceback.format_exc())
 		else:
 			assert False
 
@@ -94,6 +109,17 @@ class _SubprocObject:
 		packetObj.userName = userName
 		packetObj.moduleName = moduleName
 		packatObj.dataObj = obj
+		self.connSock.send(packetObj)
+
+	def _sendRetn(self, retVal):
+		packetObj = _LoSockRetn()
+		packetObj.retVal = retVal
+		self.connSock.send(packetObj)
+
+	def _sendExcp(self, excObj, excInfo):
+		packetObj = _LoSockExcp()
+		packetObj.excObj = excObj
+		packetObj.excInfo = excInfo
 		self.connSock.send(packetObj)
 
 	def _typeCheck(self, obj, typeobj):
