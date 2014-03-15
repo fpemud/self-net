@@ -87,9 +87,6 @@ class SnModuleInstance:
 
 	##### provide to subclass ####
 
-	def getHostName(self):
-		return socket.gethostname()
-
 	def getPeerName(self):
 		return self.peerName
 
@@ -98,6 +95,9 @@ class SnModuleInstance:
 
 	def getModuleName(self):
 		return self.moduleName
+
+	def getHostName(self):
+		return socket.gethostname()
 
 	def isLocalPeer(self):
 		return self.peerName == socket.gethostname()

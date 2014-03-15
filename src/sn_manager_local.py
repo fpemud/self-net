@@ -273,9 +273,11 @@ class SnLocalManager:
 		if self._typeCheck(packetObj, _LoSockCall):
 			assert False
 		elif self._typeCheck(packetObj, _LoSockRetn):
-			assert False
+			pass
 		elif self._typeCheck(packetObj, _LoSockExcp):
-			assert False
+			pass
+		elif self._typeCheck(packetObj, _LoSockSendObj):
+			self._sendObject(packetObj.peerName, packetObj.userName, packetObj.moduleName, packetObj.dataObj)
 		else:
 			assert False
 
@@ -467,4 +469,10 @@ class _LoSockRetn:
 class _LoSockExcp:
 	funcName = None							# str
 	excpMessage = None						# str
+
+class _LoSockSendObj:
+	peerName = None							# str
+	userName = None							# str
+	moduleName = None						# str
+	dataObj = None							# obj
 

@@ -16,19 +16,25 @@ from sn_param import SnParam
 from sn_manager_local import _LoSockCall
 from sn_manager_local import _LoSockRetn
 from sn_manager_local import _LoSockExcp
+from sn_manager_local import _LoSockSendObj
 
 class SnSubProcess:
 
-	def __init__(self, peerName, userName, moduleName, stopFunc):
+	def __init__(self, peerName, userName, moduleName, tmpDir, stopFunc):
 		self.peerName = peerName
 		self.userName = userName
 		self.moduleName = moduleName
+		self.tmpDir = tmpDir
 		self.stopFunc = stopFunc
 		self.pipeConn = None
 
 	def start(self):
 		self.pipeConn, child_conn = multiprocessing.Pipe()
-		multiprocessing.Process(target=_subproc_main, args=(self.peerName, self.userName, self.moduleName, child_conn,))
+		pargs = (self.peerName, self.userName, self.moduleName, self.tmpDir, child_conn,)
+		multiprocessing.Process(target=_subproc_main, args=pargs)
+
+	def stop(self):
+		pass
 
 	def get_pipe(self):
 		return self.parent_conn
@@ -44,28 +50,21 @@ def _subproc_main(peerName, userName, moduleName, pipeConn):
 
 class _SubprocObject:
 
-	def __init__(self, peerName, userName, moduleName, pipeConn):
+	def __init__(self, peerName, userName, moduleName, pipeConn, tmpDir):
 		self.peerName = peerName
 		self.userName = userName
 		self.moduleName = moduleName
+		self.tmpDir = tmpDir
 		self.connSock = objsocket(pipeConn, self.onConnRecv, self.onConnError, self._gcComplete)
+		self.mo = None
 
 		# create module object, init module object
 		exec("from %s import ModuleInstanceObject"%(self.moduleName.replace("-", "_")))
-		if minfo.moduleScope == "sys":
-			self.mo = ModuleInstanceObject(None)
-			try:
-				self.mo.onInit()
-			except Exception as e:
-				self.mo.setState(SnModuleInstance.STATE_EXCEPT, traceback.format_exc())
-		elif minfo.moduleScope == "usr":
-			self.mo = ModuleInstanceObject(None)
-			try:
-				self.mo.onInit()
-			except Exception as e:
-				self.mo.setState(SnModuleInstance.STATE_EXCEPT, traceback.format_exc())
-		else:
-			assert False
+		self.mo = ModuleInstanceObject(self, self.peerName, self.userName, self.moduleName, self.tmpDir)
+		try:
+			self.mo.onInit()
+		except Exception as e:
+			self.mo.setState(SnModuleInstance.STATE_EXCEPT, traceback.format_exc())
 
 	def onConnRecv(self, sock, packetObj):
 		assert sock == self.connSock
@@ -89,8 +88,13 @@ class _SubprocObject:
 	def _gcComplete(self):
 		assert False
 
-	def send(self):
-		pass
+	def _sendObject(self, peerName, userName, moduleName, obj):
+		packetObj = _LoSockSendObj()
+		packetObj.peerName = peerName
+		packetObj.userName = userName
+		packetObj.moduleName = moduleName
+		packatObj.dataObj = obj
+		self.connSock.send(packetObj)
 
 	def _typeCheck(self, obj, typeobj):
 		return str(obj.__class__) == str(typeobj)
