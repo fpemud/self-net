@@ -219,12 +219,12 @@ class SnUtil:
 				os.setegid(pwobj.pw_gid)
 				os.seteuid(pwobj.pw_uid)
 
-				func(*args)
+				return func(*args)
 			finally:
 				os.seteuid(oldeuid)
 				os.setegid(oldegid)
 		else:
-			func(*args)
+			return func(*args)
 
 	@staticmethod
 	def checkSshPubKey(pubkey, keyType, userName, hostName):

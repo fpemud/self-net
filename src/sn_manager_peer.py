@@ -292,7 +292,7 @@ class SnPeerManager:
 			else:
 				self._sendReject(peerName, "invalid system packet data format")
 		elif self._typeCheck(packetObj, SnDataPacket):
-			self.param.localManager.onPacketRecv(peerName, packetObj.srcUserName, 
+			self.param.localManager.onPeerSockRecv(peerName, packetObj.srcUserName, 
 						packetObj.srcModuleName, packetObj.data)
 		else:
 			self._sendReject(peerName, "invalid packet format, %s"%(packetObj.__class__))

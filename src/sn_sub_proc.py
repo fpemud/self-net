@@ -14,7 +14,6 @@ from objsocket import objsocket
 from sn_util import SnUtil
 from sn_param import SnParam
 from sn_module import SnRejectException
-from sn_manager_local import _LoSockInitComplete
 from sn_manager_local import _LoSockSendObj
 from sn_manager_local import _LoSockCall
 from sn_manager_local import _LoSockRetn
@@ -78,8 +77,6 @@ class _SubprocObject:
 		exec("from %s import ModuleInstanceObject"%(self.moduleName.replace("-", "_")))
 		self.mo = ModuleInstanceObject(self, self.peerName, self.userName, self.moduleName, self.tmpDir)
 
-		self._sendInitComplete()
-
 	def onConnRecv(self, sock, packetObj):
 		assert sock == self.connSock
 		assert self._typeCheck(packetObj, _LoSockCall)
@@ -108,9 +105,6 @@ class _SubprocObject:
 
 	def _gcComplete(self):
 		assert False
-
-	def _sendInitComplete(self):
-		self.connSock.send(_LoSockInitComplete())
 
 	def _sendRetn(self, retVal):
 		packetObj = _LoSockRetn()

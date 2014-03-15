@@ -11,41 +11,6 @@ Some example: sys-server-distcc, sys-client-distcc, usr-server-ssh, usr-client-s
 Replace "-" with "_" can selfnet module name be converted to python module name.
 """
 
-"""
-ModuleInstance FSM trigger table:
-
-  STATE_INIT is the initial state.
-
-  STATE_INIT        -> STATE_INACTIVE    : initialized
-  STATE_INACTIVE    -> STATE_ACTIVE      : peer added, peer module added
-  STATE_ACTIVE      -> STATE_INACTIVE    : peer removed, peer module removed
-
-  STATE_ACTIVE      -> STATE_REJECT      : onRecv raise SnRejectException
-  STATE_ACTIVE      -> STATE_PEER_REJECT : reject received
-  STATE_REJECT      -> STATE_INACTIVE    : peer removed, peer module removed
-  STATE_PEER_REJECT -> STATE_INACTIVE    : peer removed, peer module removed
-
-  STATE_INIT        -> STATE_EXCEPT      : onInit raise exception
-  STATE_INACTIVE    -> STATE_EXCEPT      : onActive raise exception
-  STATE_ACTIVE      -> STATE_EXCEPT      : onRecv / onInactive raise exception
-  STATE_ACTIVE      -> STATE_PEER_EXCEPT : except received
-  STATE_PEER_EXCEPT -> STATE_INACTIVE    : peer removed, peer module removed
-"""
-
-"""
-ModuleInstance FSM event callback table:
-
-  STATE_INIT     -> STATE_INACTIVE    : call onInit        BEFORE state change
-  STATE_INACTIVE -> STATE_ACTIVE      : call onActive      AFTER state change
-  STATE_ACTIVE   -> STATE_INACTIVE    : call onInactive    AFTER state change
-  STATE_ACTIVE   -> STATE_REJECT      : call onInactive    AFTER state change
-  STATE_ACTIVE   -> STATE_PEER_REJECT : call onInactive    AFTER state change
-  STATE_ACTIVE   -> STATE_EXCEPT      : call onInactive    AFTER state change
-  STATE_ACTIVE   -> STATE_PEER_EXCEPT : call onInactive    AFTER state change
-
-The concept is: module has no way to control the state change, it can only respond to it.
-"""
-
 import os
 import socket
 
