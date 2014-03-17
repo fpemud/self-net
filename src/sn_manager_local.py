@@ -55,6 +55,16 @@ ModuleInstance FSM event callback table:
 """
 
 """
+Module state change can occur during function call:
+
+  onInit     : uninterruptible
+  onActive   : interruptible
+  onInactive : uninterruptible
+  onRecv     : interruptible
+
+"""
+
+"""
 ModuleInstance FSM sendReject / sendExcept table:
 
   STATE_INIT        -> onInit     -> excGeneral   -> STATE_EXCEPT
