@@ -16,6 +16,7 @@ from sn_sub_proc import LocalSockSendObj
 from sn_sub_proc import LocalSockCall
 from sn_sub_proc import LocalSockRetn
 from sn_sub_proc import LocalSockExcp
+from sn_module import SnModuleInstance
 from sn_module import SnRejectException
 
 """
@@ -139,7 +140,7 @@ class SnLocalManager:
 
 	def getWorkState(self):
 		for moi in self.moiList:
-			if moi.workState == _ModuleInfoInternal.WORK_STATE_WORKING:
+			if moi.workState == SnModuleInstance.WORK_STATE_WORKING:
 				return SnLocalManager.WORK_STATE_WORKING
 		return SnLocalManager.WORK_STATE_IDLE
 
@@ -231,6 +232,11 @@ class SnLocalManager:
 		else:
 			self.param.peerManager._sendDataObject(peerName, userName, moduleName, messageObj)
 
+	def _setWorkState(self, peerName, userName, moduleName, workState):
+		moi = self._getMoi(peerName, userName, moduleName)
+		assert moi.state == _ModuleInfoInternal.STATE_ACTIVE
+		moi.workState = workState
+
 	def _idleLocalPeerActive(self):
 		self.onPeerChange(socket.gethostname(), self.localInfo)
 		return False
@@ -249,6 +255,7 @@ class SnLocalManager:
 				moi.proc.start()
 			moi.state = _ModuleInfoInternal.STATE_INIT
 			moi.failMessage = ""
+			moi.workState = SnModuleInstance.WORK_STATE_IDLE
 			self._moiCallFunc(moi, "onInit")
 
 	def _getLocalInfo(self):
@@ -349,9 +356,9 @@ class SnLocalManager:
 	def _matchPmi(self, peerName, peerInfo, moi):
 		"""pmi stands for peer-module-info"""
 
+		assert moi.peerName == peerName
 		for pmi in peerInfo.moduleList:
-			if (moi.peerName == peerName and moi.userName == pmi.userName
-					and moi.moduleName == self._mapModuleName(pmi.moduleName)):
+			if moi.userName == pmi.userName and moi.moduleName == self._mapModuleName(pmi.moduleName):
 				return True
 		return False
 
@@ -413,6 +420,7 @@ class SnLocalManager:
 		if funcName == "onInit":
 			self._moiChangeState(moi, _ModuleInfoInternal.STATE_INACTIVE)
 		elif funcName == "onInactive":
+			assert moi.workState == SnModuleInstance.WORK_STATE_IDLE
 			if moi.state == _ModuleInfoInternal.STATE_REJECT:
 				self._sendReject(moi.peerName, moi.userName, moi.moduleName, moi.failMessage)
 		elif funcName == "onActive":
@@ -438,12 +446,15 @@ class SnLocalManager:
 
 		# do post call operation
 		if funcName == "onInit":
+			moi.workState = SnModuleInstance.WORK_STATE_IDLE
 			self._moiChangeState(moi, _ModuleInfoInternal.STATE_EXCEPT, excInfo)
 		elif funcName == "onInactive":
+			moi.workState = SnModuleInstance.WORK_STATE_IDLE
 			self._moiChangeState(moi, _ModuleInfoInternal.STATE_EXCEPT, excInfo)
 			if moi.state == _ModuleInfoInternal.STATE_REJECT:
 				self._sendExcept(moi.peerName, moi.userName, moi.moduleName)
 		elif funcName == "onActive":
+			moi.workState = SnModuleInstance.WORK_STATE_IDLE
 			self._moiChangeState(moi, _ModuleInfoInternal.STATE_EXCEPT, excInfo)
 			self._sendExcept(moi.peerName, moi.userName, moi.moduleName)
 		elif funcName == "onRecv":
@@ -451,6 +462,7 @@ class SnLocalManager:
 				self._moiChangeState(moi, _ModuleInfoInternal.STATE_REJECT, excObj.message)
 				self._moiCallFunc(moi, "onInactive")
 			else:
+				moi.workState = SnModuleInstance.WORK_STATE_IDLE
 				self._moiChangeState(moi, _ModuleInfoInternal.STATE_EXCEPT, excInfo)
 				self._sendExcept(moi.peerName, moi.userName, moi.moduleName)
 		else:
@@ -515,8 +527,6 @@ class _ModuleInfoInternal:
 	STATE_EXCEPT = 5
 	STATE_PEER_EXCEPT = 6
 
-	WORK_STATE_IDLE = 0
-	WORK_STATE_WORKING = 1
 
 	peerName = None							# str
 	userName = None							# str, can be None

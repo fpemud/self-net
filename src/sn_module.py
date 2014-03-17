@@ -27,6 +27,9 @@ class SnModule:
 
 class SnModuleInstance:
 
+	WORK_STATE_IDLE = 0
+	WORK_STATE_WORKING = 1
+
 	def __init__(self, coreObj, peerName, userName, moduleName, tmpDir):
 		self.coreObj = coreObj
 		self.peerName = peerName
@@ -79,6 +82,10 @@ class SnModuleInstance:
 
 	def sendObject(self, obj):
 		self.coreObj._sendObject(self.peerName, self.userName, self.moduleName, obj)
+
+	def setWorkState(self, workState):
+		assert workState in [ SnModuleInstance.WORK_STATE_IDLE, SnModuleInstance.WORK_STATE_WORKING ]
+		self.coreObj._setWorkState(self.peerName, self.userName, self.moduleName, workState)
 
 class SnRejectException(Exception):
 	pass

@@ -12,10 +12,10 @@ from sn_param import SnParam
 from sn_module import SnRejectException
 
 class LocalSockSendObj:
-	peerName = None							# str
-	userName = None							# str
-	moduleName = None						# str
 	dataObj = None							# obj
+
+class LocalSockSetWorkState
+	workState = None						# enum
 
 class LocalSockCall:
 	funcName = None							# str
@@ -41,7 +41,7 @@ class SnSubProcess:
 
 	def start(self):
 		parent_conn, child_conn = multiprocessing.Pipe()
-		self.pipeConn = objsocket(parent_conn, self.onConnRecv, self.onConnError, self._gcComplete)
+		self.pipeConn = objsocket(parent_conn, self.onConnRecv, self._onConnError, self._gcComplete)
 		pargs = (self.peerName, self.userName, self.moduleName, self.tmpDir, child_conn,)
 		multiprocessing.Process(target=_subproc_main, args=pargs)
 
@@ -55,7 +55,7 @@ class SnSubProcess:
 		assert sock == self.pipeConn
 		self.recvFunc(self, self.peerName, self.userName, self.moduleName, packetObj)
 
-	def onConnError(self, sock, errMsg):
+	def _onConnError(self, sock, errMsg):
 		assert sock == self.pipeConn
 		assert False
 
@@ -79,7 +79,7 @@ class _SubprocObject:
 		self.userName = userName
 		self.moduleName = moduleName
 		self.tmpDir = tmpDir
-		self.connSock = objsocket(pipeConn, self.onConnRecv, self.onConnError, self._gcComplete)
+		self.connSock = objsocket(pipeConn, self.onConnRecv, self._onConnError, self._gcComplete)
 		self.mo = None
 
 		# create module object
@@ -109,10 +109,10 @@ class _SubprocObject:
 		else:
 			assert False
 
-	def onConnError(self):
+	def _onConnError(self, sock):
 		assert False
 
-	def _gcComplete(self):
+	def _gcComplete(self, sock):
 		assert False
 
 	def _sendRetn(self, retVal):
@@ -128,10 +128,12 @@ class _SubprocObject:
 
 	def _sendObject(self, peerName, userName, moduleName, obj):
 		packetObj = LocalSockSendObj()
-		packetObj.peerName = peerName
-		packetObj.userName = userName
-		packetObj.moduleName = moduleName
 		packetObj.dataObj = obj
+		self.connSock.send(packetObj)
+
+	def _setWorkState(self, peerName, userName, moduleName, workState):
+		packetObj = LocalSockSetWorkState()
+		packetObj.workState = workState
 		self.connSock.send(packetObj)
 
 	def _typeCheck(self, obj, typeobj):
