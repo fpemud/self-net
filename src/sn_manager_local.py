@@ -209,7 +209,7 @@ class SnLocalManager:
 		if peerName == socket.gethostname():
 			GLib.idle_add(self._idleLocalPeerRecv, peerName, userName, moduleName, obj)
 		else:
-			self.param.peerManager._sendDataObject(peerName, userName, moduleName, obj)
+			self.param.peerManager.sendDataObject(peerName, userName, moduleName, obj)
 
 	def _sendReject(self, peerName, userName, moduleName, rejectMessage):
 		logging.warning("SnLocalManager.sendReject, %s, %s, %s, %s", peerName, userName, moduleName, rejectMessage)
@@ -219,7 +219,7 @@ class SnLocalManager:
 		if peerName == socket.gethostname():
 			GLib.idle_add(self._idleLocalPeerRecv, peerName, userName, moduleName, messageObj)
 		else:
-			self.param.peerManager._sendDataObject(peerName, userName, moduleName, messageObj)
+			self.param.peerManager.sendDataObject(peerName, userName, moduleName, messageObj)
 
 	def _sendExcept(self, peerName, userName, moduleName):
 		logging.warning("SnLocalManager.sendExcept, %s, %s, %s", peerName, userName, moduleName)
@@ -228,7 +228,7 @@ class SnLocalManager:
 		if peerName == socket.gethostname():
 			GLib.idle_add(self._idleLocalPeerRecv, peerName, userName, moduleName, messageObj)
 		else:
-			self.param.peerManager._sendDataObject(peerName, userName, moduleName, messageObj)
+			self.param.peerManager.sendDataObject(peerName, userName, moduleName, messageObj)
 
 	def _setWorkState(self, peerName, userName, moduleName, workState):
 		moi = self._getMoi(peerName, userName, moduleName)
@@ -522,13 +522,8 @@ class SnLocalManager:
 				assert False
 
 class _PeerObjInternal:
-	PEER_STATE_IN_INIT
-	PEER_STATE_IN_ACTIVE
-	PEER_STATE_IN_INACTIVE
-
-	state = None
-	packetQueue = None						# List<obj>
 	moiList = None							# List<_ModuleInfoInternal
+	packetQueue = None						# List<obj>
 
 class _ModuleObjInternal:
 	STATE_INIT = 0

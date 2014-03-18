@@ -313,6 +313,16 @@ class SnPeerManager:
 				self.clientEndPoint.connect(pname, self.param.configManager.getHostInfo(pname).port)
 		return True
 
+	def sendDataObject(self, peerName, srcUserName, srcModuleName, obj):
+		if self.peerInfoDict[peerName].fsmState != _PeerInfoInternal.STATE_FULL:
+			return
+
+		packetObj = SnDataPacket()
+		packetObj.srcUserName = srcUserName
+		packetObj.srcModuleName = srcModuleName
+		packetObj.data = obj
+		self.peerInfoDict[peerName].sock.send(packetObj)
+
 	##### implementation ####
 
 	def _getPeerNameBySock(self, sock):
@@ -487,13 +497,6 @@ class SnPeerManager:
 		logging.info("SnPeerManager._gcComplete: %s", _dbgmsg_peer_state_change(peerName, oldFsmState, newFsmState))
 
 		self._timerOperation()
-
-	def _sendDataObject(self, peerName, srcUserName, srcModuleName, obj):
-		packetObj = SnDataPacket()
-		packetObj.srcUserName = srcUserName
-		packetObj.srcModuleName = srcModuleName
-		packetObj.data = obj
-		self.peerInfoDict[peerName].sock.send(packetObj)
 
 	def _peerToShutdown(self, peerName):
 		oldState = self.peerInfoDict[peerName].fsmState
