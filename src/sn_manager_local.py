@@ -117,7 +117,7 @@ class SnLocalManager:
 		# variables
 		self.param = param
 		self.localInfo = self._getLocalInfo()
-		self.moiList = self._getMoiList()
+		self.poiDict = self._getPoiDict()
 		self.sleepNotifier = SnSleepNotifier(self.onBeforeSleep, self.onAfterResume)
 
 		GLib.idle_add(self._idleInitMoiList)
@@ -131,7 +131,10 @@ class SnLocalManager:
 
 		self.localInfo = None
 		self.onPeerChange(socket.gethostname(), None)
-		assert all(x for x in self.moiList if x.state in [ _ModuleInfoInternal.STATE_EXCEPT, _ModuleInfoInternal.STATE_INACTIVE ])
+
+		for pname, moiList in self.poiDict.items():
+			for moi in moiList:
+				assert moi.state in [ _ModuleObjInternal.STATE_EXCEPT, _ModuleObjInternal.STATE_INACTIVE ]
 
 		logging.debug("SnLocalManager.dispose: End")
 		return
@@ -140,15 +143,17 @@ class SnLocalManager:
 		return self.localInfo
 
 	def getWorkState(self):
-		for moi in self.moiList:
-			if moi.workState == SnModuleInstance.WORK_STATE_WORKING:
-				return SnLocalManager.WORK_STATE_WORKING
+		for pname, moiList in self.poiDict.items():
+			for moi in moiList:
+				if moi.workState == SnModuleInstance.WORK_STATE_WORKING:
+					return SnLocalManager.WORK_STATE_WORKING
 		return SnLocalManager.WORK_STATE_IDLE
 
 	def getModuleKeyList(self):
 		ret = []
-		for moi in self.moiList:
-			ret.append((moi.peerName, moi.userName, moi.moduleName))
+		for pname, moiList in self.poiDict.items():
+			for moi in moiList:
+				ret.append((moi.peerName, moi.userName, moi.moduleName))
 		return ret
 
 	def getModuleState(self, peerName, userName, moduleName):
@@ -160,7 +165,8 @@ class SnLocalManager:
 	def onPeerChange(self, peerName, peerInfo):
 		logging.debug("SnLocalManager.onPeerChange: Start, %s", peerName)
 
-		for moi in self.moiList:
+		moiList = self.poiDict[peerName]
+		for moi in moiList:
 			self._moiPeerUpdate(peerName, peerInfo, moi)
 
 		logging.debug("SnLocalManager.onPeerChange: End")
@@ -168,14 +174,14 @@ class SnLocalManager:
 
 	def onPeerSockRecv(self, peerName, userName, srcModuleName, data):
 		moi = self._getMoiMapped(peerName, userName, srcModuleName)
-		if moi.state != _ModuleInfoInternal.STATE_ACTIVE:
+		if moi.state != _ModuleObjInternal.STATE_ACTIVE:
 			return
 
 		if self._typeCheck(data, SnDataPacketReject):
-			self._moiChangeState(moi, _ModuleInfoInternal.STATE_PEER_REJECT)
+			self._moiChangeState(moi, _ModuleObjInternal.STATE_PEER_REJECT)
 			self._moiCallFunc(moi, "onInactive")
 		elif self._typeCheck(data, SnDataPacketExcept):
-			self._moiChangeState(moi, _ModuleInfoInternal.STATE_PEER_EXCEPT)
+			self._moiChangeState(moi, _ModuleObjInternal.STATE_PEER_EXCEPT)
 			self._moiCallFunc(moi, "onInactive")
 		else:
 			self._moiCallFunc(moi, "onRecv", data)
@@ -226,7 +232,7 @@ class SnLocalManager:
 
 	def _setWorkState(self, peerName, userName, moduleName, workState):
 		moi = self._getMoi(peerName, userName, moduleName)
-		assert moi.state == _ModuleInfoInternal.STATE_ACTIVE
+		assert moi.state == _ModuleObjInternal.STATE_ACTIVE
 		moi.workState = workState
 
 	def _idleLocalPeerActive(self):
@@ -238,17 +244,18 @@ class SnLocalManager:
 		return False
 
 	def _idleInitMoiList(self):
-		for moi in self.moiList:
-			if not moi.propDict["standalone"]:
-				exec("from %s import ModuleInstanceObject"%(moi.moduleName.replace("-", "_")))
-				moi.mo = ModuleInstanceObject(self, moi.peerName, moi.userName, moi.moduleName, moi.tmpDir)
-			else:
-				moi.proc = SnSubProcess(moi.peerName, moi.userName, moi.moduleName, moi.tmpDir, self.onLocalSockRecv, None)
-				moi.proc.start()
-			moi.state = _ModuleInfoInternal.STATE_INIT
-			moi.failMessage = ""
-			moi.workState = SnModuleInstance.WORK_STATE_IDLE
-			self._moiCallFunc(moi, "onInit")
+		for pname, moiList in self.poiDict.items():
+			for moi in moiList:
+				if not moi.propDict["standalone"]:
+					exec("from %s import ModuleInstanceObject"%(moi.moduleName.replace("-", "_")))
+					moi.mo = ModuleInstanceObject(self, moi.peerName, moi.userName, moi.moduleName, moi.tmpDir)
+				else:
+					moi.proc = SnSubProcess(moi.peerName, moi.userName, moi.moduleName, moi.tmpDir, self.onLocalSockRecv, None)
+					moi.proc.start()
+				moi.state = _ModuleObjInternal.STATE_INIT
+				moi.failMessage = ""
+				moi.workState = SnModuleInstance.WORK_STATE_IDLE
+				self._moiCallFunc(moi, "onInit")
 
 	def _getLocalInfo(self):
 		pgs = strict_pgs.PasswdGroupShadow("/")
@@ -283,18 +290,19 @@ class SnLocalManager:
 
 		return ret
 
-	def _getMoiList(self):
+	def _getPoiDict(self):
 		"""Create a full module object collection"""
 
 		pgs = strict_pgs.PasswdGroupShadow("/")
-		moiList = []
+		poiDict = dict()
 		for pname in self.param.configManager.getHostNameList():
+			moiList = []
 			for mname in self.param.configManager.getModuleNameList():
 				minfo = self.param.configManager.getModuleInfo(mname)
 				if pname == socket.gethostname() and not minfo.moduleObj.getPropDict()["allow-local-peer"]:
 					continue
 				if minfo.moduleScope == "sys":
-					moi = _ModuleInfoInternal()
+					moi = _ModuleObjInternal()
 					moi.peerName = pname
 					moi.userName = None
 					moi.moduleName = mname
@@ -308,7 +316,7 @@ class SnLocalManager:
 					for uname in pgs.getNormalUserList():
 						if uname in self.param.configManager.getUserBlackList():
 							continue
-						moi = _ModuleInfoInternal()
+						moi = _ModuleObjInternal()
 						moi.peerName = pname
 						moi.userName = uname
 						moi.moduleName = mname
@@ -320,12 +328,14 @@ class SnLocalManager:
 						moiList.append(moi)
 				else:
 					assert False
-		return moiList
+			poiDict[pname] = moiList
+		return poiDict
 
 	def _getMoi(self, peerName, userName, moduleName):
-		for moi in self.moiList:
-			if (moi.peerName == peerName and moi.userName == userName
-					and moi.moduleName == moduleName):
+		moiList = self.poiDict[peerName]
+		for moi in moiList:
+			assert moi.peerName == peerName
+			if moi.userName == userName and moi.moduleName == moduleName:
 				return moi
 		assert False
 
@@ -335,9 +345,10 @@ class SnLocalManager:
 		return moi
 
 	def _findMoiMapped(self, peerName, userName, srcModuleName):
+		moiList = self.poiDict[peerName]
 		for moi in self.moiList:
-			if (moi.peerName == peerName and moi.userName == userName
-					and moi.moduleName == self._mapModuleName(srcModuleName)):
+			assert moi.peerName == peerName
+			if moi.userName == userName and moi.moduleName == self._mapModuleName(srcModuleName):
 				return moi
 		return None
 
@@ -366,7 +377,7 @@ class SnLocalManager:
 		return str(obj.__class__) == str(typeobj)
 
 	def _moiChangeState(self, moi, newState, failMessage=""):
-		if newState in [ _ModuleInfoInternal.STATE_REJECT, _ModuleInfoInternal.STATE_PEER_REJECT, _ModuleInfoInternal.STATE_EXCEPT ]:
+		if newState in [ _ModuleObjInternal.STATE_REJECT, _ModuleObjInternal.STATE_PEER_REJECT, _ModuleObjInternal.STATE_EXCEPT ]:
 			assert failMessage != ""
 		else:
 			assert failMessage == ""
@@ -410,10 +421,10 @@ class SnLocalManager:
 
 		# do post call operation
 		if funcName == "onInit":
-			self._moiChangeState(moi, _ModuleInfoInternal.STATE_INACTIVE)
+			self._moiChangeState(moi, _ModuleObjInternal.STATE_INACTIVE)
 		elif funcName == "onInactive":
 			assert moi.workState == SnModuleInstance.WORK_STATE_IDLE
-			if moi.state == _ModuleInfoInternal.STATE_REJECT:
+			if moi.state == _ModuleObjInternal.STATE_REJECT:
 				self._sendReject(moi.peerName, moi.userName, moi.moduleName, moi.failMessage)
 		elif funcName == "onActive":
 			pass
@@ -439,23 +450,23 @@ class SnLocalManager:
 		# do post call operation
 		if funcName == "onInit":
 			moi.workState = SnModuleInstance.WORK_STATE_IDLE
-			self._moiChangeState(moi, _ModuleInfoInternal.STATE_EXCEPT, excInfo)
+			self._moiChangeState(moi, _ModuleObjInternal.STATE_EXCEPT, excInfo)
 		elif funcName == "onInactive":
 			moi.workState = SnModuleInstance.WORK_STATE_IDLE
-			self._moiChangeState(moi, _ModuleInfoInternal.STATE_EXCEPT, excInfo)
-			if moi.state == _ModuleInfoInternal.STATE_REJECT:
+			self._moiChangeState(moi, _ModuleObjInternal.STATE_EXCEPT, excInfo)
+			if moi.state == _ModuleObjInternal.STATE_REJECT:
 				self._sendExcept(moi.peerName, moi.userName, moi.moduleName)
 		elif funcName == "onActive":
 			moi.workState = SnModuleInstance.WORK_STATE_IDLE
-			self._moiChangeState(moi, _ModuleInfoInternal.STATE_EXCEPT, excInfo)
+			self._moiChangeState(moi, _ModuleObjInternal.STATE_EXCEPT, excInfo)
 			self._sendExcept(moi.peerName, moi.userName, moi.moduleName)
 		elif funcName == "onRecv":
 			if self._typeCheck(excObj, SnRejectException):
-				self._moiChangeState(moi, _ModuleInfoInternal.STATE_REJECT, excObj.message)
+				self._moiChangeState(moi, _ModuleObjInternal.STATE_REJECT, excObj.message)
 				self._moiCallFunc(moi, "onInactive")
 			else:
 				moi.workState = SnModuleInstance.WORK_STATE_IDLE
-				self._moiChangeState(moi, _ModuleInfoInternal.STATE_EXCEPT, excInfo)
+				self._moiChangeState(moi, _ModuleObjInternal.STATE_EXCEPT, excInfo)
 				self._sendExcept(moi.peerName, moi.userName, moi.moduleName)
 		else:
 			assert False
@@ -473,44 +484,44 @@ class SnLocalManager:
 
 		if peerInfo is not None and self._matchPmi(peerName, peerInfo, moi):
 			# peer exist
-			if moi.state == _ModuleInfoInternal.STATE_INIT:
+			if moi.state == _ModuleObjInternal.STATE_INIT:
 				pass
-			elif moi.state == _ModuleInfoInternal.STATE_ACTIVE:
+			elif moi.state == _ModuleObjInternal.STATE_ACTIVE:
 				pass
-			elif moi.state == _ModuleInfoInternal.STATE_INACTIVE:
-				self._moiChangeState(moi, _ModuleInfoInternal.STATE_ACTIVE)
+			elif moi.state == _ModuleObjInternal.STATE_INACTIVE:
+				self._moiChangeState(moi, _ModuleObjInternal.STATE_ACTIVE)
 				self._moiCallFunc(moi, "onActive")
-			elif moi.state == _ModuleInfoInternal.STATE_REJECT:
+			elif moi.state == _ModuleObjInternal.STATE_REJECT:
 				pass
-			elif moi.state == _ModuleInfoInternal.STATE_PEER_REJECT:
+			elif moi.state == _ModuleObjInternal.STATE_PEER_REJECT:
 				pass
-			elif moi.state == _ModuleInfoInternal.STATE_EXCEPT:
+			elif moi.state == _ModuleObjInternal.STATE_EXCEPT:
 				pass
-			elif moi.state == _ModuleInfoInternal.STATE_PEER_EXCEPT:
+			elif moi.state == _ModuleObjInternal.STATE_PEER_EXCEPT:
 				pass
 			else:
 				assert False
 		else:
 			# peer not exist
-			if moi.state == _ModuleInfoInternal.STATE_INIT:
+			if moi.state == _ModuleObjInternal.STATE_INIT:
 				pass
-			elif moi.state == _ModuleInfoInternal.STATE_ACTIVE:
-				self._moiChangeState(moi, _ModuleInfoInternal.STATE_INACTIVE)
+			elif moi.state == _ModuleObjInternal.STATE_ACTIVE:
+				self._moiChangeState(moi, _ModuleObjInternal.STATE_INACTIVE)
 				self._moiCallFunc(moi, "onInactive")
-			elif moi.state == _ModuleInfoInternal.STATE_INACTIVE:
+			elif moi.state == _ModuleObjInternal.STATE_INACTIVE:
 				pass
-			elif moi.state == _ModuleInfoInternal.STATE_REJECT:
-				self._moiChangeState(moi, _ModuleInfoInternal.STATE_INACTIVE)
-			elif moi.state == _ModuleInfoInternal.STATE_PEER_REJECT:
-				self._moiChangeState(moi, _ModuleInfoInternal.STATE_INACTIVE)
-			elif moi.state == _ModuleInfoInternal.STATE_EXCEPT:
+			elif moi.state == _ModuleObjInternal.STATE_REJECT:
+				self._moiChangeState(moi, _ModuleObjInternal.STATE_INACTIVE)
+			elif moi.state == _ModuleObjInternal.STATE_PEER_REJECT:
+				self._moiChangeState(moi, _ModuleObjInternal.STATE_INACTIVE)
+			elif moi.state == _ModuleObjInternal.STATE_EXCEPT:
 				pass
-			elif moi.state == _ModuleInfoInternal.STATE_PEER_EXCEPT:
-				self._moiChangeState(moi, _ModuleInfoInternal.STATE_INACTIVE)
+			elif moi.state == _ModuleObjInternal.STATE_PEER_EXCEPT:
+				self._moiChangeState(moi, _ModuleObjInternal.STATE_INACTIVE)
 			else:
 				assert False
 
-class _PeerInfoInternal:
+class _PeerObjInternal:
 	PEER_STATE_IN_INIT
 	PEER_STATE_IN_ACTIVE
 	PEER_STATE_IN_INACTIVE
@@ -519,7 +530,7 @@ class _PeerInfoInternal:
 	packetQueue = None						# List<obj>
 	moiList = None							# List<_ModuleInfoInternal
 
-class _ModuleInfoInternal:
+class _ModuleObjInternal:
 	STATE_INIT = 0
 	STATE_INACTIVE = 1
 	STATE_ACTIVE = 2
@@ -550,19 +561,19 @@ def _dbgmsg_moi_key(moi):
 		return "%s, %s, %s"%(moi.peerName, moi.userName, moi.moduleName)
 
 def _module_state_to_str(moduleState):
-	if moduleState == _ModuleInfoInternal.STATE_INIT:
+	if moduleState == _ModuleObjInternal.STATE_INIT:
 		return "STATE_INIT"
-	elif moduleState == _ModuleInfoInternal.STATE_INACTIVE:
+	elif moduleState == _ModuleObjInternal.STATE_INACTIVE:
 		return "STATE_INACTIVE"
-	elif moduleState == _ModuleInfoInternal.STATE_ACTIVE:
+	elif moduleState == _ModuleObjInternal.STATE_ACTIVE:
 		return "STATE_ACTIVE"
-	elif moduleState == _ModuleInfoInternal.STATE_REJECT:
+	elif moduleState == _ModuleObjInternal.STATE_REJECT:
 		return "STATE_REJECT"
-	elif moduleState == _ModuleInfoInternal.STATE_PEER_REJECT:
+	elif moduleState == _ModuleObjInternal.STATE_PEER_REJECT:
 		return "STATE_PEER_REJECT"
-	elif moduleState == _ModuleInfoInternal.STATE_EXCEPT:
+	elif moduleState == _ModuleObjInternal.STATE_EXCEPT:
 		return "STATE_EXCEPT"
-	elif moduleState == _ModuleInfoInternal.STATE_PEER_EXCEPT:
+	elif moduleState == _ModuleObjInternal.STATE_PEER_EXCEPT:
 		return "STATE_PEER_EXCEPT"
 	else:
 		assert False
