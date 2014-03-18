@@ -43,7 +43,7 @@ ModuleInstance FSM trigger table:
 
 """
 ModuleInstance FSM event callback table:
-  (module has no way to control the state change, it can only respond to it)
+  (module has no way to control the state change, it can only adapte to it)
 
   STATE_INIT     -> STATE_INACTIVE    : call onInit        BEFORE state change
   STATE_INACTIVE -> STATE_ACTIVE      : call onActive      AFTER state change
@@ -51,16 +51,6 @@ ModuleInstance FSM event callback table:
   STATE_ACTIVE   -> STATE_REJECT      : call onInactive    AFTER state change
   STATE_ACTIVE   -> STATE_PEER_REJECT : call onInactive    AFTER state change
   STATE_ACTIVE   -> STATE_PEER_EXCEPT : call onInactive    AFTER state change
-
-"""
-
-"""
-Module state change can occur during function call:
-
-  onInit     : uninterruptible
-  onActive   : interruptible
-  onInactive : uninterruptible
-  onRecv     : interruptible
 
 """
 
@@ -139,7 +129,8 @@ class SnLocalManager:
 	def dispose(self):
 		logging.debug("SnLocalManager.dispose: Start")
 
-		self.onPeerRemove(socket.gethostname())
+		self.localInfo = None
+		self.onPeerChange(socket.gethostname(), None)
 		assert all(x for x in self.moiList if x.state in [ _ModuleInfoInternal.STATE_EXCEPT, _ModuleInfoInternal.STATE_INACTIVE ])
 
 		logging.debug("SnLocalManager.dispose: End")
@@ -173,15 +164,6 @@ class SnLocalManager:
 			self._moiPeerUpdate(peerName, peerInfo, moi)
 
 		logging.debug("SnLocalManager.onPeerChange: End")
-		return
-
-	def onPeerRemove(self, peerName):
-		logging.debug("SnLocalManager.onPeerRemove: Start, %s", peerName)
-
-		for moi in self.moiList:
-			self._moiPeerUpdate(peerName, None, moi)
-
-		logging.debug("SnLocalManager.onPeerRemove: End")
 		return
 
 	def onPeerSockRecv(self, peerName, userName, srcModuleName, data):
@@ -528,6 +510,15 @@ class SnLocalManager:
 			else:
 				assert False
 
+class _PeerInfoInternal:
+	PEER_STATE_IN_INIT
+	PEER_STATE_IN_ACTIVE
+	PEER_STATE_IN_INACTIVE
+
+	state = None
+	packetQueue = None						# List<obj>
+	moiList = None							# List<_ModuleInfoInternal
+
 class _ModuleInfoInternal:
 	STATE_INIT = 0
 	STATE_INACTIVE = 1
@@ -536,7 +527,6 @@ class _ModuleInfoInternal:
 	STATE_PEER_REJECT = 4
 	STATE_EXCEPT = 5
 	STATE_PEER_EXCEPT = 6
-
 
 	peerName = None							# str
 	userName = None							# str, can be None

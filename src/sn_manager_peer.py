@@ -74,8 +74,8 @@ Peer FSM callback table:
 
   STATE_CFG_MATCH -> STATE_FULL      : call onPeerChange
   STATE_FULL                         : call onPeerChange when SnSysInfo is received
-  STATE_FULL      -> STATE_REJECT    : call onPeerRemove
-  STATE_FULL      -> STATE_NONE      : call onPeerRemove
+  STATE_FULL      -> STATE_REJECT    : call onPeerChange
+  STATE_FULL      -> STATE_NONE      : call onPeerChange
 """
 
 """
@@ -496,10 +496,8 @@ class SnPeerManager:
 		self.peerInfoDict[peerName].sock.send(packetObj)
 
 	def _peerToShutdown(self, peerName):
-		# do notify
-		if self.peerInfoDict[peerName].fsmState == _PeerInfoInternal.STATE_FULL:
-			self.param.localManager.onPeerRemove(peerName)
-
+		oldState = self.peerInfoDict[peerName].fsmState
+	
 		# remove peer, don't modify powerStateWhenInactive
 		self.peerInfoDict[peerName].sock.close()
 		self.peerInfoDict[peerName].fsmState = _PeerInfoInternal.STATE_NONE
@@ -507,11 +505,13 @@ class SnPeerManager:
 		self.peerInfoDict[peerName].sock = None
 		self.peerInfoDict[peerName].opArgPower = None
 
-	def _peerToReject(self, peerName):
 		# do notify
-		if self.peerInfoDict[peerName].fsmState == _PeerInfoInternal.STATE_FULL:
-			self.param.localManager.onPeerRemove(peerName)
+		if oldState == _PeerInfoInternal.STATE_FULL:
+			self.param.localManager.onPeerChange(peerName, None)
 
+	def _peerToReject(self, peerName):
+		oldState = self.peerInfoDict[peerName].fsmState
+	
 		# remove peer
 		self.peerInfoDict[peerName].sock.close()
 		self.peerInfoDict[peerName].powerStateWhenInactive = self.POWER_STATE_UNKNOWN
@@ -519,6 +519,10 @@ class SnPeerManager:
 		self.peerInfoDict[peerName].infoObj = None
 		self.peerInfoDict[peerName].sock = None
 		self.peerInfoDict[peerName].opArgPower = None
+
+		# do notify
+		if oldState == _PeerInfoInternal.STATE_FULL:
+			self.param.localManager.onPeerChange(peerName, None)
 
 	def _timerOperation(self):
 		if any(x for x in self.peerInfoDict.values() if x.sock is None):
