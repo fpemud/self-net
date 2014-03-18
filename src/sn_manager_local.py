@@ -20,7 +20,7 @@ from sn_module import SnModuleInstance
 from sn_module import SnRejectException
 
 """
-ModuleInstance FSM trigger table:
+ModuleInstance FSM trigger:
   (STATE_INIT is the initial state)
 
   STATE_INIT        -> STATE_INACTIVE    : initialized
@@ -42,7 +42,7 @@ ModuleInstance FSM trigger table:
 """
 
 """
-ModuleInstance FSM event callback table:
+ModuleInstance FSM event callback:
   (module has no way to control the state change, it can only adapte to it)
 
   STATE_INIT     -> STATE_INACTIVE    : call onInit        BEFORE state change
@@ -55,7 +55,7 @@ ModuleInstance FSM event callback table:
 """
 
 """
-ModuleInstance FSM sendReject / sendExcept table:
+ModuleInstance FSM sendReject / sendExcept:
 
   STATE_INIT        -> onInit     -> excGeneral   -> STATE_EXCEPT
   STATE_ACTIVE      -> onActive   -> excGeneral   -> STATE_EXCEPT -> sendExcept
@@ -65,6 +65,43 @@ ModuleInstance FSM sendReject / sendExcept table:
   STATE_PEER_EXCEPT -> onInactive -> excGeneral   -> STATE_EXCEPT
   STATE_REJECT      -> onInactive -> return                       -> sendReject
   STATE_REJECT      -> onInactive -> excGeneral   -> STATE_EXCEPT -> sendExcept
+
+"""
+
+"""
+ModuleInstance FSM action after onXXX returns:
+
+  onInit returns:
+    STATE_INIT + peerDown -> STATE_INACTIVE
+    STATE_INIT + peerUp   -> STATE_ACTIVE
+
+  onActive returns:
+    STATE_ACTIVE                    -> do nothing
+    STATE_ACTIVE + peerDownPending  -> call onInactive, clear peerDownPending
+    STATE_INACTIVE                  -> call onInactive
+    STATE_PEER_REJECT               -> call onInactive
+    STATE_PEER_EXCEPT               -> call onInactive
+
+  onRecv returns:
+    STATE_ACTIVE                    -> do nothing
+    STATE_ACTIVE + peerDownPending  -> call onInactive, clear peerDownPending
+    STATE_INACTIVE                  -> call onInactive
+    STATE_PEER_REJECT               -> call onInactive
+    STATE_PEER_EXCEPT               -> call onInactive
+
+  onInactive returns:
+    STATE_ACTIVE                    -> call onActive
+    STATE_INACTIVE                  -> do nothing
+    STATE_PEER_REJECT               -> do nothing
+    STATE_PEER_EXCEPT               -> do nothing
+
+"""
+
+"""
+ModuleInstance peerPacketQueue:
+
+  This queue is filled whenever packet is received from peer.
+  This queue is cleare when the peer becomes down.
 
 """
 
@@ -120,8 +157,9 @@ class SnLocalManager:
 		self.poiDict = self._getPoiDict()
 		self.sleepNotifier = SnSleepNotifier(self.onBeforeSleep, self.onAfterResume)
 
-		GLib.idle_add(self._idleInitMoiList)
-		GLib.idle_add(self._idleLocalPeerActive)
+		# initialization
+		self._initMoiList()
+		self.onPeerChange(socket.gethostname(), self.localInfo)
 
 		logging.debug("SnLocalManager.__init__: End")
 		return
@@ -235,27 +273,9 @@ class SnLocalManager:
 		assert moi.state == _ModuleObjInternal.STATE_ACTIVE
 		moi.workState = workState
 
-	def _idleLocalPeerActive(self):
-		self.onPeerChange(socket.gethostname(), self.localInfo)
-		return False
-
 	def _idleLocalPeerRecv(self, peerName, userName, moduleName, data):
 		self.onPeerSockRecv(peerName, userName, moduleName, data)
 		return False
-
-	def _idleInitMoiList(self):
-		for pname, moiList in self.poiDict.items():
-			for moi in moiList:
-				if not moi.propDict["standalone"]:
-					exec("from %s import ModuleInstanceObject"%(moi.moduleName.replace("-", "_")))
-					moi.mo = ModuleInstanceObject(self, moi.peerName, moi.userName, moi.moduleName, moi.tmpDir)
-				else:
-					moi.proc = SnSubProcess(moi.peerName, moi.userName, moi.moduleName, moi.tmpDir, self.onLocalSockRecv, None)
-					moi.proc.start()
-				moi.state = _ModuleObjInternal.STATE_INIT
-				moi.failMessage = ""
-				moi.workState = SnModuleInstance.WORK_STATE_IDLE
-				self._moiCallFunc(moi, "onInit")
 
 	def _getLocalInfo(self):
 		pgs = strict_pgs.PasswdGroupShadow("/")
@@ -331,6 +351,20 @@ class SnLocalManager:
 			poiDict[pname] = moiList
 		return poiDict
 
+	def _initMoiList(self):
+		for pname, moiList in self.poiDict.items():
+			for moi in moiList:
+				if not moi.propDict["standalone"]:
+					exec("from %s import ModuleInstanceObject"%(moi.moduleName.replace("-", "_")))
+					moi.mo = ModuleInstanceObject(self, moi.peerName, moi.userName, moi.moduleName, moi.tmpDir)
+				else:
+					moi.proc = SnSubProcess(moi.peerName, moi.userName, moi.moduleName, moi.tmpDir, self.onLocalSockRecv, None)
+					moi.proc.start()
+				moi.state = _ModuleObjInternal.STATE_INIT
+				moi.failMessage = ""
+				moi.workState = SnModuleInstance.WORK_STATE_IDLE
+				self._moiCallFunc(moi, "onInit")
+
 	def _getMoi(self, peerName, userName, moduleName):
 		moiList = self.poiDict[peerName]
 		for moi in moiList:
@@ -386,6 +420,9 @@ class SnLocalManager:
 				_module_state_to_str(newState), _dbgmsg_moi_key(moi))
 		moi.state = newState
 		moi.failMessage = failMessage
+
+		if newState != _ModuleObjInternal.STATE_ACTIVE:
+			moi.peerPacketQueue = []
 
 	def _moiCallFunc(self, moi, funcName, *args):
 		assert moi.calling is None
@@ -515,7 +552,7 @@ class SnLocalManager:
 			elif moi.state == _ModuleObjInternal.STATE_PEER_REJECT:
 				self._moiChangeState(moi, _ModuleObjInternal.STATE_INACTIVE)
 			elif moi.state == _ModuleObjInternal.STATE_EXCEPT:
-				pass
+				self._moiChangeState(moi, _ModuleObjInternal.STATE_INACTIVE)
 			elif moi.state == _ModuleObjInternal.STATE_PEER_EXCEPT:
 				self._moiChangeState(moi, _ModuleObjInternal.STATE_INACTIVE)
 			else:
@@ -523,7 +560,6 @@ class SnLocalManager:
 
 class _PeerObjInternal:
 	moiList = None							# List<_ModuleInfoInternal
-	packetQueue = None						# List<obj>
 
 class _ModuleObjInternal:
 	STATE_INIT = 0
@@ -548,6 +584,7 @@ class _ModuleObjInternal:
 	failMessage = None						# str
 	calling = None							# str
 	workState = None						# enum
+	peerPacketQueue = None					# List<obj>
 
 def _dbgmsg_moi_key(moi):
 	if moi.userName is None:
