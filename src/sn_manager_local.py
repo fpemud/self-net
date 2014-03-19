@@ -20,88 +20,101 @@ from sn_module import SnModuleInstance
 from sn_module import SnRejectException
 
 """
-ModuleInstance FSM trigger:
-  (STATE_INIT is the initial state)
+ModuleInstance life cycle:
 
-  STATE_INIT        -> STATE_INACTIVE    : initialized
-  STATE_INACTIVE    -> STATE_ACTIVE      : peer added, peer module added
-  STATE_ACTIVE      -> STATE_INACTIVE    : peer removed, peer module removed
+A MoudleInstance is created when (peer up && peer module added), is destroyed
+when (peer down || peer module removed).
 
-  STATE_ACTIVE      -> STATE_REJECT      : onRecv raise SnRejectException
-  STATE_ACTIVE      -> STATE_PEER_REJECT : reject received
-  STATE_REJECT      -> STATE_INACTIVE    : peer removed, peer module removed
-  STATE_PEER_REJECT -> STATE_INACTIVE    : peer removed, peer module removed
+If peer becomes down and up rapidly (or peer module become removed and added
+rapidly), the previous ModuleInstance must be full destroyed before the new
+ModuleInstance is created.
 
-  STATE_INIT        -> STATE_EXCEPT      : onInit raise exception
-  STATE_INACTIVE    -> STATE_EXCEPT      : onActive raise exception
-  STATE_ACTIVE      -> STATE_EXCEPT      : onRecv / onInactive raise exception
-  STATE_ACTIVE      -> STATE_PEER_EXCEPT : except received
-  STATE_REJECT      -> STATE_EXCEPT      : onInactive raise exception
-  STATE_PEER_EXCEPT -> STATE_INACTIVE    : peer removed, peer module removed
+The FSM of ModuleInstance can be generally described as below:
+  new -> STATE_ACTIVE -> STATE_FULL -> STATE_INACTIVE -> delete
 
 """
 
 """
-ModuleInstance FSM event callback:
-  (module has no way to control the state change, it can only adapte to it)
+ModuleInstance FSM detailed specification:
 
-  STATE_INIT     -> STATE_INACTIVE    : call onInit        BEFORE state change
-  STATE_INACTIVE -> STATE_ACTIVE      : call onActive      AFTER state change
-  STATE_ACTIVE   -> STATE_INACTIVE    : call onInactive    AFTER state change
-  STATE_ACTIVE   -> STATE_REJECT      : call onInactive    AFTER state change
-  STATE_ACTIVE   -> STATE_PEER_REJECT : call onInactive    AFTER state change
-  STATE_ACTIVE   -> STATE_PEER_EXCEPT : call onInactive    AFTER state change
+    new             -> STATE_ACTIVE      : module instance created
+  STATE_ACTIVE      -> STATE_FULL        : onActive returns
+  STATE_FULL        -> STATE_INACTIVE    : peer removed, peer module removed
+  STATE_INACTIVE    ->   delete          : onInactive returns or raises exception
+
+  STATE_FULL        -> STATE_REJECT      : onRecv raise SnRejectException
+  STATE_FULL        -> STATE_PEER_REJECT : reject received
+  STATE_FULL        -> STATE_PEER_EXCEPT : except received
+
+  STATE_ACTIVE      -> STATE_EXCEPT      : onActive raises exception
+  STATE_FULL        -> STATE_EXCEPT      : onRecv raises exception
+  STATE_REJECT      -> STATE_EXCEPT      : onInactive raises exception
+  STATE_PEER_REJECT -> STATE_EXCEPT      : onInactive raises exception
+  STATE_PEER_EXCEPT -> STATE_EXCEPT      : onInactive raises exception
+
+  STATE_REJECT      ->   delete          : peer removed, peer module removed
+  STATE_PEER_REJECT ->   delete          : peer removed, peer module removed
+  STATE_EXCEPT      ->   delete          : peer removed, peer module removed
+  STATE_PEER_EXCEPT ->   delete          : peer removed, peer module removed
+
+"""
+
+"""
+ModuleInstance FSM event callback specification:
+  (action is carried on AFTER state change)
+
+                    -> STATE_ACTIVE      : call onActive
+  STATE_ACTIVE      -> STATE_FULL        : do nothing
+  STATE_FULL        -> STATE_INACTIVE    : call onInactive
+  STATE_INACTIVE    ->  delete           :
+
+  STATE_FULL        -> STATE_REJECT      : call onInactive
+  STATE_FULL        -> STATE_PEER_REJECT : call onInactive
+  STATE_FULL        -> STATE_PEER_EXCEPT : call onInactive
+
+  STATE_ACTIVE      -> STATE_EXCEPT      : do nothing
+  STATE_FULL        -> STATE_EXCEPT      : do nothing
+  STATE_REJECT      -> STATE_EXCEPT      : do nothing
+  STATE_PEER_REJECT -> STATE_EXCEPT      : do nothing
+  STATE_PEER_EXCEPT -> STATE_EXCEPT      : do nothing
+
+  STATE_REJECT      ->   delete          :
+  STATE_PEER_REJECT ->   delete          :
+  STATE_EXCEPT      ->   delete          :
+  STATE_PEER_EXCEPT ->   delete          :
 
 """
 
 """
 ModuleInstance FSM sendReject / sendExcept:
 
-  STATE_INIT        -> onInit     -> excGeneral   -> STATE_EXCEPT
   STATE_ACTIVE      -> onActive   -> excGeneral   -> STATE_EXCEPT -> sendExcept
-  STATE_ACTIVE      -> onRecv     -> excGeneral   -> STATE_EXCEPT -> sendExcept
-  STATE_INACTIVE    -> onInactive -> excGeneral   -> STATE_EXCEPT
+  STATE_FULL        -> onRecv     -> excReject    -> STATE_REJECT -> onInactive -> return     -> sendReject
+  STATE_FULL        -> onRecv     -> excReject    -> STATE_REJECT -> onInactive -> excGeneral -> STATE_EXCEPT -> sendExcept
+  STATE_FULL        -> onRecv     -> excGeneral   -> STATE_EXCEPT -> sendExcept
   STATE_PEER_REJECT -> onInactive -> excGeneral   -> STATE_EXCEPT
   STATE_PEER_EXCEPT -> onInactive -> excGeneral   -> STATE_EXCEPT
-  STATE_REJECT      -> onInactive -> return                       -> sendReject
-  STATE_REJECT      -> onInactive -> excGeneral   -> STATE_EXCEPT -> sendExcept
-
-"""
-
-"""
-ModuleInstance FSM action after onXXX returns:
-
-  onInit returns:
-    STATE_INIT + peerDown -> STATE_INACTIVE
-    STATE_INIT + peerUp   -> STATE_ACTIVE
-
-  onActive returns:
-    STATE_ACTIVE                    -> do nothing
-    STATE_ACTIVE + peerDownPending  -> call onInactive, clear peerDownPending
-    STATE_INACTIVE                  -> call onInactive
-    STATE_PEER_REJECT               -> call onInactive
-    STATE_PEER_EXCEPT               -> call onInactive
-
-  onRecv returns:
-    STATE_ACTIVE                    -> do nothing
-    STATE_ACTIVE + peerDownPending  -> call onInactive, clear peerDownPending
-    STATE_INACTIVE                  -> call onInactive
-    STATE_PEER_REJECT               -> call onInactive
-    STATE_PEER_EXCEPT               -> call onInactive
-
-  onInactive returns:
-    STATE_ACTIVE                    -> call onActive
-    STATE_INACTIVE                  -> do nothing
-    STATE_PEER_REJECT               -> do nothing
-    STATE_PEER_EXCEPT               -> do nothing
 
 """
 
 """
 ModuleInstance peerPacketQueue:
 
-  This queue is filled whenever packet is received from peer.
-  This queue is cleare when the peer becomes down.
+Packets received are stored in moi.peerPacketQueue. Packet receiving starts
+when the ModuleInstance is created, stops when the peer enters STATE_INACTIVE,
+STATE_REJECT, STATE_PEER_REJECT, STATE_EXCEPT or STATE_PEER_EXCEPT state.
+moi.peerPacketQueue is also cleared when packet receiving is stopped.
+
+Packet can only be sent when moi is in STATE_FULL.
+
+"""
+
+"""
+ModuleInstance function interruption:
+
+  onActive   : STATE_INACTIVE, STATE_PEER_REJECT, STATE_PEER_EXCEPT
+  onRecv     : STATE_INACTIVE, STATE_PEER_REJECT, STATE_PEER_EXCEPT
+  onInactive : none interruption
 
 """
 
