@@ -20,31 +20,58 @@ from sn_module import SnModuleInstance
 from sn_module import SnRejectException
 
 """
-ModuleInstance life cycle:
+_PeerObjInternal(poi) life cycle:
 
-A MoudleInstance is created when (peer up && peer module added), is destroyed
-when (peer down || peer module removed).
+The poi object is created when peer up, is destroyed when peer down. But the
+poi object must go through a garbage-collection process before destruction if
+it has start functioning. In garbage-collection, poi object wait for all the
+moi object to complete their inactive function call.
 
-If peer becomes down and up rapidly (or peer module become removed and added
-rapidly), the previous ModuleInstance must be full destroyed before the new
-ModuleInstance is created.
+If the peer up again in the middle of the GC process, the new poi object will
+still be created but remain in a pending state, it will only start work after
+the old poi object is finally destroyed.
+If the peer down again, then the new poi object is directly destroyed because
+the functioning has not begin.
 
-The FSM of ModuleInstance can be generally described as below:
-  new -> STATE_ACTIVE -> STATE_FULL -> STATE_INACTIVE -> delete
+FSM of poi object:
+  new -> STATE_PENDING -> STATE_NORMAL -> STATE_GC -> delete
+  new -> STATE_PENDING -> delete
+
+The poi object starts receive packet immediately after it is created, it is
+not related to any moi object state.
 
 """
 
 """
-ModuleInstance FSM detailed specification:
+_ModuleObjInternal(moi) life cycle:
 
-    new             -> STATE_ACTIVE      : module instance created
-  STATE_ACTIVE      -> STATE_FULL        : onActive returns
-  STATE_FULL        -> STATE_INACTIVE    : peer removed, peer module removed
-  STATE_INACTIVE    ->   delete          : onInactive returns or raises exception
+The moi object is stored in poi.moiList, so it is created after the poi
+object. The moi object is create if there's counterpart in peerInfo, and is
+destroyed if the counterpart disappears from peerInfo.
 
+FSM of moi object:
+  new -> STATE_PENDING -> STATE_ACTIVE -> STATE_FULL -> STATE_INACTIVE -> delete
+
+"""
+
+"""
+_ModuleObjInternal FSM detailed specification:
+
+    new             -> STATE_PENDING     : module instance created, old poi object is around
+    new             -> STATE_ACTIVE      : module instance created, no old poi object
+  STATE_PENDING     -> STATE_ACTIVE      : old poi object is destroyed
+
+  STATE_ACTIVE      -> STATE_FULL        : onActive returns, peer normal and peer module normal
+  STATE_ACTIVE      -> STATE_PEER_REJECT : onActive returns, reject received
+  STATE_ACTIVE      -> STATE_PEER_EXCEPT : onActive returns, except received
+  STATE_ACTIVE      -> STATE_INACTIVE    : onActive returns, peer removed or peer module removed
+
+  STATE_FULL        -> STATE_INACTIVE    : peer removed or peer module removed
   STATE_FULL        -> STATE_REJECT      : onRecv raise SnRejectException
-  STATE_FULL        -> STATE_PEER_REJECT : reject received
-  STATE_FULL        -> STATE_PEER_EXCEPT : except received
+  STATE_FULL        -> STATE_PEER_REJECT : onRecv returns, reject received
+  STATE_FULL        -> STATE_PEER_EXCEPT : onRecv returns, except received
+
+  STATE_INACTIVE    ->   delete          : onInactive returns or raises exception
 
   STATE_ACTIVE      -> STATE_EXCEPT      : onActive raises exception
   STATE_FULL        -> STATE_EXCEPT      : onRecv raises exception
@@ -60,17 +87,24 @@ ModuleInstance FSM detailed specification:
 """
 
 """
-ModuleInstance FSM event callback specification:
+_ModuleObjInternal FSM event callback specification:
   (action is carried on AFTER state change)
 
-                    -> STATE_ACTIVE      : call onActive
-  STATE_ACTIVE      -> STATE_FULL        : do nothing
-  STATE_FULL        -> STATE_INACTIVE    : call onInactive
-  STATE_INACTIVE    ->  delete           :
+    new             -> STATE_PENDING     : do nothing
+    new             -> STATE_ACTIVE      : call onActive
+  STATE_PENDING     -> STATE_ACTIVE      : call onActive
 
+  STATE_ACTIVE      -> STATE_FULL        : do nothing
+  STATE_ACTIVE      -> STATE_PEER_REJECT : call onInactive
+  STATE_ACTIVE      -> STATE_PEER_EXCEPT : call onInactive
+  STATE_ACTIVE      -> STATE_INACTIVE    : call onInactive
+
+  STATE_FULL        -> STATE_INACTIVE    : call onInactive
   STATE_FULL        -> STATE_REJECT      : call onInactive
   STATE_FULL        -> STATE_PEER_REJECT : call onInactive
   STATE_FULL        -> STATE_PEER_EXCEPT : call onInactive
+
+  STATE_INACTIVE    ->  delete           :
 
   STATE_ACTIVE      -> STATE_EXCEPT      : do nothing
   STATE_FULL        -> STATE_EXCEPT      : do nothing
@@ -86,7 +120,7 @@ ModuleInstance FSM event callback specification:
 """
 
 """
-ModuleInstance FSM sendReject / sendExcept:
+_ModuleObjInternal FSM sendReject / sendExcept:
 
   STATE_ACTIVE      -> onActive   -> excGeneral   -> STATE_EXCEPT -> sendExcept
   STATE_FULL        -> onRecv     -> excReject    -> STATE_REJECT -> onInactive -> return     -> sendReject
@@ -94,27 +128,6 @@ ModuleInstance FSM sendReject / sendExcept:
   STATE_FULL        -> onRecv     -> excGeneral   -> STATE_EXCEPT -> sendExcept
   STATE_PEER_REJECT -> onInactive -> excGeneral   -> STATE_EXCEPT
   STATE_PEER_EXCEPT -> onInactive -> excGeneral   -> STATE_EXCEPT
-
-"""
-
-"""
-ModuleInstance peerPacketQueue:
-
-Packets received are stored in moi.peerPacketQueue. Packet receiving starts
-when the ModuleInstance is created, stops when the peer enters STATE_INACTIVE,
-STATE_REJECT, STATE_PEER_REJECT, STATE_EXCEPT or STATE_PEER_EXCEPT state.
-moi.peerPacketQueue is also cleared when packet receiving is stopped.
-
-Packet can only be sent when moi is in STATE_FULL.
-
-"""
-
-"""
-ModuleInstance function interruption:
-
-  onActive   : STATE_INACTIVE, STATE_PEER_REJECT, STATE_PEER_EXCEPT
-  onRecv     : STATE_INACTIVE, STATE_PEER_REJECT, STATE_PEER_EXCEPT
-  onInactive : none interruption
 
 """
 
@@ -572,6 +585,12 @@ class SnLocalManager:
 				assert False
 
 class _PeerObjInternal:
+	STATE_PENDING = 0
+	STATE_NORMAL = 1
+	STATE_GC = 2
+
+	state = None							# enum
+	peerPacketQueue = None					# List<obj>
 	moiList = None							# List<_ModuleInfoInternal
 
 class _ModuleObjInternal:
@@ -597,7 +616,6 @@ class _ModuleObjInternal:
 	failMessage = None						# str
 	calling = None							# str
 	workState = None						# enum
-	peerPacketQueue = None					# List<obj>
 
 def _dbgmsg_moi_key(moi):
 	if moi.userName is None:
