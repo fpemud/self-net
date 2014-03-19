@@ -38,7 +38,8 @@ FSM of poi object:
   new -> STATE_PENDING -> delete
 
 The poi object starts receive packet immediately after it is created, it is
-not related to any moi object state.
+not related to any moi object state. Packet is received into poi.peerPacketQueue.
+Only when the poi objec is in STATE_NORMAL can packet be sent out.
 
 """
 
@@ -51,6 +52,10 @@ destroyed if the counterpart disappears from peerInfo.
 
 FSM of moi object:
   new -> STATE_PENDING -> STATE_ACTIVE -> STATE_FULL -> STATE_INACTIVE -> delete
+
+moi object receives packet from poi.peerPacketQueue after it enters STATE_FULL.
+Only when the moi objec is in STATE_ACTIVE or STATE_FULL can business packet be
+sent out (except and reject packet is system packet).
 
 """
 
