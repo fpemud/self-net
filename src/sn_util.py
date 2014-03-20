@@ -227,6 +227,13 @@ class SnUtil:
 			return func(*args)
 
 	@staticmethod
+	def idleInvoke(func, *args):
+		def _idleCallback(func, *args):
+			func(*args)
+			return False
+		GLib.idle_add(_idleCallback, func, *args)
+
+	@staticmethod
 	def checkSshPubKey(pubkey, keyType, userName, hostName):
 		if keyType == "rsa":
 			prefix = "ssh-rsa"

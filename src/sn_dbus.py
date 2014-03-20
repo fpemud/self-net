@@ -8,7 +8,7 @@ import dbus.service
 from gi.repository import GObject
 from sn_util import SnUtil
 from sn_manager_local import SnLocalManager
-from sn_manager_local import _ModuleObjInternal			# fixme
+from sn_manager_local import _MoiObj			# fixme
 from sn_manager_peer import SnPeerManager
 
 ################################################################################
@@ -204,13 +204,13 @@ class DbusModuleObject(dbus.service.Object):
 	                     in_signature='', out_signature='(ss)')
 	def GetState(self, sender=None):
 		moduleStateDict = {
-			_ModuleObjInternal.STATE_INIT: "init",
-			_ModuleObjInternal.STATE_INACTIVE: "inactive",
-			_ModuleObjInternal.STATE_ACTIVE: "active",
-			_ModuleObjInternal.STATE_REJECT: "reject",
-			_ModuleObjInternal.STATE_PEER_REJECT: "peer-reject",
-			_ModuleObjInternal.STATE_EXCEPT: "except",
-			_ModuleObjInternal.STATE_PEER_EXCEPT: "peer-except",
+			_MoiObj.STATE_INIT: "init",
+			_MoiObj.STATE_INACTIVE: "inactive",
+			_MoiObj.STATE_ACTIVE: "active",
+			_MoiObj.STATE_REJECT: "reject",
+			_MoiObj.STATE_PEER_REJECT: "peer-reject",
+			_MoiObj.STATE_EXCEPT: "except",
+			_MoiObj.STATE_PEER_EXCEPT: "peer-except",
 		}
 		state, failMessage = self.param.localManager.getModuleState(self.peerName, self.userName, self.moduleName)
 		return (moduleStateDict[state], failMessage)

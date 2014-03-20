@@ -20,62 +20,42 @@ from sn_module import SnModuleInstance
 from sn_module import SnRejectException
 
 """
-_PeerObjInternal(poi) life cycle:
-
-The poi object is created when peer up, is destroyed when peer down. But the
-poi object must go through a garbage-collection process before destruction if
-it has start functioning. In garbage-collection, poi object wait for all the
-moi object to complete their inactive function call.
-
-If the peer up again in the middle of the GC process, the new poi object will
-still be created but remain in a pending state, it will only start work after
-the old poi object is finally destroyed.
-If the peer down again, then the new poi object is directly destroyed because
-the functioning has not begin.
-
-FSM of poi object:
-  new -> STATE_PENDING -> STATE_NORMAL -> STATE_GC -> delete
-  new -> STATE_PENDING -> delete
-
-The poi object starts receive packet immediately after it is created, it is
-not related to any moi object state. Packet is received into poi.peerPacketQueue.
-Only when the poi objec is in STATE_NORMAL can packet be sent out.
-
-"""
-
-"""
 _ModuleObjInternal(moi) life cycle:
 
-The moi object is stored in poi.moiList, so it is created after the poi
-object. The moi object is create if there's counterpart in peerInfo, and is
-destroyed if the counterpart disappears from peerInfo.
+moi object is created and destroyed when peer module appears and disappears, 
+but moi object must go through a garbage-collection process before destruction
+if it has start functioning (out of PENDING state).
 
-FSM of moi object:
-  new -> STATE_PENDING -> STATE_ACTIVE -> STATE_FULL -> STATE_INACTIVE -> delete
+New moi object won't go out of the PENDING state and start work before the
+old moi object is finally destroyed. The new moi object can be destroyed directly
+because it has not begon functioning.
 
-moi object receives packet from poi.peerPacketQueue after it enters STATE_FULL.
-Only when the moi objec is in STATE_ACTIVE or STATE_FULL can business packet be
-sent out (except and reject packet is system packet).
+moi object starts receive packet immediately after it is created. Packet is
+received into moi.peerPacketQueue.
+
+moi object can only send / recv business packet (except and reject packet is
+system packet) in FULL state. And moi object can not send / recv packet if it is
+in garbage-collection.
 
 """
 
 """
-_ModuleObjInternal FSM detailed specification:
+_ModuleObjInternal FSM state condition:
 
-    new             -> STATE_PENDING     : module instance created, old poi object is around
-    new             -> STATE_ACTIVE      : module instance created, no old poi object
-  STATE_PENDING     -> STATE_ACTIVE      : old poi object is destroyed
+    new             -> STATE_PENDING     : object created
+  STATE_PENDING     -> STATE_ACTIVE      : old poi object does not exist any more
 
   STATE_ACTIVE      -> STATE_FULL        : onActive returns, peer normal and peer module normal
   STATE_ACTIVE      -> STATE_PEER_REJECT : onActive returns, reject received
   STATE_ACTIVE      -> STATE_PEER_EXCEPT : onActive returns, except received
   STATE_ACTIVE      -> STATE_INACTIVE    : onActive returns, peer removed or peer module removed
 
-  STATE_FULL        -> STATE_INACTIVE    : peer removed or peer module removed
   STATE_FULL        -> STATE_REJECT      : onRecv raise SnRejectException
   STATE_FULL        -> STATE_PEER_REJECT : onRecv returns, reject received
   STATE_FULL        -> STATE_PEER_EXCEPT : onRecv returns, except received
+  STATE_FULL        -> STATE_INACTIVE    : peer down or peer module removed
 
+  STATE_PENDING     ->   delete          : peer down or peer module removed
   STATE_INACTIVE    ->   delete          : onInactive returns or raises exception
 
   STATE_ACTIVE      -> STATE_EXCEPT      : onActive raises exception
@@ -84,19 +64,15 @@ _ModuleObjInternal FSM detailed specification:
   STATE_PEER_REJECT -> STATE_EXCEPT      : onInactive raises exception
   STATE_PEER_EXCEPT -> STATE_EXCEPT      : onInactive raises exception
 
-  STATE_REJECT      ->   delete          : peer removed, peer module removed
-  STATE_PEER_REJECT ->   delete          : peer removed, peer module removed
-  STATE_EXCEPT      ->   delete          : peer removed, peer module removed
-  STATE_PEER_EXCEPT ->   delete          : peer removed, peer module removed
+  STATE_REJECT      ->   delete          : peer down or peer module removed
+  STATE_PEER_REJECT ->   delete          : peer down or peer module removed
+  STATE_EXCEPT      ->   delete          : peer down or peer module removed
+  STATE_PEER_EXCEPT ->   delete          : peer down or peer module removed
 
-"""
-
-"""
-_ModuleObjInternal FSM event callback specification:
+_ModuleObjInternal FSM state action:
   (action is carried on AFTER state change)
 
     new             -> STATE_PENDING     : do nothing
-    new             -> STATE_ACTIVE      : call onActive
   STATE_PENDING     -> STATE_ACTIVE      : call onActive
 
   STATE_ACTIVE      -> STATE_FULL        : do nothing
@@ -105,14 +81,14 @@ _ModuleObjInternal FSM event callback specification:
   STATE_ACTIVE      -> STATE_INACTIVE    : call onInactive
 
   STATE_FULL        -> STATE_INACTIVE    : call onInactive
-  STATE_FULL        -> STATE_REJECT      : call onInactive
+  STATE_FULL        -> STATE_REJECT      : sendReject, call onInactive
   STATE_FULL        -> STATE_PEER_REJECT : call onInactive
   STATE_FULL        -> STATE_PEER_EXCEPT : call onInactive
 
   STATE_INACTIVE    ->  delete           :
 
-  STATE_ACTIVE      -> STATE_EXCEPT      : do nothing
-  STATE_FULL        -> STATE_EXCEPT      : do nothing
+  STATE_ACTIVE      -> STATE_EXCEPT      : sendExcept
+  STATE_FULL        -> STATE_EXCEPT      : sendExcept
   STATE_REJECT      -> STATE_EXCEPT      : do nothing
   STATE_PEER_REJECT -> STATE_EXCEPT      : do nothing
   STATE_PEER_EXCEPT -> STATE_EXCEPT      : do nothing
@@ -121,18 +97,6 @@ _ModuleObjInternal FSM event callback specification:
   STATE_PEER_REJECT ->   delete          :
   STATE_EXCEPT      ->   delete          :
   STATE_PEER_EXCEPT ->   delete          :
-
-"""
-
-"""
-_ModuleObjInternal FSM sendReject / sendExcept:
-
-  STATE_ACTIVE      -> onActive   -> excGeneral   -> STATE_EXCEPT -> sendExcept
-  STATE_FULL        -> onRecv     -> excReject    -> STATE_REJECT -> onInactive -> return     -> sendReject
-  STATE_FULL        -> onRecv     -> excReject    -> STATE_REJECT -> onInactive -> excGeneral -> STATE_EXCEPT -> sendExcept
-  STATE_FULL        -> onRecv     -> excGeneral   -> STATE_EXCEPT -> sendExcept
-  STATE_PEER_REJECT -> onInactive -> excGeneral   -> STATE_EXCEPT
-  STATE_PEER_EXCEPT -> onInactive -> excGeneral   -> STATE_EXCEPT
 
 """
 
@@ -184,12 +148,13 @@ class SnLocalManager:
 
 		# variables
 		self.param = param
-		self.localInfo = self._getLocalInfo()
-		self.poiDict = self._getPoiDict()
+		self.localInfo = None
+		self.moiList = []
+		self.moiGcDict = []
 		self.sleepNotifier = SnSleepNotifier(self.onBeforeSleep, self.onAfterResume)
 
-		# initialization
-		self._initMoiList()
+		# local peer go into up state
+		self.localInfo = self._getLocalInfo()
 		self.onPeerChange(socket.gethostname(), self.localInfo)
 
 		logging.debug("SnLocalManager.__init__: End")
@@ -201,9 +166,7 @@ class SnLocalManager:
 		self.localInfo = None
 		self.onPeerChange(socket.gethostname(), None)
 
-		for pname, moiList in self.poiDict.items():
-			for moi in moiList:
-				assert moi.state in [ _ModuleObjInternal.STATE_EXCEPT, _ModuleObjInternal.STATE_INACTIVE ]
+		# FIXME: need to wait operation complete
 
 		logging.debug("SnLocalManager.dispose: End")
 		return
@@ -212,57 +175,98 @@ class SnLocalManager:
 		return self.localInfo
 
 	def getWorkState(self):
-		for pname, moiList in self.poiDict.items():
-			for moi in moiList:
-				if moi.workState == SnModuleInstance.WORK_STATE_WORKING:
-					return SnLocalManager.WORK_STATE_WORKING
+		for moi in self.moiList:
+			if moi.workState == SnModuleInstance.WORK_STATE_WORKING:
+				return SnLocalManager.WORK_STATE_WORKING
 		return SnLocalManager.WORK_STATE_IDLE
-
-	def getModuleKeyList(self):
-		ret = []
-		for pname, moiList in self.poiDict.items():
-			for moi in moiList:
-				ret.append((moi.peerName, moi.userName, moi.moduleName))
-		return ret
-
-	def getModuleState(self, peerName, userName, moduleName):
-		moi = self._getMoi(peerName, userName, moduleName)
-		return (moi.state, moi.failMessage)
 
 	##### event callback ####
 
 	def onPeerChange(self, peerName, peerInfo):
 		logging.debug("SnLocalManager.onPeerChange: Start, %s", peerName)
 
-		moiList = self.poiDict[peerName]
-		for moi in moiList:
-			self._moiPeerUpdate(peerName, peerInfo, moi)
+		if peerInfo is None:
+			peerInfo = SnSysInfo()
+			peerInfo.moduleList = []
+
+		# module remove
+		newMoiList = []
+		for moi in self.moiList:
+			if moi.peerName == peerName and not self._pmiMatch(peerName, peerInfo, moi):
+				if moi.state != _MoiObj.STATE_PENDING:
+					self.moiGcList.append(moi)
+					moi.gcFlag = _MoiObj.GC_START
+					if gcmoi.calling is None:
+						self._moiGcStart(moi)
+			else:
+				newMoiList.append(moi)
+		self.moiList = newMoiList
+
+		# module add
+		newMoiList = []
+		for moduleName in self.param.configManager.getModuleNameList():
+			minfo = self.param.configManager.getModuleInfo(moduleName)
+			if peerName == socket.gethostname() and not minfo.moduleObj.getPropDict()["allow-local-peer"]:
+				continue
+			if minfo.moduleScope == "sys":
+				moi = self._moiCreate(peerName, None, moduleName, minfo)
+				newMoiList.append(moi)
+			elif minfo.moduleScope == "usr":
+				for userName in pgs.getNormalUserList():
+					if userName in self.param.configManager.getUserBlackList():
+						continue
+					moi = self._moiCreate(peerName, userName, moduleName, minfo)
+					newMoiList.append(moi)
+		for moi in newMoiList:
+			if not self.pmiMatch(peerName, peerInfo, moi)
+				continue
+			self.moiList.append(moi)
+			if not self._moiGcObjExist(moi):
+				self._moiChangeState(moi, _MoiObj.STATE_ACTIVE, "")
 
 		logging.debug("SnLocalManager.onPeerChange: End")
 		return
 
 	def onPeerSockRecv(self, peerName, userName, srcModuleName, data):
 		moi = self._getMoiMapped(peerName, userName, srcModuleName)
-		if moi.state != _ModuleObjInternal.STATE_ACTIVE:
-			return
 
-		if self._typeCheck(data, SnDataPacketReject):
-			self._moiChangeState(moi, _ModuleObjInternal.STATE_PEER_REJECT)
-			self._moiCallFunc(moi, "onInactive")
-		elif self._typeCheck(data, SnDataPacketExcept):
-			self._moiChangeState(moi, _ModuleObjInternal.STATE_PEER_EXCEPT)
-			self._moiCallFunc(moi, "onInactive")
+		if moi.state == _MoiObj.STATE_PENDING:
+			moi.peerPacketQueue.append(data)
+		elif moi.state == _MoiObj.STATE_ACTIVE:
+			moi.peerPacketQueue.append(data)
+		elif moi.state == _MoiObj.STATE_FULL:
+			moi.peerPacketQueue.append(data)
+			if moi.calling is None:
+				assert len(self.peerPacketQueue) == 1
+				self._moiProcessPacket(moi)
+		elif moi.state == _MoiObj.STATE_REJECT:
+			pass			# redundant packet received
+		elif moi.state == _MoiObj.STATE_PEER_REJECT:
+			assert False	# shouldn't receive packet after peer reject
+		elif moi.state == _MoiObj.STATE_EXCEPT:
+			pass			# redundant packet received
+		elif moi.state == _MoiObj.STATE_PEER_EXCEPT:
+			assert False	# shouldn't receive packet after peer except
+		elif moi.state == _MoiObj.STATE_INACTIVE:
+			assert False	# shouldn't receive packet after peer down
 		else:
-			self._moiCallFunc(moi, "onRecv", data)
+			assert False
 
 	def onLocalSockRecv(self, peerName, userName, moduleName, packetObj):
-		moi = self._getMoi(peerName, userName, moduleName)
-		if self._typeCheck(packetObj, LocalSockSendObj):
-			self._sendObject(packetObj.peerName, packetObj.userName, packetObj.moduleName, packetObj.dataObj)
-		elif self._typeCheck(packetObj, LocalSockRetn):
+		moi = self._moiGet(peerName, userName, moduleName)
+		if _type_check(packetObj, LocalSockSendObj):
+			self._sendObject(peerName, userName, moduleName, packetObj.dataObj)
+		elif _type_check(packetObj, LocalSockRetn):
 			self._moiCallFuncReturn(moi, packetObj.retVal)
-		elif self._typeCheck(packetObj, LocalSockExcp):
+		elif _type_check(packetObj, LocalSockExcp):
 			self._moiCallFuncExcept(packetObj, packetObj.excObj, packetObj.excInfo)
+		else:
+			assert False
+
+	def onSubProcessStop(self, procObj):
+		moi = self._moiGet(procObj.peerName, procObj.userName, procObj.moduleName)
+		if moi.gcFlag is not None:
+			self._moiGcComplete(moi)
 		else:
 			assert False
 
@@ -273,40 +277,6 @@ class SnLocalManager:
 		pass
 
 	##### implementation ####
-
-	def _sendObject(self, peerName, userName, moduleName, obj):
-		if peerName == socket.gethostname():
-			GLib.idle_add(self._idleLocalPeerRecv, peerName, userName, moduleName, obj)
-		else:
-			self.param.peerManager.sendDataObject(peerName, userName, moduleName, obj)
-
-	def _sendReject(self, peerName, userName, moduleName, rejectMessage):
-		logging.warning("SnLocalManager.sendReject, %s, %s, %s, %s", peerName, userName, moduleName, rejectMessage)
-
-		messageObj = SnDataPacketReject()
-		messageObj.message = rejectMessage
-		if peerName == socket.gethostname():
-			GLib.idle_add(self._idleLocalPeerRecv, peerName, userName, moduleName, messageObj)
-		else:
-			self.param.peerManager.sendDataObject(peerName, userName, moduleName, messageObj)
-
-	def _sendExcept(self, peerName, userName, moduleName):
-		logging.warning("SnLocalManager.sendExcept, %s, %s, %s", peerName, userName, moduleName)
-
-		messageObj = SnDataPacketExcept()
-		if peerName == socket.gethostname():
-			GLib.idle_add(self._idleLocalPeerRecv, peerName, userName, moduleName, messageObj)
-		else:
-			self.param.peerManager.sendDataObject(peerName, userName, moduleName, messageObj)
-
-	def _setWorkState(self, peerName, userName, moduleName, workState):
-		moi = self._getMoi(peerName, userName, moduleName)
-		assert moi.state == _ModuleObjInternal.STATE_ACTIVE
-		moi.workState = workState
-
-	def _idleLocalPeerRecv(self, peerName, userName, moduleName, data):
-		self.onPeerSockRecv(peerName, userName, moduleName, data)
-		return False
 
 	def _getLocalInfo(self):
 		pgs = strict_pgs.PasswdGroupShadow("/")
@@ -341,128 +311,223 @@ class SnLocalManager:
 
 		return ret
 
-	def _getPoiDict(self):
-		"""Create a full module object collection"""
+	def _sendReject(self, peerName, userName, moduleName, rejectMessage):
+		moi = self._moiGet(peerName, userName, moduleName)
+		if moi.gcFlag is not None:
+			return
 
-		pgs = strict_pgs.PasswdGroupShadow("/")
-		poiDict = dict()
-		for pname in self.param.configManager.getHostNameList():
-			moiList = []
-			for mname in self.param.configManager.getModuleNameList():
-				minfo = self.param.configManager.getModuleInfo(mname)
-				if pname == socket.gethostname() and not minfo.moduleObj.getPropDict()["allow-local-peer"]:
-					continue
-				if minfo.moduleScope == "sys":
-					moi = _ModuleObjInternal()
-					moi.peerName = pname
-					moi.userName = None
-					moi.moduleName = mname
-					moi.moduleScope = minfo.moduleScope
-					moi.moduleType = minfo.moduleType
-					moi.moduleId = minfo.moduleId
-					moi.propDict = minfo.moduleObj.getPropDict()
-					moi.tmpDir = os.path.join(self.param.tmpDir, mname)
-					moiList.append(moi)
-				elif minfo.moduleScope == "usr":
-					for uname in pgs.getNormalUserList():
-						if uname in self.param.configManager.getUserBlackList():
-							continue
-						moi = _ModuleObjInternal()
-						moi.peerName = pname
-						moi.userName = uname
-						moi.moduleName = mname
-						moi.moduleScope = minfo.moduleScope
-						moi.moduleType = minfo.moduleType
-						moi.moduleId = minfo.moduleId
-						moi.propDict = minfo.moduleObj.getPropDict()
-						moi.tmpDir = os.path.join(self.param.tmpDir, "%s-%s"%(mname, uname))
-						moiList.append(moi)
-				else:
-					assert False
-			poiDict[pname] = moiList
-		return poiDict
+		logging.warning("SnLocalManager.sendReject, %s, %s, %s, %s", peerName, userName, moduleName, rejectMessage)
 
-	def _initMoiList(self):
-		for pname, moiList in self.poiDict.items():
-			for moi in moiList:
+		messageObj = SnDataPacketReject()
+		messageObj.message = rejectMessage
+		if peerName == socket.gethostname():
+			SnUtil.idleInvoke(self._idleLocalPeerRecv, peerName, userName, moduleName, messageObj)
+		else:
+			self.param.peerManager.sendDataObject(peerName, userName, moduleName, messageObj)
+
+	def _sendExcept(self, peerName, userName, moduleName):
+		moi = self._moiGet(peerName, userName, moduleName)
+		if moi.gcFlag is not None:
+			return
+
+		logging.warning("SnLocalManager.sendExcept, %s, %s, %s", peerName, userName, moduleName)
+
+		messageObj = SnDataPacketExcept()
+		if peerName == socket.gethostname():
+			SnUtil.idleInvoke(self._idleLocalPeerRecv, peerName, userName, moduleName, messageObj)
+		else:
+			self.param.peerManager.sendDataObject(peerName, userName, moduleName, messageObj)
+
+	def _sendObject(self, peerName, userName, moduleName, obj):
+		moi = self._moiGet(peerName, userName, moduleName)
+		if moi.gcFlag is not None:
+			return
+	
+		assert moi.state == _MoiObj.STATE_FULL
+		if peerName == socket.gethostname():
+			SnUtil.idleInvoke(self._idleLocalPeerRecv, peerName, userName, moduleName, obj)
+		else:
+			self.param.peerManager.sendDataObject(peerName, userName, moduleName, obj)
+
+	def _setWorkState(self, peerName, userName, moduleName, workState):
+		moi = self._moiGet(peerName, userName, moduleName)
+		if moi.gcFlag is not None:
+			return
+
+		assert moi.state == _MoiObj.STATE_FULL
+		moi.workState = workState
+
+	##### moi assistant method ####
+
+	def _moiCreate(self, peerName, userName, moduleName, minfo):
+		if minfo.moduleScope == "sys":
+			assert userName is None
+		elif minfo.moduleScope == "usr":
+			assert userName is not None
+		else:
+			assert False
+
+		moi = _MoiObj()
+		moi.peerName = peerName
+		moi.userName = userName
+		moi.moduleName = moduleName
+		moi.moduleScope = minfo.moduleScope
+		moi.moduleType = minfo.moduleType
+		moi.moduleId = minfo.moduleId
+		moi.propDict = minfo.moduleObj.getPropDict()
+		if userName is None:
+			moi.tmpDir = os.path.join(self.param.tmpDir, "%s-%s"%(peerName, moduleName))
+		else:
+			moi.tmpDir = os.path.join(self.param.tmpDir, "%s-%s-%s"%(peerName, userName, moduleName))
+		moi.state = _MoiObj.STATE_PENDING
+		moi.workState = SnModuleInstance.WORK_STATE_IDLE
+		moi.peerPacketQueue = collections.deque()
+
+	def _moiGet(self, peerName, userName, moduleName):
+		moi = self._moiFind(peerName, userName, srcModuleName)
+		assert moi is not None
+		return moi
+
+	def _moiFind(self, peerName, userName, moduleName):
+		for moi in self.moiList:
+			if moi.peerName == peerName and moi.userName == userName and moi.moduleName == moduleName:
+				return moi
+		return None
+
+	def _moiGetMapped(self, peerName, userName, srcModuleName):
+		moi = self._moiFindMapped(peerName, userName, srcModuleName)
+		assert moi is not None
+		return moi
+
+	def _moiFindMapped(self, peerName, userName, srcModuleName):
+		for moi in self.moiList:
+			if moi.peerName == peerName and moi.userName == userName and moi.moduleName == _map_module_name(srcModuleName):
+				return moi
+		return None
+
+	def _moiGcObjExist(self, moi):
+		for gcObj in self.moiGcList:
+			if gcObj.peerName == moi.peerName and gcObj.userName == moi.userName and gcObj.moduleName == moi.moduleName:
+				return True
+		return False
+
+	def _moiChangeState(self, moi, newState, failMessage=""):
+		assert _moi_state_is_valid(newState, failMessage)
+		assert moi.calling is None
+
+		# change state
+		oldState = moi.state
+		logging.info("SnLocalManager.moiChangeState: %s, %s -> %s", _moi_key_to_str(moi),
+				_moi_state_to_str(oldState), _moi_state_to_str(newState))
+		moi.state = newState
+
+		# change workState, clear peerPacketQueue
+		if newState in [ _MoiObj.STATE_INACTIVE, _MoiObj.STATE_REJECT, _MoiObj.STATE_PEER_REJECT, _MoiObj.STATE_EXCEPT, _MoiObj.STATE_PEER_EXCEPT]:
+			moi.workState = SnModuleInstance.WORK_STATE_IDLE
+			moi.peerPacketQueue.clear()
+
+		# change failMessage
+		if newState in [ _MoiObj.STATE_REJECT, _MoiObj.STATE_PEER_REJECT, _MoiObj.STATE_EXCEPT]:
+			moi.failMessage = failMessage
+
+		# do post change operation
+		if True:
+			if newState == _MoiObj.STATE_ACTIVE:
+				assert moi.failMessage == ""
+				assert moi.workState == SnModuleInstance.WORK_STATE_IDLE
+
 				if not moi.propDict["standalone"]:
 					exec("from %s import ModuleInstanceObject"%(moi.moduleName.replace("-", "_")))
 					moi.mo = ModuleInstanceObject(self, moi.peerName, moi.userName, moi.moduleName, moi.tmpDir)
 				else:
-					moi.proc = SnSubProcess(moi.peerName, moi.userName, moi.moduleName, moi.tmpDir, self.onLocalSockRecv, None)
+					moi.proc = SnSubProcess(moi.peerName, moi.userName, moi.moduleName, moi.tmpDir, self.onLocalSockRecv, self.onSubProcessStop)
 					moi.proc.start()
-				moi.state = _ModuleObjInternal.STATE_INIT
-				moi.failMessage = ""
+				self._moiCallFunc(moi, "onActive")
+				return
+
+			if newState == _MoiObj.STATE_FULL:
+				assert moi.failMessage == ""
+				assert moi.workState == SnModuleInstance.WORK_STATE_IDLE
+
+				if len(moi.peerPacketQueue) > 0:
+					self._moiProcessPacket(moi)
+				return
+
+			if newState == _MoiObj.STATE_INACTIVE:
+				assert moi.failMessage == ""
 				moi.workState = SnModuleInstance.WORK_STATE_IDLE
-				self._moiCallFunc(moi, "onInit")
 
-	def _getMoi(self, peerName, userName, moduleName):
-		moiList = self.poiDict[peerName]
-		for moi in moiList:
-			assert moi.peerName == peerName
-			if moi.userName == userName and moi.moduleName == moduleName:
-				return moi
-		assert False
+				self._moiCallFunc(moi, "onInactive")
+				return
 
-	def _getMoiMapped(self, peerName, userName, srcModuleName):
-		moi = self._findMoiMapped(peerName, userName, srcModuleName)
-		assert moi is not None
-		return moi
+			if newState == _MoiObj.STATE_REJECT:
+				moi.failMessage == failMessage
+				moi.workState = SnModuleInstance.WORK_STATE_IDLE
 
-	def _findMoiMapped(self, peerName, userName, srcModuleName):
-		moiList = self.poiDict[peerName]
-		for moi in self.moiList:
-			assert moi.peerName == peerName
-			if moi.userName == userName and moi.moduleName == self._mapModuleName(srcModuleName):
-				return moi
-		return None
+				self._sendReject(moi.peerName, moi.userName, moi.moduleName, moi.failMessage)
+				self._moiCallFunc(moi, "onInactive")
+				return
 
-	def _matchMoiMapped(self, peerName, userName, srcModuleName):
-		moi = self._findMoiMapped(peerName, userName, srcModuleName)
-		return moi is not None
+			if newState == _MoiObj.STATE_PEER_REJECT:
+				moi.failMessage == failMessage
+				moi.workState = SnModuleInstance.WORK_STATE_IDLE
 
-	def _matchPmi(self, peerName, peerInfo, moi):
-		"""pmi stands for peer-module-info"""
+				self._moiCallFunc(moi, "onInactive")
+				return
 
-		assert moi.peerName == peerName
-		for pmi in peerInfo.moduleList:
-			if moi.userName == pmi.userName and moi.moduleName == self._mapModuleName(pmi.moduleName):
-				return True
-		return False
+			if newState == _MoiObj.STATE_EXCEPT:
+				moi.failMessage == failMessage
+				moi.workState = SnModuleInstance.WORK_STATE_IDLE
 
-	def _mapModuleName(self, moduleName):
-		strList = moduleName.split("-")
-		if strList[1] == "server":
-			strList[1] = "client"
-		elif strList[1] == "client":
-			strList[1] = "server"
-		return "-".join(strList)
+				if oldState in [ _MoiObj.STATE_ACTIVE, _MoiObj.STATE_FULL ]:
+					self._sendExcept(moi.peerName, moi.userName, moi.moduleName)
+				return
 
-	def _typeCheck(self, obj, typeobj):
-		return str(obj.__class__) == str(typeobj)
+			if newState == _MoiObj.STATE_PEER_EXCEPT:
+				moi.failMessage == ""
+				moi.workState = SnModuleInstance.WORK_STATE_IDLE
 
-	def _moiChangeState(self, moi, newState, failMessage=""):
-		if newState in [ _ModuleObjInternal.STATE_REJECT, _ModuleObjInternal.STATE_PEER_REJECT, _ModuleObjInternal.STATE_EXCEPT ]:
-			assert failMessage != ""
+				self._moiCallFunc(moi, "onInactive")
+				return
+
+			assert False
+			return
+
+	def _moiGcStart(self, gcmoi):
+		assert gcmoi.gcFlag == _MoiObj.GC_START
+		logging.debug("SnLocalManager.moiGcStart: %s", _moi_key_to_str(gcmoi))
+		gcmoi.gcFlag = _MoiObj.GC_STARTED
+
+		if gcmoi.state == _MoiObj.STATE_FULL:
+			self._moiChangeState(gcmoi, _MoiObj.STATE_INACTIVE, "")
+		elif gcmoi.state in [ _MoiObj.STATE_REJECT, _MoiObj.STATE_PEER_REJECT, _MoiObj.STATE_EXCEPT, _MoiObj.STATE_PEER_EXCEPT ]:
+			if gcmoi.mo is not None:
+				SnUtil.idleInvoke(self._moiGcComplete, gcmoi)
+			elif gcmoi.proc is not None:
+				gcmoi.proc.stop()
+			else:
+				assert False
 		else:
-			assert failMessage == ""
+			assert False
 
-		logging.info("SnLocalManager.moiChangeState: %s -> %s, %s", _module_state_to_str(moi.state), 
-				_module_state_to_str(newState), _dbgmsg_moi_key(moi))
-		moi.state = newState
-		moi.failMessage = failMessage
+	def _moiGcComplete(self, gcmoi)
+		assert gcmoi.gcFlag == _MoiObj.GC_STARTED
+		logging.debug("SnLocalManager.moiGcComplete: %s", _moi_key_to_str(gcmoi))
+		self.moiGcList.remove(gcmoi)
 
-		if newState != _ModuleObjInternal.STATE_ACTIVE:
-			moi.peerPacketQueue = []
+		moi = self._moiFind(gcmoi.peerName, gcmoi.userName, gcmoi.moduleName)
+		if moi is not None:
+			assert moi.state == _MoiObj.STATE_PENDING:
+			self._moiChangeState(moi, _MoiObj.STATE_ACTIVE, "")
 
 	def _moiCallFunc(self, moi, funcName, *args):
 		assert moi.calling is None
 
-		logging.debug("SnLocalManager.moiCallFunc: %s, call, %s", funcName, _dbgmsg_moi_key(moi))
+		logging.debug("SnLocalManager.moiCallFunc: %s, call, %s", funcName, _moi_key_to_str(moi))
 		moi.calling = funcName
 
 		if moi.mo is not None:
-			GLib.idle_add(self._idleMoiCallFuncImpl, moi, *args)
+			SnUtil.idleInvoke(self._moiCallFuncImpl, moi, *args)
 		elif moi.proc is not None:
 			p = LocalSockCall()
 			p.funcName = funcName
@@ -471,141 +536,120 @@ class SnLocalManager:
 		else:
 			assert False
 
-	def _idleMoiCallFuncImpl(self, moi, *args):
-		ret = None
+	def _moiCallFuncImpl(self, moi, *args):
 		try:
-			exec("ret = SnUtil.euidInvoke(moi.userName, moi.mo.%s, *args)"%(moi.calling))
+			if moi.calling == "onActive":
+				assert len(args) == 0
+				SnUtil.euidInvoke(moi.userName, moi.mo.onInit)
+				SnUtil.euidInvoke(moi.userName, moi.mo.onActive)
+			elif moi.calling == "onRecv":
+				assert len(args) == 1
+				SnUtil.euidInvoke(moi.userName, moi.mo.onRecv, args[0])
+			elif moi.calling == "onInactive":
+				assert len(args) == 0
+				SnUtil.euidInvoke(moi.userName, moi.mo.onInactive)
+			else:
+				assert False
 		except Exception as e:
 			self._moiCallFuncExcept(moi, e, traceback.format_exc())
 			return
 		shutil.rmtree(moi.tmpDir, True)
-		self._moiCallFuncReturn(moi, ret)
+		self._moiCallFuncReturn(moi, None)
 
 	def _moiCallFuncReturn(self, moi, retVal):
 		# finish function call
 		funcName = moi.calling
-		logging.debug("SnLocalManager.moiCallFunc: %s, return, %s", moi.calling, _dbgmsg_moi_key(moi))
+		logging.debug("SnLocalManager.moiCallFunc: %s, return, %s", moi.calling, _moi_key_to_str(moi))
 		moi.calling = None
 
 		# do post call operation
-		if funcName == "onInit":
-			self._moiChangeState(moi, _ModuleObjInternal.STATE_INACTIVE)
-		elif funcName == "onInactive":
-			assert moi.workState == SnModuleInstance.WORK_STATE_IDLE
-			if moi.state == _ModuleObjInternal.STATE_REJECT:
-				self._sendReject(moi.peerName, moi.userName, moi.moduleName, moi.failMessage)
-		elif funcName == "onActive":
-			pass
-		elif funcName == "onRecv":
-			pass
+		if moi.gcFlag is None:
+			if funcName == "onActive":
+				self._moiChangeState(moi, _MoiObj.STATE_FULL, "")
+			elif funcName == "onRecv":
+				if len(moi.peerPacketQueue) > 0:
+					self._moiProcessPacket()
+			elif funcName == "onInactive":
+				pass
+			else:
+				assert False
 		else:
-			assert False
-
-		# do peer update
-		if moi.peerName == socket.gethostname():
-			self._moiPeerUpdate(moi.peerName, self.localInfo, moi)
-		else:
-			peerInfo = self.param.peerManager.getPeerInfo(moi.peerName)
-			self._moiPeerUpdate(moi.peerName, peerInfo, moi)
+			if moi.gcFlag == _MoiObj.GC_START:
+				self._moiGcStart(moi)
+				return
+			elif moi.gcFlag == _MoiObj.GC_STARTED:
+				assert funcName == "onInactive" and moi.state == _MoiObj.STATE_INACTIVE
+				if moi.mo is not None:
+					self._moiGcComplete(moi)
+				elif moi.proc is not None:
+					moi.proc.stop()
+				else:
+					assert False
+			else:
+				assert False
 		
 	def _moiCallFuncExcept(self, moi, excObj, excInfo):
 		# finish function call
 		funcName = moi.calling
-		logging.debug("SnLocalManager.moiCallFunc: %s, except, %s, %s, %s", moi.calling, 
-				_dbgmsg_moi_key(moi), excObj.__class__, excObj)
+		logging.debug("SnLocalManager.moiCallFunc: %s, except, %s, %s, %s", moi.calling, _moi_key_to_str(moi), excObj.__class__, excObj)
 		moi.calling = None
 
 		# do post call operation
-		if funcName == "onInit":
-			moi.workState = SnModuleInstance.WORK_STATE_IDLE
-			self._moiChangeState(moi, _ModuleObjInternal.STATE_EXCEPT, excInfo)
-		elif funcName == "onInactive":
-			moi.workState = SnModuleInstance.WORK_STATE_IDLE
-			self._moiChangeState(moi, _ModuleObjInternal.STATE_EXCEPT, excInfo)
-			if moi.state == _ModuleObjInternal.STATE_REJECT:
-				self._sendExcept(moi.peerName, moi.userName, moi.moduleName)
-		elif funcName == "onActive":
-			moi.workState = SnModuleInstance.WORK_STATE_IDLE
-			self._moiChangeState(moi, _ModuleObjInternal.STATE_EXCEPT, excInfo)
-			self._sendExcept(moi.peerName, moi.userName, moi.moduleName)
-		elif funcName == "onRecv":
-			if self._typeCheck(excObj, SnRejectException):
-				self._moiChangeState(moi, _ModuleObjInternal.STATE_REJECT, excObj.message)
-				self._moiCallFunc(moi, "onInactive")
-			else:
-				moi.workState = SnModuleInstance.WORK_STATE_IDLE
-				self._moiChangeState(moi, _ModuleObjInternal.STATE_EXCEPT, excInfo)
-				self._sendExcept(moi.peerName, moi.userName, moi.moduleName)
-		else:
-			assert False
-
-		# do peer update
-		if moi.peerName == socket.gethostname():
-			self._moiPeerUpdate(moi.peerName, self.localInfo, moi)
-		else:
-			peerInfo = self.param.peerManager.getPeerInfo(moi.peerName)
-			self._moiPeerUpdate(moi.peerName, peerInfo, moi)
-
-	def _moiPeerUpdate(self, peerName, peerInfo, moi):
-		if moi.calling is not None:
-			return
-
-		if peerInfo is not None and self._matchPmi(peerName, peerInfo, moi):
-			# peer exist
-			if moi.state == _ModuleObjInternal.STATE_INIT:
-				pass
-			elif moi.state == _ModuleObjInternal.STATE_ACTIVE:
-				pass
-			elif moi.state == _ModuleObjInternal.STATE_INACTIVE:
-				self._moiChangeState(moi, _ModuleObjInternal.STATE_ACTIVE)
-				self._moiCallFunc(moi, "onActive")
-			elif moi.state == _ModuleObjInternal.STATE_REJECT:
-				pass
-			elif moi.state == _ModuleObjInternal.STATE_PEER_REJECT:
-				pass
-			elif moi.state == _ModuleObjInternal.STATE_EXCEPT:
-				pass
-			elif moi.state == _ModuleObjInternal.STATE_PEER_EXCEPT:
-				pass
+		if moi.gcFlag is None:
+			if funcName == "onActive":
+				self._moiChangeState(moi, _MoiObj.STATE_EXCEPT, excInfo)
+			elif funcName == "onRecv":
+				if _type_check(excObj, SnRejectException):
+					self._moiChangeState(moi, _MoiObj.STATE_REJECT, excObj.message)
+				else:
+					self._moiChangeState(moi, _MoiObj.STATE_EXCEPT, excInfo)
+			elif funcName == "onInactive":
+				self._moiChangeState(moi, _MoiObj.STATE_EXCEPT, excInfo)
 			else:
 				assert False
 		else:
-			# peer not exist
-			if moi.state == _ModuleObjInternal.STATE_INIT:
-				pass
-			elif moi.state == _ModuleObjInternal.STATE_ACTIVE:
-				self._moiChangeState(moi, _ModuleObjInternal.STATE_INACTIVE)
-				self._moiCallFunc(moi, "onInactive")
-			elif moi.state == _ModuleObjInternal.STATE_INACTIVE:
-				pass
-			elif moi.state == _ModuleObjInternal.STATE_REJECT:
-				self._moiChangeState(moi, _ModuleObjInternal.STATE_INACTIVE)
-			elif moi.state == _ModuleObjInternal.STATE_PEER_REJECT:
-				self._moiChangeState(moi, _ModuleObjInternal.STATE_INACTIVE)
-			elif moi.state == _ModuleObjInternal.STATE_EXCEPT:
-				self._moiChangeState(moi, _ModuleObjInternal.STATE_INACTIVE)
-			elif moi.state == _ModuleObjInternal.STATE_PEER_EXCEPT:
-				self._moiChangeState(moi, _ModuleObjInternal.STATE_INACTIVE)
+			if moi.mo is not None:
+				self._moiGcComplete(moi)
+			elif moi.proc is not None:
+				moi.proc.stop()
 			else:
 				assert False
 
-class _PeerObjInternal:
+	def _moiProcessPacket(self, moi):
+		assert moi.state == _MoiObj.STATE_FULL
+		assert moi.calling is None
+	
+		data = moi.peerPacketQueue.popleft()
+		if _type_check(data, SnDataPacketReject):
+			self._moiChangeState(moi, _MoiObj.STATE_PEER_REJECT)
+		elif _type_check(data, SnDataPacketExcept):
+			self._moiChangeState(moi, _MoiObj.STATE_PEER_EXCEPT)
+		else:
+			self._moiCallFunc(moi, "onRecv", data)
+
+	##### pmi assistant method ####
+
+	def _pmiMatch(self, peerName, peerInfo, moi):
+		assert moi.peerName == peerName
+		for pmi in peerInfo.moduleList:
+			if moi.userName == pmi.userName and moi.moduleName == _map_module_name(pmi.moduleName):
+				return True
+		return False
+
+class _MoiObj:
+	"""MOI: module object internal"""
+
 	STATE_PENDING = 0
-	STATE_NORMAL = 1
-	STATE_GC = 2
-
-	state = None							# enum
-	peerPacketQueue = None					# List<obj>
-	moiList = None							# List<_ModuleInfoInternal
-
-class _ModuleObjInternal:
-	STATE_INIT = 0
-	STATE_INACTIVE = 1
-	STATE_ACTIVE = 2
+	STATE_ACTIVE = 1
+	STATE_FULL = 2
 	STATE_REJECT = 3
 	STATE_PEER_REJECT = 4
 	STATE_EXCEPT = 5
 	STATE_PEER_EXCEPT = 6
+	STATE_INACTIVE = 7
+
+	GC_START = 1
+	GC_STARTED = 2
 
 	peerName = None							# str
 	userName = None							# str, can be None
@@ -621,28 +665,63 @@ class _ModuleObjInternal:
 	failMessage = None						# str
 	calling = None							# str
 	workState = None						# enum
+	gcFlag = None							# enum, can be None
+	peerPacketQueue = None					# deque<obj>
 
-def _dbgmsg_moi_key(moi):
+def _moi_key_to_str(moi):
 	if moi.userName is None:
 		return "%s, %s"%(moi.peerName, moi.moduleName)
 	else:
 		return "%s, %s, %s"%(moi.peerName, moi.userName, moi.moduleName)
 
-def _module_state_to_str(moduleState):
-	if moduleState == _ModuleObjInternal.STATE_INIT:
-		return "STATE_INIT"
-	elif moduleState == _ModuleObjInternal.STATE_INACTIVE:
-		return "STATE_INACTIVE"
-	elif moduleState == _ModuleObjInternal.STATE_ACTIVE:
+def _moi_state_is_valid(moiState, failMessage):
+	if moiState == _MoiObj.STATE_PENDING and failMessage == "":
+		return True
+	elif moiState == _MoiObj.STATE_ACTIVE and failMessage == "":
+		return True
+	elif moiState == _MoiObj.STATE_FULL and failMessage == "":
+		return True
+	elif moiState == _MoiObj.STATE_REJECT and failMessage != "":
+		return True
+	elif moiState == _MoiObj.STATE_PEER_REJECT and failMessage != "":
+		return True
+	elif moiState == _MoiObj.STATE_EXCEPT and failMessage != "":
+		return True
+	elif moiState == _MoiObj.STATE_PEER_EXCEPT and failMessage == "":
+		return True
+	elif moiState == _MoiObj.STATE_INACTIVE and failMessage == "":
+		return True
+	else:
+		return False
+
+def _moi_state_to_str(moiState):
+	if moiState == _MoiObj.STATE_PENDING:
+		return "STATE_PENDING"
+	elif moiState == _MoiObj.STATE_ACTIVE:
 		return "STATE_ACTIVE"
-	elif moduleState == _ModuleObjInternal.STATE_REJECT:
+	elif moiState == _MoiObj.STATE_FULL:
+		return "STATE_FULL"
+	elif moiState == _MoiObj.STATE_REJECT:
 		return "STATE_REJECT"
-	elif moduleState == _ModuleObjInternal.STATE_PEER_REJECT:
+	elif moiState == _MoiObj.STATE_PEER_REJECT:
 		return "STATE_PEER_REJECT"
-	elif moduleState == _ModuleObjInternal.STATE_EXCEPT:
+	elif moiState == _MoiObj.STATE_EXCEPT:
 		return "STATE_EXCEPT"
-	elif moduleState == _ModuleObjInternal.STATE_PEER_EXCEPT:
+	elif moiState == _MoiObj.STATE_PEER_EXCEPT:
 		return "STATE_PEER_EXCEPT"
+	elif moiState == _MoiObj.STATE_INACTIVE:
+		return "STATE_INACTIVE"
 	else:
 		assert False
+
+def _map_module_name(moduleName):
+	strList = moduleName.split("-")
+	if strList[1] == "server":
+		strList[1] = "client"
+	elif strList[1] == "client":
+		strList[1] = "server"
+	return "-".join(strList)
+
+def _type_check(obj, typeobj):
+	return str(obj.__class__) == str(typeobj)
 
