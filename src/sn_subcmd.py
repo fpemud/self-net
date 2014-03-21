@@ -90,15 +90,10 @@ class SnSubCmdMain:
 
 	def listModules(self):
 		dbusObj = dbus.SystemBus().get_object('org.fpemud.SelfNet', '/org/fpemud/SelfNet')
-		for mk, mv in dbusObj.DebugGetModuleInfo(dbus_interface='org.fpemud.SelfNet'):
-			peerName, userName, moduleName = mk
+		for mk, mv in dbusObj.DebugGetModuleInfo(dbus_interface='org.fpemud.SelfNet').items():
 			moduleState, moduleFailMessage = mv
 
-			if userName != None:
-				print "%s, %s, %s:"%(peerName, userName, moduleName)
-			else:
-				print "%s, %s:"%(peerName, moduleName)
-
+			print "%s:"%(mk)
 			print "\tState: %s"%(moduleState)
 			if moduleState == "reject" or moduleState == "peer-reject":
 				print "\tReject Message: %s"%(moduleFailMessage)

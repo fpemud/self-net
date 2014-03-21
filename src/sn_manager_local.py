@@ -195,7 +195,7 @@ class SnLocalManager:
 
 		ret = dict()
 		for moi in self.moiList:
-			key = (moi.peerName, moi.userName, moi.moduleName)
+			key = _moi_key_to_str(moi)
 			ret[key] = (moduleStateDict[moi.state], moi.failMessage)
 		return ret
 
@@ -241,7 +241,7 @@ class SnLocalManager:
 			if not self._pmiMatch(peerName, peerInfo, moi):
 				continue
 			self.moiList.append(moi)
-			if not self._moiGcObjExist(moi):
+			if self._moiGcFind(moi.peerName, moi.userName, moi.moduleName) is None:
 				self._moiChangeState(moi, _MoiObj.STATE_ACTIVE, "")
 
 		logging.debug("SnLocalManager.onPeerChange: End")
@@ -272,7 +272,7 @@ class SnLocalManager:
 		else:
 			assert False
 
-	def onLocalSockRecv(self, peerName, userName, moduleName, packetObj):
+	def onSubProcRecv(self, peerName, userName, moduleName, packetObj):
 		moi = self._moiGet(peerName, userName, moduleName)
 		if _type_check(packetObj, LocalSockSendObj):
 			self._sendObject(peerName, userName, moduleName, packetObj.dataObj)
@@ -283,12 +283,33 @@ class SnLocalManager:
 		else:
 			assert False
 
-	def onSubProcessStop(self, procObj):
+	def onSubProcStop(self, procObj):
+		gcmoi = self._moiGcFind(procObj.peerName, procObj.userName, procObj.moduleName)
+		if gcmoi is not None:
+			assert gcmoi.proc == procObj
+			gcmoi.proc = None
+			if gcmoi.calling is not None:
+				self._moiCallFuncExcept(gcmoi, Exception("sub process aborted"), "sub process aborted")
+			else:
+				self._moiGcComplete(gcmoi)
+			return
+
 		moi = self._moiGet(procObj.peerName, procObj.userName, procObj.moduleName)
-		if moi.gcFlag is not None:
-			self._moiGcComplete(moi)
-		else:
-			assert False
+		if moi is not None:
+			assert moi.proc == procObj
+			moi.proc = None
+			if moi.calling is not None:
+				self._moiCallFuncExcept(moi, Exception("sub process aborted"), "sub process aborted")
+			else:
+				if moi.state in [ _MoiObj.STATE_ACTIVE, _MoiObj.STATE_FULL ]:
+					self._moiChangeState(moi, _MoiObj.STATE_EXCEPT, "sub process aborted")
+				elif moi.state in [ _MoiObj.STATE_REJECT, _MoiObj.STATE_PEER_REJECT, _MoiObj.STATE_EXCEPT, _MoiObj.STATE_PEER_EXCEPT ]:
+					pass
+				else:
+					assert False
+			return
+
+		assert False
 
 	def onBeforeSleep(self, sleepType):
 		pass
@@ -427,11 +448,11 @@ class SnLocalManager:
 				return moi
 		return None
 
-	def _moiGcObjExist(self, moi):
+	def _moiGcFind(self, peerName, userName, moduleName):
 		for gcObj in self.moiGcList:
-			if gcObj.peerName == moi.peerName and gcObj.userName == moi.userName and gcObj.moduleName == moi.moduleName:
-				return True
-		return False
+			if gcObj.peerName == peerName and gcObj.userName == userName and gcObj.moduleName == moduleName:
+				return gcObj
+		return None
 
 	def _moiChangeState(self, moi, newState, failMessage=""):
 		assert _moi_state_is_valid(newState, failMessage)
@@ -462,7 +483,7 @@ class SnLocalManager:
 					exec("from %s import ModuleInstanceObject"%(moi.moduleName.replace("-", "_")))
 					moi.mo = ModuleInstanceObject(self, moi.peerName, moi.userName, moi.moduleName, moi.tmpDir)
 				else:
-					moi.proc = SnSubProcess(moi.peerName, moi.userName, moi.moduleName, moi.tmpDir, self.onLocalSockRecv, self.onSubProcessStop)
+					moi.proc = SnSubProcess(moi.peerName, moi.userName, moi.moduleName, moi.tmpDir, self.onSubProcRecv, self.onSubProcStop)
 					moi.proc.start()
 				self._moiCallFunc(moi, "onActive")
 				return
@@ -525,10 +546,11 @@ class SnLocalManager:
 		elif gcmoi.state in [ _MoiObj.STATE_REJECT, _MoiObj.STATE_PEER_REJECT, _MoiObj.STATE_EXCEPT, _MoiObj.STATE_PEER_EXCEPT ]:
 			if gcmoi.mo is not None:
 				SnUtil.idleInvoke(self._moiGcComplete, gcmoi)
-			elif gcmoi.proc is not None:
-				gcmoi.proc.stop()
 			else:
-				assert False
+				if gcmoi.proc is not None:
+					pass
+				else:
+					SnUtil.idleInvoke(self._moiGcComplete, gcmoi)
 		else:
 			assert False
 
@@ -550,13 +572,14 @@ class SnLocalManager:
 
 		if moi.mo is not None:
 			SnUtil.idleInvoke(self._moiCallFuncImpl, moi, *args)
-		elif moi.proc is not None:
-			p = LocalSockCall()
-			p.funcName = funcName
-			p.funcArgs = args
-			moi.proc.get_pipe().send(p)
 		else:
-			assert False
+			if moi.proc is not None:
+				p = LocalSockCall()
+				p.funcName = funcName
+				p.funcArgs = args
+				moi.proc.get_pipe().send(p)
+			else:
+				assert False
 
 	def _moiCallFuncImpl(self, moi, *args):
 		try:
@@ -603,10 +626,11 @@ class SnLocalManager:
 				assert funcName == "onInactive" and moi.state == _MoiObj.STATE_INACTIVE
 				if moi.mo is not None:
 					self._moiGcComplete(moi)
-				elif moi.proc is not None:
-					moi.proc.stop()
 				else:
-					assert False
+					if moi.proc is not None:
+						pass
+					else:
+						self._moiGcComplete(moi)
 			else:
 				assert False
 		
@@ -632,10 +656,11 @@ class SnLocalManager:
 		else:
 			if moi.mo is not None:
 				self._moiGcComplete(moi)
-			elif moi.proc is not None:
-				moi.proc.stop()
 			else:
-				assert False
+				if moi.proc is not None:
+					pass
+				else:
+					self._moiGcComplete(moi)
 
 	def _moiProcessPacket(self, moi):
 		assert moi.state == _MoiObj.STATE_FULL

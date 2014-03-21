@@ -91,7 +91,7 @@ class DbusMainObject(dbus.service.Object):
 	def WorkStateChanged(self, newWorkState):
 		pass
 
-	@dbus.service.method('org.fpemud.SelfNet', in_signature='', out_signature='a{(sss)(ss)}')
+	@dbus.service.method('org.fpemud.SelfNet', in_signature='', out_signature='a{s(ss)}')
 	def DebugGetModuleInfo(self):
 		return self.param.localManager.debugGetModuleInfo()
 
