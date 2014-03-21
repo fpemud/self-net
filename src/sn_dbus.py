@@ -24,8 +24,6 @@ from sn_manager_peer import SnPeerManager
 # str                 GetWorkState()
 # array<peerId:int>   GetPeerList()
 # peerId:int          GetPeer(peerName:str)
-# array<moduleId:int> GetModuleList()
-# moduleId:int        GetModule(peerName:str, userName:str, moduleName:str)
 #
 # Signals:
 # WorkStateChanged(newWorkState:str)
@@ -43,18 +41,6 @@ from sn_manager_peer import SnPeerManager
 # Signals:
 # PowerStateChanged(newPowerState:str)
 #
-# ==== Module ====
-# Service               org.fpemud.SelfNet
-# Interface             org.fpemud.SelfNet.Module
-# Object path           /Modules/{moduleId:int}
-#
-# Methods:
-# str:str:str       GetKey()
-# str:str           GetState()
-#
-# Signals:
-# ModuleStateChanged(newModuleState:str)
-#
 
 class DbusMainObject(dbus.service.Object):
 
@@ -68,14 +54,6 @@ class DbusMainObject(dbus.service.Object):
 		for pn in self.param.peerManager.getPeerNameList():
 			po = DbusPeerObject(self.param, i, pn)
 			self.peerList.append(po)
-			i = i + 1
-
-		# initialize module list
-		i = 0
-		for mk in self.param.localManager.getModuleKeyList():
-			peerName, userName, moduleName = mk
-			mo = DbusModuleObject(self.param, i, peerName, userName, moduleName)
-			self.moduleList.append(mo)
 			i = i + 1
 
 		# register dbus object path
@@ -109,24 +87,13 @@ class DbusMainObject(dbus.service.Object):
 				return po.peerId
 		return -1
 
-	@dbus.service.method('org.fpemud.SelfNet', in_signature='', out_signature='ai')
-	def GetModuleList(self):
-		ret = []
-		for mo in self.moduleList:
-			ret.append(mo.moduleId)
-		return ret
-
-	@dbus.service.method('org.fpemud.SelfNet', in_signature='sss', out_signature='i')
-	def GetModule(self, peerName, userName, moduleName):
-		for mo in self.moduleList:
-			if (peerName == mo.peerName and moduleName == mo.moduleName and
-					(userName == mo.userName or (userName == "" and mo.userName is None))):
-				return mo.moduleId
-		return -1
-
 	@dbus.service.signal('org.fpemud.SelfNet', signature='s')
 	def WorkStateChanged(self, newWorkState):
 		pass
+
+	@dbus.service.method('org.fpemud.SelfNet', in_signature='', out_signature='a{(sss)(ss)}')
+	def DebugGetModuleInfo(self):
+		return self.param.localManager.debugGetModuleInfo()
 
 class DbusPeerObject(dbus.service.Object):
 
@@ -175,43 +142,4 @@ class DbusPeerObject(dbus.service.Object):
 	def PowerStateChanged(self, newPowerState):
 		pass
 
-class DbusModuleObject(dbus.service.Object):
-	"""For sys module, userName == '' """
-
-	def __init__(self, param, moduleId, peerName, userName, moduleName):
-		self.param = param
-		self.moduleId = moduleId
-		self.peerName = peerName
-		self.userName = userName
-		self.moduleName = moduleName
-
-		# register dbus object path
-		bus_name = dbus.service.BusName('org.fpemud.SelfNet', bus=dbus.SystemBus())
-		dbus.service.Object.__init__(self, bus_name, '/org/fpemud/SelfNet/Modules/%d'%(self.moduleId))
-
-	def release(self):
-		self.remove_from_connection()
-
-	@dbus.service.method('org.fpemud.SelfNet.Module', sender_keyword='sender',
-	                     in_signature='', out_signature='(sss)')
-	def GetKey(self, sender=None):
-		userName = ""
-		if self.userName is not None:
-			userName = self.userName
-		return (self.peerName, userName, self.moduleName)
-
-	@dbus.service.method('org.fpemud.SelfNet.Module', sender_keyword='sender',
-	                     in_signature='', out_signature='(ss)')
-	def GetState(self, sender=None):
-		moduleStateDict = {
-			_MoiObj.STATE_INIT: "init",
-			_MoiObj.STATE_INACTIVE: "inactive",
-			_MoiObj.STATE_ACTIVE: "active",
-			_MoiObj.STATE_REJECT: "reject",
-			_MoiObj.STATE_PEER_REJECT: "peer-reject",
-			_MoiObj.STATE_EXCEPT: "except",
-			_MoiObj.STATE_PEER_EXCEPT: "peer-except",
-		}
-		state, failMessage = self.param.localManager.getModuleState(self.peerName, self.userName, self.moduleName)
-		return (moduleStateDict[state], failMessage)
 

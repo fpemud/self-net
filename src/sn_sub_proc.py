@@ -14,7 +14,7 @@ from sn_module import SnRejectException
 class LocalSockSendObj:
 	dataObj = None							# obj
 
-class LocalSockSetWorkState
+class LocalSockSetWorkState:
 	workState = None						# enum
 
 class LocalSockCall:
