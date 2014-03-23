@@ -1,6 +1,7 @@
 #!/usr/bin/python2
 # -*- coding: utf-8; tab-width: 4; indent-tabs-mode: t -*-
 
+import sys
 import socket
 import pickle
 import struct
@@ -10,18 +11,21 @@ from sn_util import SnUtil
 
 class objsocket:
 
-	SOCKTYPE_SSL = 0
-	SOCKTYPE_MULTIPROCESSING_PIPE = 1
+	SOCKTYPE_SOCKET = 0					# normal socket
+	SOCKTYPE_SSL_SOCKET = 1				# ssl socket
+	SOCKTYPE_PIPE = 2					# bidirectional pipe
+	SOCKTYPE_PIPE_PAIR = 3				# a pair of unidirectonal pipe, mySock should be (inPipe, outPipe)
+	SOCKTYPE_MULTIPROCESSING_PIPE = 4	# the return value of multiprocessing.Pipe()
 
 	_GC_STATE_NONE = 0
 	_GC_STATE_PENDING = 1
 	_GC_STATE_COMPLETE = 2
 
-	def __init__(self, mySock, mySockType, recvFunc, errorFunc, gcCompleteFunc):
-		assert mySockType in [ self.SOCKTYPE_SSL, self.SOCKTYPE_MULTIPROCESSING_PIPE ]
+	def __init__(self, mySockType, mySock, recvFunc, errorFunc, gcCompleteFunc):
+		assert mySockType in [ self.SOCKTYPE_SSL_SOCKET, self.SOCKTYPE_PIPE_PAIR ]
 
-		self.mySock = mySock
 		self.mySockType = mySockType
+		self.mySock = mySock
 		self.gcState = self._GC_STATE_NONE
 		self.recvFunc = recvFunc
 		self.errorFunc = errorFunc
@@ -29,13 +33,21 @@ class objsocket:
 
 		self.sendBuffer = ""
 		self.recvBuffer = ""
-		self.recvSourceId = GLib.io_add_watch(self.mySock, GLib.IO_IN | _flagError, self._onRecv)
+		self.recvSourceId = None
 		self.sendSourceId = None
+
+		if mySockType == self.SOCKTYPE_SSL_SOCKET:
+			self.recvSourceId = self._doAddRecvWatchTypeSslSocket(self.mySock, self._onRecv)
+		elif mySockType == self.SOCKTYPE_PIPE_PAIR:
+			self.recvSourceId = self._doAddRecvWatchTypePipePair(self.mySock, self._onRecv)
+		else:
+			assert False
 
 	def send(self, dataObj):
 		"""Never raise exception, errorFunc is called if the socket is broken"""
 
-		assert self.mySock is not None and self.gcState == self._GC_STATE_NONE
+		assert self.mySock is not None
+		assert self.gcState == self._GC_STATE_NONE
 
 		data = pickle.dumps(dataObj)
 		header = struct.pack("!I", len(data))
@@ -43,13 +55,19 @@ class objsocket:
 		self.sendBuffer += packet
 
 		if self.sendSourceId is None:
-			self.sendSourceId = GLib.io_add_watch(self.mySock, GLib.IO_OUT, self._onSend)
+			if self.mySockType == self.SOCKTYPE_SSL_SOCKET:
+				self.sendSourceId = self._doAddSendWatchTypeSslSocket(self.mySock, self._onSend)
+			elif self.mySockType == self.SOCKTYPE_PIPE_PAIR:
+				self.sendSourceId = self._doAddSendWatchTypePipePair(self.mySock, self._onSend)
+			else:
+				assert False
 
 	def gracefulClose(self):
 		"""This function does not close the socket, the socket must be closed
 		   by graceful close complete callback funtion"""
 
-		assert self.mySock is not None and self.gcState == self._GC_STATE_NONE
+		assert self.mySock is not None
+		assert self.gcState == self._GC_STATE_NONE
 
 		# no receiving in graceful closing
 		if self.recvSourceId is not None:
@@ -78,20 +96,24 @@ class objsocket:
 			assert ret
 			self.recvSourceId = None
 
-		self.mySock.close()
+		if self.mySockType == self.SOCKTYPE_SSL_SOCKET:
+			self._doCloseTypeSslSocket(self.mySock)
+		elif self.mySockType == self.SOCKTYPE_PIPE_PAIR:
+			self._doCloseTypePipePair(self.mySock)
+		else:
+			assert False
+
 		self.mySock = None
 
 	def _onSend(self, source, cb_condition):
-		assert source == self.mySock
-
 		# send data as much as possible
 		try:
 			if cb_condition & _flagError:
 				raise _ObjSocketException(CbConditionException(cb_condition))
-			if self.mySockType == self.SOCKTYPE_SSL:
-				sendLen = self._doSendTypeSsl(self.mySock, self.sendBuffer)
-			elif self.mySockType == self.SOCKTYPE_MULTIPROCESSING_PIPE:
-				sendLen = self._doSendTypeMultiprocessingPipe(self.mySock, self.sendBuffer)
+			if self.mySockType == self.SOCKTYPE_SSL_SOCKET:
+				sendLen = self._doSendTypeSslSocket(self.mySock, self.sendBuffer)
+			elif self.mySockType == self.SOCKTYPE_PIPE_PAIR:
+				sendLen = self._doSendTypePipePair(self.mySock, self.sendBuffer)
 			else:
 				assert False
 			self.sendBuffer = self.sendBuffer[sendLen:]
@@ -128,16 +150,16 @@ class objsocket:
 		try:
 			if cb_condition & _flagError:
 				raise _ObjSocketException(CbConditionException(cb_condition))
-			if self.mySockType == self.SOCKTYPE_SSL:
-				ret = self._doRecvTypeSsl(self.mySock)
-			elif self.mySockType == self.SOCKTYPE_MULTIPROCESSING_PIPE:
-				ret = self._doRecvTypeMultiprocessingPipe(self.mySock)
+			if self.mySockType == self.SOCKTYPE_SSL_SOCKET:
+				ret = self._doRecvTypeSslSocket(self.mySock)
+			elif self.mySockType == self.SOCKTYPE_PIPE_PAIR:
+				ret = self._doRecvTypePipePair(self.mySock)
 			else:
 				assert False
 			self.recvBuffer += ret
 		except _ObjSocketException as e:
 			self.errorFunc(self, e.excObj)
-			assert self.mySock is None		# errorFunc should close the socket
+			assert self.mySock is None			# errorFunc should close the socket
 			return False
 
 		while True:
@@ -159,8 +181,13 @@ class objsocket:
 			if self.mySock is None or self.gcState != self._GC_STATE_NONE:
 				return False
 
+	def _gcComplete(self):
+		self.gcState = self._GC_STATE_COMPLETE
+		self.gcCompleteFunc(self)
+		assert self.mySock is None				# gcCompleteFunc should close the socket
+
 	@staticmethod
-	def _doSendTypeSsl(mySock, sendBuffer):
+	def _doSendTypeSslSocket(mySock, sendBuffer):
 		if len(sendBuffer) > 128:						# fixme
 			sendLen = 128
 		else:
@@ -174,7 +201,7 @@ class objsocket:
 			raise _ObjSocketException(e.excObj)
 
 	@staticmethod
-	def _doRecvTypeSsl(mySock):
+	def _doRecvTypeSslSocket(mySock):
 		try:
 			recvBuf = mySock.recv(4096)
 			if len(recvBuf) == 0:
@@ -186,23 +213,40 @@ class objsocket:
 			raise _ObjSocketException(e)
 
 	@staticmethod
-	def _doSendTypeMultiprocessingPipe(mySock, sendBuffer):
-		try:
-			return mySock.send_bytes(sendBuffer)
-		except ValueError as e:
-			raise _ObjSocketException(e)
+	def _doCloseTypeSslSocket(mySock):
+		mySock.close()
 
 	@staticmethod
-	def _doRecvTypeMultiprocessingPipe(mySock):
+	def _doAddSendWatchTypeSslSocket(mySock, mySendFunc):
+		return GLib.io_add_watch(mySock, GLib.IO_OUT, mySendFunc)
+
+	@staticmethod
+	def _doAddRecvWatchTypeSslSocket(mySock, myRecvFunc):
+		return GLib.io_add_watch(mySock, GLib.IO_IN | _flagError, myRecvFunc)
+
+	@staticmethod
+	def _doSendTypePipePair(mySock, sendBuffer):
+		return mySock[1].write(sendBuffer)
+
+	@staticmethod
+	def _doRecvTypePipePair(mySock):
 		try:
-			return mySock.recv_bytes()
+			return mySock[0].read()
 		except EOFError as e:
 			raise _ObjSocketException(e)
 
-	def _gcComplete(self):
-		self.gcState = self._GC_STATE_COMPLETE
-		self.gcCompleteFunc(self)
-		assert self.mySock is None			# gcCompleteFunc should close the socket
+	@staticmethod
+	def _doCloseTypePipePair(mySock):
+		mySock[0].close()
+		mySock[1].close()
+
+	@staticmethod
+	def _doAddSendWatchTypePipePair(mySock, mySendFunc):
+		return GLib.io_add_watch(mySock[1], GLib.IO_OUT, mySendFunc)
+
+	@staticmethod
+	def _doAddRecvWatchTypePipePair(mySock, myRecvFunc):
+		return GLib.io_add_watch(mySock[0], GLib.IO_IN | _flagError, myRecvFunc)
 
 class CbConditionException(Exception):
 	def __init__(self, cb_condition):

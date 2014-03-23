@@ -8,6 +8,7 @@ class SnParam:
 	def __init__(self):
 		self.cfgDir = "/etc/selfnetd"
 		self.libDir = "/usr/lib/selfnetd"
+		self.libexecDir = "/usr/libexec/selfnetd"
 		self.dataDir = "/usr/share/selfnetd"
 		self.moduleDir = os.path.join(self.libDir, "modules")
 		self.runDir = "/run/selfnetd"
@@ -25,6 +26,7 @@ class SnParam:
 		self.pidFile = os.path.join(self.runDir, "selfnetd.pid")
 		self.socketFile = os.path.join(self.runDir, "selfnetd.socket")
 		self.logFile = os.path.join(self.logDir, "selfnetd.log")
+		self.subprocFile = os.path.join(self.libexecDir, "subproc.py")
 
 		# to be set
 		self.tmpDir = None				# str

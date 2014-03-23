@@ -6,6 +6,7 @@ import shutil
 import socket
 import logging
 import traceback
+import subprocess
 import collections
 import strict_pgs
 from objsocket import objsocket
@@ -13,8 +14,8 @@ from gi.repository import GLib
 
 from sn_util import SnUtil
 from sn_util import SnSleepNotifier
-from sn_sub_proc import SnSubProcBuilder
 from sn_sub_proc import LocalSockSendObj
+from sn_sub_proc import LocalSockSetWorkState
 from sn_sub_proc import LocalSockCall
 from sn_sub_proc import LocalSockRetn
 from sn_sub_proc import LocalSockExcp
@@ -155,12 +156,12 @@ class SnLocalManager:
 		self.localInfo = None
 		self.moiList = []
 		self.moiGcList = []
-		self.subProcBuilder = SnSubProcBuilder()
 		self.sleepNotifier = SnSleepNotifier(self.onBeforeSleep, self.onAfterResume)
 
 		# local peer go into up state
 		self.localInfo = self._getLocalInfo()
 		self.onPeerChange(socket.gethostname(), self.localInfo)
+
 
 		logging.debug("SnLocalManager.__init__: End")
 		return
@@ -286,6 +287,8 @@ class SnLocalManager:
 		moi = self._moiGetByProcPipe(procPipe)
 		if _type_check(packetObj, LocalSockSendObj):
 			self._sendObject(moi.peerName, moi.userName, moi.moduleName, packetObj.dataObj)
+		elif _type_check(packetObj, LocalSockSetWorkState):
+			self._sendObject(moi.peerName, moi.userName, moi.moduleName, packetObj.workState)
 		elif _type_check(packetObj, LocalSockRetn):
 			self._moiCallFuncReturn(moi, packetObj.retVal)
 		elif _type_check(packetObj, LocalSockExcp):
@@ -363,6 +366,18 @@ class SnLocalManager:
 				assert False
 
 		return ret
+
+	def _startSubProc(self, peerName, userName, moduleName, tmpDir):
+		if userName is None:
+			cmdStr = "\"%s\" \"%s\" \"\" \"%s\" \"%s\""%(self.param.subprocFile, peerName, moduleName, tmpDir)
+		else:
+			cmdStr = "\"%s\" \"%s\" \"%s\" \"%s\" \"%s\""%(self.param.subprocFile, peerName, userName, moduleName, tmpDir)
+
+		return subprocess.Popen(cmdStr,
+								shell = True,
+								stdin = subprocess.PIPE,
+								stdout = subprocess.PIPE,
+								stderr = subprocess.STDOUT)
 
 	def _sendReject(self, peerName, userName, moduleName, rejectMessage):
 		moi = self._moiGet(peerName, userName, moduleName)
@@ -535,9 +550,8 @@ class SnLocalManager:
 					exec("from %s import ModuleInstanceObject"%(moi.moduleName.replace("-", "_")))
 					moi.mo = ModuleInstanceObject(self, moi.peerName, moi.userName, moi.moduleName, moi.tmpDir)
 				else:
-					proc, procPipe = self.subProcBuilder.startSubProc(moi.peerName, moi.userName, moi.moduleName, moi.tmpDir)
-					moi.proc = proc
-					moi.procPipe = objsocket(procPipe, objsocket.SOCKTYPE_MULTIPROCESSING_PIPE, self.onProcPipeRecv, self.onProcPipeError, self._procPipeGcComplete)
+					moi.proc = self._startSubProc(moi.peerName, moi.userName, moi.moduleName, moi.tmpDir)
+					moi.procPipe = objsocket(objsocket.SOCKTYPE_PIPE_PAIR, (moi.proc.stdin, moi.proc.stdout), self.onProcPipeRecv, self.onProcPipeError, self._procPipeGcComplete)
 				self._moiCallFunc(moi, "onActive")
 				return
 

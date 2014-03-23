@@ -258,7 +258,7 @@ class SnPeerManager:
 		self.peerInfoDict[peerName].fsmState = _PeerInfoInternal.STATE_INIT
 		self.peerInfoDict[peerName].powerStateWhenInactive = self.POWER_STATE_UNKNOWN
 		self.peerInfoDict[peerName].infoObj = None
-		self.peerInfoDict[peerName].sock = objsocket(sslSock, objsocket.SOCKTYPE_SSL, self.onSocketRecv, self.onSocketError, self._gcComplete)
+		self.peerInfoDict[peerName].sock = objsocket(objsocket.SOCKTYPE_SSL_SOCKET, sslSock, self.onSocketRecv, self.onSocketError, self._gcComplete)
 		logging.info("SnPeerManager.onSocketConnected: %s", _dbgmsg_peer_state_change(peerName, oldFsmState, self.peerInfoDict[peerName].fsmState))
 
 		# timer operation
