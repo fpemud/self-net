@@ -29,9 +29,14 @@ install:
 	install -m 0755 selfnetctl "$(DESTDIR)/$(prefix)/bin"
 
 	install -d -m 0755 "$(DESTDIR)/$(prefix)/lib/selfnetd"
-	cp -r src/* "$(DESTDIR)/$(prefix)/lib/selfnetd"
+	cp -r lib/* "$(DESTDIR)/$(prefix)/lib/selfnetd"
 	find "$(DESTDIR)/$(prefix)/lib/selfnetd" -type f | xargs chmod 644
 	find "$(DESTDIR)/$(prefix)/lib/selfnetd" -type d | xargs chmod 755
+
+	install -d -m 0755 "$(DESTDIR)/$(prefix)/libexec/selfnetd"
+	cp -r libexec/* "$(DESTDIR)/$(prefix)/libexec/selfnetd"
+	find "$(DESTDIR)/$(prefix)/libexec/selfnetd" -type f | xargs chmod 755
+	find "$(DESTDIR)/$(prefix)/libexec/selfnetd" -type d | xargs chmod 755
 
 	install -d -m 0755 "$(DESTDIR)/$(prefix)/lib/selfnetd/modules"
 	cp -r modules/* "$(DESTDIR)/$(prefix)/lib/selfnetd/modules"
