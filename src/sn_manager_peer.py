@@ -258,7 +258,7 @@ class SnPeerManager:
 		self.peerInfoDict[peerName].fsmState = _PeerInfoInternal.STATE_INIT
 		self.peerInfoDict[peerName].powerStateWhenInactive = self.POWER_STATE_UNKNOWN
 		self.peerInfoDict[peerName].infoObj = None
-		self.peerInfoDict[peerName].sock = objsocket(sslSock, self.onSocketRecv, self.onSocketError, self._gcComplete)
+		self.peerInfoDict[peerName].sock = objsocket(sslSock, objsocket.SOCKTYPE_SSL, self.onSocketRecv, self.onSocketError, self._gcComplete)
 		logging.info("SnPeerManager.onSocketConnected: %s", _dbgmsg_peer_state_change(peerName, oldFsmState, self.peerInfoDict[peerName].fsmState))
 
 		# timer operation
@@ -297,13 +297,13 @@ class SnPeerManager:
 		else:
 			self._sendReject(peerName, "invalid packet format, %s"%(packetObj.__class__))
 
-	def onSocketError(self, sock, errMsg):
+	def onSocketError(self, sock, excObj):
 		peerName = self._getPeerNameBySock(sock)
 
 		oldFsmState = self.peerInfoDict[peerName].fsmState
 		newFsmState = _PeerInfoInternal.STATE_NONE
 		self._peerToShutdown(peerName)
-		logging.info("SnPeerManager.onSocketError: %s, %s", errMsg, _dbgmsg_peer_state_change(peerName, oldFsmState, newFsmState))
+		logging.info("SnPeerManager.onSocketError: %s, %s", str(excObj), _dbgmsg_peer_state_change(peerName, oldFsmState, newFsmState))
 
 		self._timerOperation()
 

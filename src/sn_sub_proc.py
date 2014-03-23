@@ -2,9 +2,10 @@
 # -*- coding: utf-8; tab-width: 4; indent-tabs-mode: t -*-
 
 import os
+import pickle
+import struct
 import traceback
 import multiprocessing
-from objsocket import objsocket
 from gi.repository import GLib
 
 from sn_util import SnUtil
@@ -28,40 +29,19 @@ class LocalSockExcp:
 	excObj = None							# str
 	excInfo = None							# str
 
-class SnSubProcess:
+class SnSubProcBuilder:
 
-	def __init__(self, peerName, userName, moduleName, tmpDir, recvFunc, stopFunc):
-		self.peerName = peerName
-		self.userName = userName
-		self.moduleName = moduleName
-		self.tmpDir = tmpDir
-		self.recvFunc = recvFunc
-		self.stopFunc = stopFunc
-		self.pipeConn = None
-
-	def start(self):
+	def startSubProc(self, peerName, userName, moduleName, tmpDir):
 		parent_conn, child_conn = multiprocessing.Pipe()
-		self.pipeConn = objsocket(parent_conn, self.onConnRecv, self._onConnError, self._gcComplete)
-		pargs = (self.peerName, self.userName, self.moduleName, self.tmpDir, child_conn,)
-		multiprocessing.Process(target=_subproc_main, args=pargs)
-
-	def get_pipe(self):
-		return self.pipeConn
-
-	def onConnRecv(self, sock, packetObj):
-		assert sock == self.pipeConn
-		self.recvFunc(self, self.peerName, self.userName, self.moduleName, packetObj)
-
-	def _onConnError(self, sock, errMsg):
-		assert sock == self.pipeConn
-		sock.close()
-		self.stopFunc(self)
-
-	def _gcComplete(self, sock):
-		assert sock == self.pipeConn
-		assert False
+		pargs = (peerName, userName, moduleName, tmpDir, child_conn)
+		proc = multiprocessing.Process(target=_subproc_main, args=pargs)
+		proc.start()
+		return (proc, parent_conn)
 
 def _subproc_main(peerName, userName, moduleName, tmpDir, pipeConn):
+
+	print "********* debug2, %d"%(os.getpid())
+
 	# drop priviledge
 	if userName is not None:
 		SnUtil.dropPriviledgeTo(userName)
@@ -78,7 +58,7 @@ class _SubprocObject:
 		self.userName = userName
 		self.moduleName = moduleName
 		self.tmpDir = tmpDir
-		self.connSock = objsocket(pipeConn, self.onConnRecv, self._onConnError, self._gcComplete)
+		self.connSock = _SubProcObjSocket(pipeConn, self.onConnRecv, self.onConnError)
 		self.mo = None
 
 		# create module object
@@ -120,10 +100,7 @@ class _SubprocObject:
 		else:
 			assert False
 
-	def _onConnError(self, sock):
-		assert False
-
-	def _gcComplete(self, sock):
+	def onConnError(self, sock):
 		assert False
 
 	def _sendRetn(self, retVal):
@@ -147,8 +124,57 @@ class _SubprocObject:
 		packetObj.workState = workState
 		self.connSock.send(packetObj)
 
-_flagError = GLib.IO_PRI | GLib.IO_ERR | GLib.IO_HUP | GLib.IO_NVAL
+class _SubProcObjSocket:
+
+	def __init__(self, mySock, recvFunc, errorFunc):
+		self.mySock = mySock
+		self.recvFunc = recvFunc
+		self.errorFunc = errorFunc
+		self.recvBuffer = ""
+		self.recvSourceId = GLib.io_add_watch(self.mySock, GLib.IO_IN | _flagError, self._onRecv)
+
+	def send(self, dataObj):
+		data = pickle.dumps(dataObj)
+		header = struct.pack("!I", len(data))
+		packet = header + data
+		self.mySock.send_bytes(packet)
+
+	def _onRecv(self, source, cb_condition):
+		assert source == self.mySock
+
+		if cb_condition & _flagError:
+			self.errorFunc(self)
+			assert self.mySock is None		# errorFunc should close the socket
+			return False
+
+		try:
+			self.recvBuffer += self.mySock.recv_bytes()
+		except EOFError:
+			self.errorFunc(self)
+			assert self.mySock is None		# errorFunc should close the socket
+			return False
+
+		while True:
+			# get packet header
+			headerLen = struct.calcsize("!I")
+			if len(self.recvBuffer) < headerLen:
+				return True
+
+			# get packet data
+			dataLen = struct.unpack("!I", self.recvBuffer[:headerLen])[0]
+			totalLen = headerLen + dataLen
+			if len(self.recvBuffer) < totalLen:
+				return True
+
+			# invoke callback function
+			dataObj = pickle.loads(self.recvBuffer[headerLen:totalLen])
+			self.recvBuffer = self.recvBuffer[totalLen:]
+			self.recvFunc(self, dataObj)
+			if self.mySock is None:
+				return False
 
 def _typeCheck(obj, typeobj):
 	return str(obj.__class__) == str(typeobj)
+
+_flagError = GLib.IO_PRI | GLib.IO_ERR | GLib.IO_HUP | GLib.IO_NVAL
 

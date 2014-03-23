@@ -10,14 +10,18 @@ from sn_util import SnUtil
 
 class objsocket:
 
+	SOCKTYPE_SSL = 0
+	SOCKTYPE_MULTIPROCESSING_PIPE = 1
+
 	_GC_STATE_NONE = 0
 	_GC_STATE_PENDING = 1
 	_GC_STATE_COMPLETE = 2
 
-	def __init__(self, mySock, recvFunc, errorFunc, gcCompleteFunc):
-#		assert self._checkSock(mySock)
+	def __init__(self, mySock, mySockType, recvFunc, errorFunc, gcCompleteFunc):
+		assert mySockType in [ self.SOCKTYPE_SSL, self.SOCKTYPE_MULTIPROCESSING_PIPE ]
 
 		self.mySock = mySock
+		self.mySockType = mySockType
 		self.gcState = self._GC_STATE_NONE
 		self.recvFunc = recvFunc
 		self.errorFunc = errorFunc
@@ -29,6 +33,8 @@ class objsocket:
 		self.sendSourceId = None
 
 	def send(self, dataObj):
+		"""Never raise exception, errorFunc is called if the socket is broken"""
+
 		assert self.mySock is not None and self.gcState == self._GC_STATE_NONE
 
 		data = pickle.dumps(dataObj)
@@ -54,9 +60,7 @@ class objsocket:
 		# set state
 		self.gcState = self._GC_STATE_PENDING
 		if len(self.sendBuffer) == 0:
-			# for consistency sake, gcCompleteFunc should be called in event
-			# context, so we use idle callback here
-			GLib.idle_add(self._gcCompleteIdleFunc)
+			SnUtil.idleInvoke(self._gcComplete)
 		else:
 			# assure socket is sending data
 			assert self.sendSourceId is not None
@@ -83,27 +87,22 @@ class objsocket:
 		# send data as much as possible
 		try:
 			if cb_condition & _flagError:
-				raise _CbConditionException(cb_condition)
-
-			if len(self.sendBuffer) > 128:						# fixme
-				sendLen = 128
+				raise _ObjSocketException(CbConditionException(cb_condition))
+			if self.mySockType == self.SOCKTYPE_SSL:
+				sendLen = self._doSendTypeSsl(self.mySock, self.sendBuffer)
+			elif self.mySockType == self.SOCKTYPE_MULTIPROCESSING_PIPE:
+				sendLen = self._doSendTypeMultiprocessingPipe(self.mySock, self.sendBuffer)
 			else:
-				sendLen = len(self.sendBuffer)
-
-			sendLen = self.mySock.send(self.sendBuffer[:sendLen])
+				assert False
 			self.sendBuffer = self.sendBuffer[sendLen:]
-		except (SSL.WantReadError, SSL.WantWriteError):
-			return True
-		except (socket.error, SSL.Error, _CbConditionException) as e:
+		except _ObjSocketException as e:
 			if self.gcState == self._GC_STATE_NONE:
-				self.errorFunc(self, str(e))
+				self.errorFunc(self, e)
 				assert self.mySock is None		# errorFunc should close the socket
 				return False
 			elif self.gcState == self._GC_STATE_PENDING:
 				self.sendBuffer = ""
-				self.gcState = self._GC_STATE_COMPLETE
-				self.gcCompleteFunc(self)
-				assert self.mySock is None		# gcCompleteFunc should close the socket
+				self._gcComplete()
 				return False
 			else:
 				assert False
@@ -117,9 +116,7 @@ class objsocket:
 			self.sendSourceId = None
 			return False
 		elif self.gcState == self._GC_STATE_PENDING:
-			self.gcState = self._GC_STATE_COMPLETE
-			self.gcCompleteFunc(self)
-			assert self.mySock is None			# gcCompleteFunc should close the socket
+			self._gcComplete()
 			return False
 		else:
 			assert False
@@ -130,19 +127,19 @@ class objsocket:
 
 		try:
 			if cb_condition & _flagError:
-				raise _CbConditionException(cb_condition)
-			ret = self.mySock.recv(4096)
-			if len(ret) == 0:
-				raise _EofException()
+				raise _ObjSocketException(CbConditionException(cb_condition))
+			if self.mySockType == self.SOCKTYPE_SSL:
+				ret = self._doRecvTypeSsl(self.mySock)
+			elif self.mySockType == self.SOCKTYPE_MULTIPROCESSING_PIPE:
+				ret = self._doRecvTypeMultiprocessingPipe(self.mySock)
+			else:
+				assert False
 			self.recvBuffer += ret
-		except (SSL.WantReadError, SSL.WantWriteError):
-			return True
-		except (socket.error, SSL.Error, _CbConditionException, _EofException) as e:
-			self.errorFunc(self, str(e))
+		except _ObjSocketException as e:
+			self.errorFunc(self, e.excObj)
 			assert self.mySock is None		# errorFunc should close the socket
 			return False
 
-		i = 0
 		while True:
 			# get packet header
 			headerLen = struct.calcsize("!I")
@@ -162,34 +159,60 @@ class objsocket:
 			if self.mySock is None or self.gcState != self._GC_STATE_NONE:
 				return False
 
-			i = i + 1
+	@staticmethod
+	def _doSendTypeSsl(mySock, sendBuffer):
+		if len(sendBuffer) > 128:						# fixme
+			sendLen = 128
+		else:
+			sendLen = len(sendBuffer)
 
-	def _gcCompleteIdleFunc(self):
+		try:
+			return mySock.send(sendBuffer[:sendLen])
+		except (SSL.WantReadError, SSL.WantWriteError):
+			return 0
+		except (socket.error, SSL.Error) as e:
+			raise _ObjSocketException(e.excObj)
+
+	@staticmethod
+	def _doRecvTypeSsl(mySock):
+		try:
+			recvBuf = mySock.recv(4096)
+			if len(recvBuf) == 0:
+				raise EOFError()
+			return recvBuf
+		except (SSL.WantReadError, SSL.WantWriteError):
+			return ""
+		except (socket.error, SSL.Error, EOFError) as e:
+			raise _ObjSocketException(e)
+
+	@staticmethod
+	def _doSendTypeMultiprocessingPipe(mySock, sendBuffer):
+		try:
+			return mySock.send_bytes(sendBuffer)
+		except ValueError as e:
+			raise _ObjSocketException(e)
+
+	@staticmethod
+	def _doRecvTypeMultiprocessingPipe(mySock):
+		try:
+			return mySock.recv_bytes()
+		except EOFError as e:
+			raise _ObjSocketException(e)
+
+	def _gcComplete(self):
 		self.gcState = self._GC_STATE_COMPLETE
 		self.gcCompleteFunc(self)
 		assert self.mySock is None			# gcCompleteFunc should close the socket
-		return False
 
-	def _checkSock(self, mySock):
-		# fixme: should check if the socket is in non-blocking state, but there's no API to get that info
-
-		if isinstance(mySock, SSL.Connection):
-			return True
-		elif isinstance(mySock, socket.socket):
-			if mySock.type != socket.SOCK_STREAM:
-				return False
-			return True
-		else:
-			return False
-
-class _CbConditionException(Exception):
+class CbConditionException(Exception):
 	def __init__(self, cb_condition):
 		s = SnUtil.cbConditionToStr(cb_condition)
-		super(_CbConditionException, self).__init__(s)
+		super(CbConditionException, self).__init__(s)
 
-class _EofException(Exception):
-	def __init__(self):
-		super(_EofException, self).__init__("EOF encountered")
+class _ObjSocketException(Exception):
+	def __init__(self, excObj):
+		super(_ObjSocketException, self).__init__()
+		self.excObj = excObj
 
 _flagError = GLib.IO_PRI | GLib.IO_ERR | GLib.IO_HUP | GLib.IO_NVAL
 
