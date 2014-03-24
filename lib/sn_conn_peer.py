@@ -137,7 +137,9 @@ class _HandShaker:
 		self.sockDict = dict()
 
 	def dispose(self):
-		pass
+		for sock in self.sockDict:
+			sock.close()
+		self.sockDict.clear()
 
 	def addSocket(self, sock, serverSide, hostname=None, port=None):
 		info = _HandShakerConnInfo()

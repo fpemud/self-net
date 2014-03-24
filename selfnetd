@@ -31,6 +31,28 @@ def parseArgs():
 		help="Set output debug message level")
 	return argParser.parse_args()
 
+class SnDisposer:
+
+	_DISPOSING_PEER_MANAGER = 1
+	_DISPOSING_LOCAL_MANAGER = 2
+
+	def __init__(self, param):
+		self.param = param
+		self.state = None
+
+	def start(self):
+		self.state = self._DISPOSING_PEER_MANAGER
+		self.param.peerManager.dispose(self._onDisposeComplete)
+
+	def _onDisposeComplete(self):
+		if self.state == self._DISPOSING_PEER_MANAGER:
+			self.state = self._DISPOSING_LOCAL_MANAGER
+			self.param.localManager.dispose(self._onDisposeComplete)
+		elif self.state == self._DISPOSING_LOCAL_MANAGER:
+			self.param.mainloop.quit()
+		else:
+			assert False
+
 ################################################################################
 
 parseResult = parseArgs()

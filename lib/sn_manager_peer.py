@@ -126,6 +126,7 @@ class SnPeerManager:
 		logging.debug("SnPeerManager.__init__: Start")
 
 		self.param = param
+		self.disposeCompleteFunc = None
 
 		# create internal peer info dict
 		self.peerInfoDict = dict()
@@ -150,7 +151,7 @@ class SnPeerManager:
 		logging.debug("SnPeerManager.__init__: End")
 		return
 
-	def dispose(self):
+	def dispose(self, disposeCompleteFunc):
 		logging.debug("SnPeerManager.dispose: Start")
 
 		if self.peerProbeTimer is not None:
@@ -167,8 +168,8 @@ class SnPeerManager:
 					or peerInfo.fsmState == _PeerInfoInternal.STATE_FULL):
 				self._peerToShutdown(peerName)
 
-		logging.debug("SnPeerManager.dispose: End")
-		return
+		self.disposeCompleteFunc = disposeCompleteFunc
+		SnUtil.idleInvoke(self._disposeComplete)
 
 	def getPeerNameList(self):
 		return self.peerInfoDict.keys()
@@ -271,27 +272,27 @@ class SnPeerManager:
 
 	def onSocketRecv(self, sock, packetObj):
 		peerName = self._getPeerNameBySock(sock)
-		if self._typeCheck(packetObj, SnSysPacket):
-			if self._typeCheck(packetObj.data, SnVersion):
+		if _type_check(packetObj, SnSysPacket):
+			if _type_check(packetObj.data, SnVersion):
 				self._recvVerMatch(peerName, packetObj.data)
-			elif self._typeCheck(packetObj.data, SnCfgSerializationObject):
+			elif _type_check(packetObj.data, SnCfgSerializationObject):
 				self._recvCfgMatch(peerName, packetObj.data)
-			elif self._typeCheck(packetObj.data, SnSysInfo):
+			elif _type_check(packetObj.data, SnSysInfo):
 				self._recvPeerInfo(peerName, packetObj.data)
-			elif self._typeCheck(packetObj.data, SnSysPacketPowerOp):
+			elif _type_check(packetObj.data, SnSysPacketPowerOp):
 				logging.debug("SnPeerManager.onSocketRecv: _recvPowerOp")
 				self._recvPowerOp(peerName, packetObj.data)
-			elif self._typeCheck(packetObj.data, SnSysPacketPowerOpAck):
+			elif _type_check(packetObj.data, SnSysPacketPowerOpAck):
 				logging.debug("SnPeerManager.onSocketRecv: _recvPowerOpAck")
 				self._recvPowerOpAck(peerName, packetObj.data)
-			elif self._typeCheck(packetObj.data, SnSysPacketPowerStateWhenInactive):
+			elif _type_check(packetObj.data, SnSysPacketPowerStateWhenInactive):
 				logging.debug("SnPeerManager.onSocketRecv: _recvPowerStateWhenInactive")
 				self._recvPowerStateWhenInactive(peerName, packetObj.data)
-			elif self._typeCheck(packetObj.data, SnSysPacketReject):
+			elif _type_check(packetObj.data, SnSysPacketReject):
 				self._recvReject(peerName, packetObj.data.message)
 			else:
 				self._sendReject(peerName, "invalid system packet data format")
-		elif self._typeCheck(packetObj, SnDataPacket):
+		elif _type_check(packetObj, SnDataPacket):
 			self.param.localManager.onPeerSockRecv(peerName, packetObj.srcUserName, 
 						packetObj.srcModuleName, packetObj.data)
 		else:
@@ -539,8 +540,9 @@ class SnPeerManager:
 				GLib.source_remove(self.peerProbeTimer)
 				self.peerProbeTimer = None
 
-	def _typeCheck(self, obj, typeobj):
-		return str(obj.__class__) == str(typeobj)
+	def _disposeComplete(self):
+		logging.debug("SnPeerManager.dispose: End")
+		self.disposeCompleteFunc()
 
 class _PeerInfoInternal:
 	STATE_NONE = 0
@@ -574,4 +576,7 @@ def _peer_state_to_str(peerState):
 		return "STATE_REJECT"
 	else:
 		assert False
+
+def _type_check(obj, typeobj):
+	return str(obj.__class__) == str(typeobj)
 

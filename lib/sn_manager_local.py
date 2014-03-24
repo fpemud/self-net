@@ -149,10 +149,9 @@ class SnLocalManager:
 	def __init__(self, param):
 		logging.debug("SnLocalManager.__init__: Start")
 
-		print "********* debug, %d"%(os.getpid())
-
 		# variables
 		self.param = param
+		self.disposeCompleteFunc = None
 		self.localInfo = None
 		self.moiList = []
 		self.moiGcList = []
@@ -162,20 +161,20 @@ class SnLocalManager:
 		self.localInfo = self._getLocalInfo()
 		self.onPeerChange(socket.gethostname(), self.localInfo)
 
-
 		logging.debug("SnLocalManager.__init__: End")
 		return
 
-	def dispose(self):
+	def dispose(self, disposeCompleteFunc):
 		logging.debug("SnLocalManager.dispose: Start")
 
 		self.localInfo = None
 		self.onPeerChange(socket.gethostname(), None)
 
-		# FIXME: need to wait operation complete
+		self.disposeCompleteFunc = disposeCompleteFunc
 
-		logging.debug("SnLocalManager.dispose: End")
-		return
+		assert len(self.moiList) == 0
+		if len(self.moiGcList) == 0:
+			SnUtil.idleInvoke(self._disposeComplete)
 
 	def getLocalInfo(self):
 		return self.localInfo
@@ -429,6 +428,10 @@ class SnLocalManager:
 		"""We don't do graceful close on procPipe"""
 		assert False
 
+	def _disposeComplete(self):
+		logging.debug("SnLocalManager.dispose: End")
+		self.disposeCompleteFunc()
+
 	##### moi assistant method ####
 
 	def _moiCreate(self, peerName, userName, moduleName, minfo):
@@ -630,6 +633,11 @@ class SnLocalManager:
 		if moi is not None:
 			assert moi.state == _MoiObj.STATE_PENDING
 			self._moiChangeState(moi, _MoiObj.STATE_ACTIVE, "")
+
+		if self.disposeCompleteFunc is not None:
+			assert len(self.moiList) == 0
+			if len(self.moiGcList) == 0:
+				self._disposeComplete()
 
 	def _moiCallFunc(self, moi, funcName, *args):
 		assert moi.calling is None

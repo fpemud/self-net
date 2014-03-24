@@ -29,7 +29,7 @@ class _SubProcObject:
 
 	def onConnRecv(self, sock, packetObj):
 		assert sock == self.connSock
-		assert _typeCheck(packetObj, LocalSockCall)
+		assert _type_check(packetObj, LocalSockCall)
 
 		if packetObj.funcName == "onActive":
 			assert len(packetObj.funcArgs) == 0
@@ -142,7 +142,7 @@ class _SubProcObjSocket:
 			if self.isClose:
 				return False
 
-def _typeCheck(obj, typeobj):
+def _type_check(obj, typeobj):
 	return str(obj.__class__) == str(typeobj)
 
 _flagError = GLib.IO_PRI | GLib.IO_ERR | GLib.IO_HUP | GLib.IO_NVAL
