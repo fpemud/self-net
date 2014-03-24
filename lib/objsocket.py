@@ -129,7 +129,6 @@ class objsocket:
 			assert False
 
 	def _onRecv(self, source, cb_condition):
-		assert source == self.mySock
 		assert self.gcState == self._GC_STATE_NONE
 
 		try:
@@ -177,7 +176,7 @@ class _ObjSocketException(Exception):
 
 class _AdapterObjSslSocket:
 
-	def send(mySock, sendBuffer):
+	def send(self, mySock, sendBuffer):
 		if len(sendBuffer) > 128:						# fixme
 			sendLen = 128
 		else:
@@ -190,7 +189,7 @@ class _AdapterObjSslSocket:
 		except (socket.error, SSL.Error) as e:
 			raise _ObjSocketException(e.excObj)
 
-	def recv(mySock):
+	def recv(self, mySock):
 		try:
 			recvBuf = mySock.recv(4096)
 			if len(recvBuf) == 0:
@@ -201,34 +200,34 @@ class _AdapterObjSslSocket:
 		except (socket.error, SSL.Error, EOFError) as e:
 			raise _ObjSocketException(e)
 
-	def close(mySock):
+	def close(self, mySock):
 		mySock.close()
 
-	def addSendWatch(mySock, mySendFunc):
+	def addSendWatch(self, mySock, mySendFunc):
 		return GLib.io_add_watch(mySock, GLib.IO_OUT, mySendFunc)
 
-	def addRecvWatch(mySock, myRecvFunc):
+	def addRecvWatch(self, mySock, myRecvFunc):
 		return GLib.io_add_watch(mySock, GLib.IO_IN | _flagError, myRecvFunc)
 
 class _AdapterObjPipePair:
 
-	def send(mySock, sendBuffer):
+	def send(self, mySock, sendBuffer):
 		return mySock[1].write(sendBuffer)
 
-	def recv(mySock):
+	def recv(self, mySock):
 		try:
 			return mySock[0].read()
 		except EOFError as e:
 			raise _ObjSocketException(e)
 
-	def close(mySock):
+	def close(self, mySock):
 		mySock[0].close()
 		mySock[1].close()
 
-	def addSendWatch(mySock, mySendFunc):
+	def addSendWatch(self, mySock, mySendFunc):
 		return GLib.io_add_watch(mySock[1], GLib.IO_OUT, mySendFunc)
 
-	def addRecvWatch(mySock, myRecvFunc):
+	def addRecvWatch(self, mySock, myRecvFunc):
 		return GLib.io_add_watch(mySock[0], GLib.IO_IN | _flagError, myRecvFunc)
 
 _flagError = GLib.IO_PRI | GLib.IO_ERR | GLib.IO_HUP | GLib.IO_NVAL

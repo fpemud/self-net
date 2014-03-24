@@ -61,8 +61,10 @@ class SnPeerClient:
 		self.handshaker = _HandShaker(certFile, privkeyFile, caCertFile, connectFunc)
 		self.asyncns = libasyncns.Asyncns()
 		self.sockSet = set()
+		self.isDispose = False
 
 	def dispose(self):
+		self.isDispose = True
 		self.handshaker.dispose()
 
 	def connect(self, hostname, port):
@@ -80,6 +82,9 @@ class SnPeerClient:
 	def _onResolveComplete(self, source, cb_condition, hostname, port):
 		assert not (cb_condition & _flagError)
 		assert source == self.asyncns.get_fd()
+
+		if self.isDispose:
+			return False
 
 		# get resolve result
 		hostaddr = None
@@ -110,6 +115,9 @@ class SnPeerClient:
 		return False
 
 	def _onConnect(self, source, cb_condition, hostname, port):
+		if self.isDispose:
+			return False
+
 		self.sockSet.remove((hostname, port))
 
 		if cb_condition & _flagError:

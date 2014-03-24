@@ -7,6 +7,7 @@ import shutil
 import tempfile
 import logging
 import argparse
+import signal
 from daemon import daemon
 from daemon import pidfile
 from gi.repository import GLib
@@ -31,27 +32,30 @@ def parseArgs():
 		help="Set output debug message level")
 	return argParser.parse_args()
 
-class SnDisposer:
+def sighandler_hup(signum, frame):
+	logging.debug("selfnetd: SIGHUP occured")
 
-	_DISPOSING_PEER_MANAGER = 1
-	_DISPOSING_LOCAL_MANAGER = 2
+def sighandler_int(signum, frame):
+	logging.debug("selfnetd: SIGINT occured")
+	SnUtil.idleInvoke(_dispose)
 
-	def __init__(self, param):
-		self.param = param
-		self.state = None
+def sighandler_term(signum, frame):
+	logging.debug("selfnetd: SIGTERM occured")
+	SnUtil.idleInvoke(_dispose)
 
-	def start(self):
-		self.state = self._DISPOSING_PEER_MANAGER
-		self.param.peerManager.dispose(self._onDisposeComplete)
-
-	def _onDisposeComplete(self):
-		if self.state == self._DISPOSING_PEER_MANAGER:
-			self.state = self._DISPOSING_LOCAL_MANAGER
-			self.param.localManager.dispose(self._onDisposeComplete)
-		elif self.state == self._DISPOSING_LOCAL_MANAGER:
-			self.param.mainloop.quit()
-		else:
-			assert False
+def _dispose():
+	global param
+	if param.disposeFlag == 0:
+		param.dbusMainObject.release()
+		param.disposeFlag = 1
+		param.peerManager.dispose(_dispose)
+	elif param.disposeFlag == 1:
+		param.disposeFlag = 2
+		param.localManager.dispose(_dispose)
+	elif param.disposeFlag == 2:
+		param.mainloop.quit()
+	else:
+		assert False
 
 ################################################################################
 
@@ -61,6 +65,7 @@ parseResult = parseArgs()
 param = SnParam()
 if parseResult.pid_file is not None:
 	self.pidFile = parseResult.pid_file
+param.disposeFlag = 0
 
 try:
 	# create directory
@@ -89,7 +94,10 @@ try:
 			assert False
 		logging.getLogger().setLevel(logLevel)
 
-	logging.debug("selfnetd: Start")
+	# set signal handler
+	signal.signal(signal.SIGHUP, sighandler_hup)
+	signal.signal(signal.SIGINT, sighandler_int)
+	signal.signal(signal.SIGTERM, sighandler_term)
 
 	# daemonize
 	dc = None
@@ -99,8 +107,6 @@ try:
 		dc.open()
 
 	try:
-		logging.info("selfnetd: Initializaition starts")
-
 		# create main loop
 		DBusGMainLoop(set_as_default=True)
 		param.mainloop = GLib.MainLoop()
@@ -118,18 +124,6 @@ try:
 		param.mainloop.run()
 		logging.info("selfnetd: Mainloop exits")
 	finally:
-		if param.dbusMainObject is not None:
- 			param.dbusMainObject.release()
- 		if param.peerManager is not None:
-			param.peerManager.dispose()
-			param.peerManager = None
-		if param.localManager is not None:
-			param.localManager.dispose()
-			param.localManager = None
-		if param.configManager is not None:
-			param.configManager.dispose()
-			param.configManager = None
-		logging.info("selfnetd: Finalization completes")
 		logging.shutdown()
 		if dc is not None:
 			dc.close()

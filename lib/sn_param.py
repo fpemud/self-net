@@ -31,6 +31,7 @@ class SnParam:
 		# to be set
 		self.tmpDir = None				# str
 		self.logLevel = None			# enum
+		self.disposeFlag = None			# int
 
 		self.mainloop = None			# obj
 		self.configManager = None		# obj

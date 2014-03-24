@@ -152,14 +152,13 @@ class SnLocalManager:
 		# variables
 		self.param = param
 		self.disposeCompleteFunc = None
-		self.localInfo = None
+		self.localInfo = self._getLocalInfo()
 		self.moiList = []
 		self.moiGcList = []
 		self.sleepNotifier = SnSleepNotifier(self.onBeforeSleep, self.onAfterResume)
 
 		# local peer go into up state
-		self.localInfo = self._getLocalInfo()
-		self.onPeerChange(socket.gethostname(), self.localInfo)
+		SnUtil.idleInvoke(self.onPeerChange, socket.gethostname(), self.localInfo)
 
 		logging.debug("SnLocalManager.__init__: End")
 		return
@@ -296,20 +295,22 @@ class SnLocalManager:
 			assert False
 
 	def onProcPipeError(self, procPipe, e):
+		print "***** debug, onProcPipeError, %s"%(e)
+
 		gcmoi = self._moiGcFindByProcPipe(procPipe)
 		if gcmoi is not None:
-			assert not gcmoi.proc.is_alive()
 			gcmoi.proc = None
 			gcmoi.procPipe = None
 			if gcmoi.calling is not None:
 				self._moiCallFuncExcept(gcmoi, Exception("sub process aborted"), str(e))
 			else:
 				self._moiGcComplete(gcmoi)
+
+			print "***** debug, onProcPipeError, return 1"
 			return
 
 		moi = self._moiGetByProcPipe(procPipe)
 		if moi is not None:
-			assert not moi.proc.is_alive()
 			moi.proc = None
 			moi.procPipe = None
 			if moi.calling is not None:
@@ -321,6 +322,8 @@ class SnLocalManager:
 					pass
 				else:
 					assert False
+
+			print "***** debug, onProcPipeError, return 2"
 			return
 
 		assert False
@@ -372,11 +375,16 @@ class SnLocalManager:
 		else:
 			cmdStr = "\"%s\" \"%s\" \"%s\" \"%s\" \"%s\""%(self.param.subprocFile, peerName, userName, moduleName, tmpDir)
 
-		return subprocess.Popen(cmdStr,
+		print "**** _startSubProc, Start, %s"%(cmdStr)
+
+		ret = subprocess.Popen("passwd",
 								shell = True,
 								stdin = subprocess.PIPE,
 								stdout = subprocess.PIPE,
 								stderr = subprocess.STDOUT)
+
+		print "**** _startSubProc, Start, %s"%(cmdStr)
+
 
 	def _sendReject(self, peerName, userName, moduleName, rejectMessage):
 		moi = self._moiGet(peerName, userName, moduleName)

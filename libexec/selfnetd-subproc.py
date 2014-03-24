@@ -151,7 +151,7 @@ _flagError = GLib.IO_PRI | GLib.IO_ERR | GLib.IO_HUP | GLib.IO_NVAL
 
 assert len(sys.argv) == 5
 peerName = sys.argv[1]
-userName = sys.argv[2]
+userName = None if sys.argv[2] == "" else sys.argv[2]
 moduleName = sys.argv[3]
 tmpDir = sys.argv[4]
 
