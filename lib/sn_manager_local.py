@@ -432,6 +432,10 @@ class SnLocalManager:
 		assert moi.state in [ _MoiObj.STATE_ACTIVE, _MoiObj.STATE_FULL ]
 		moi.workState = workState
 
+	def _moduleLog(self, peerName, userName, moduleName, logLevel, msg, args):
+		logging.getLogger(
+
+
 	def _procPipeGcComplete(self, procPipe):
 		"""We don't do graceful close on procPipe"""
 		assert False
@@ -462,8 +466,10 @@ class SnLocalManager:
 		moi.propDict = minfo.moduleObj.getPropDict()
 		if userName is None:
 			moi.tmpDir = os.path.join(self.param.tmpDir, "%s-%s"%(peerName, moduleName))
+			moi.logFile = os.path.join(self.param.logDir, "selfnetd-module-%s-%s.log"%(peerName, moduleName))
 		else:
 			moi.tmpDir = os.path.join(self.param.tmpDir, "%s-%s-%s"%(peerName, userName, moduleName))
+			moi.logFile = os.path.join(self.param.logDir, "selfnetd-module-%s-%s-%s.log"%(peerName, userName, moduleName))
 		moi.state = _MoiObj.STATE_PENDING
 		moi.failMessage = ""
 		moi.workState = SnModuleInstance.WORK_STATE_IDLE
@@ -559,9 +565,9 @@ class SnLocalManager:
 
 				if not moi.propDict["standalone"]:
 					exec("from %s import ModuleInstanceObject"%(moi.moduleName.replace("-", "_")))
-					moi.mo = ModuleInstanceObject(self, moi.peerName, moi.userName, moi.moduleName, moi.tmpDir)
+					moi.mo = ModuleInstanceObject(self, moi.peerName, moi.userName, moi.moduleName, moi.tmpDir, moi.logFile)
 				else:
-					moi.proc = self._startSubProc(moi.peerName, moi.userName, moi.moduleName, moi.tmpDir)
+					moi.proc = self._startSubProc(moi.peerName, moi.userName, moi.moduleName, moi.tmpDir, moi.logFile)
 					moi.procPipe = objsocket(objsocket.SOCKTYPE_PIPE_PAIR, (moi.proc.stdin, moi.proc.stdout), self.onProcPipeRecv, self.onProcPipeError, self._procPipeGcComplete)
 				self._moiCallFunc(moi, "onActive")
 				return
@@ -781,7 +787,7 @@ class _MoiObj:
 	STATE_PEER_EXCEPT = 6
 	STATE_INACTIVE = 7
 
-	GC_START = 1
+	GC_START = 1p
 	GC_STARTED = 2
 
 	peerName = None							# str
@@ -792,6 +798,7 @@ class _MoiObj:
 	moduleId = None							# str
 	propDict = None							# dict
 	tmpDir = None							# str
+	logFile = None							# str
 	mo = None								# obj, SnModuleInstance, standalone module: None
 	proc = None								# obj, not-standalone module: None
 	procPipe = None							# obj, not-standalone module: None

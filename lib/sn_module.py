@@ -30,12 +30,13 @@ class SnModuleInstance:
 	WORK_STATE_IDLE = 0
 	WORK_STATE_WORKING = 1
 
-	def __init__(self, coreObj, peerName, userName, moduleName, tmpDir):
+	def __init__(self, coreObj, peerName, userName, moduleName, tmpDir, logFile):
 		self.coreObj = coreObj
 		self.peerName = peerName
 		self.userName = userName
 		self.moduleName = moduleName
 		self.tmpDir = tmpDir
+		self.logFile = logFile
 
 	##### callback functions ####
 
@@ -86,6 +87,21 @@ class SnModuleInstance:
 	def setWorkState(self, workState):
 		assert workState in [ SnModuleInstance.WORK_STATE_IDLE, SnModuleInstance.WORK_STATE_WORKING ]
 		self.coreObj._setWorkState(self.peerName, self.userName, self.moduleName, workState)
+
+	def logDebug(self, pattern, *args):
+		self.coreObj._moduleLog(self.peerName, self.userName, self.moduleName, logging.DEBUG, pattern, args)
+
+	def logInfo(self, pattern, *args):
+		self.coreObj._moduleLog(self.peerName, self.userName, self.moduleName, logging.INFO, pattern, args)
+
+	def logWarning(self, pattern, *args):
+		self.coreObj._moduleLog(self.peerName, self.userName, self.moduleName, logging.WARNING, pattern, args)
+
+	def logError(self, pattern, *args):
+		self.coreObj._moduleLog(self.peerName, self.userName, self.moduleName, logging.ERROR, pattern, args)
+
+	def logCritical(self, pattern, *args):
+		self.coreObj._moduleLog(self.peerName, self.userName, self.moduleName, logging.CRITICAL, pattern, args)
 
 class SnRejectException(Exception):
 	pass
