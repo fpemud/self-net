@@ -377,14 +377,14 @@ class SnLocalManager:
 
 		print "**** _startSubProc, Start, %s"%(cmdStr)
 
-		ret = subprocess.Popen("passwd",
+		ret = subprocess.Popen(cmdStr,
 								shell = True,
 								stdin = subprocess.PIPE,
 								stdout = subprocess.PIPE,
 								stderr = subprocess.STDOUT)
 
-		print "**** _startSubProc, Start, %s"%(cmdStr)
-
+		print "**** _startSubProc, Start2, %d"%(ret.pid)
+		return ret
 
 	def _sendReject(self, peerName, userName, moduleName, rejectMessage):
 		moi = self._moiGet(peerName, userName, moduleName)
