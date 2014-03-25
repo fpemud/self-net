@@ -212,7 +212,8 @@ class _AdapterObjSslSocket:
 class _AdapterObjPipePair:
 
 	def send(self, mySock, sendBuffer):
-		return mySock[1].write(sendBuffer)
+		mySock[1].write(sendBuffer)
+		return len(sendBuffer)
 
 	def recv(self, mySock):
 		try:

@@ -571,7 +571,7 @@ class SnLocalManager:
 					moi.mo = ModuleInstanceObject(self, moi.peerName, moi.userName, moi.moduleName, moi.tmpDir, moi.logFile)
 				else:
 					moi.proc = self._startSubProc(moi.peerName, moi.userName, moi.moduleName, moi.tmpDir, moi.logFile)
-					moi.procPipe = objsocket(objsocket.SOCKTYPE_PIPE_PAIR, (moi.proc.stdin, moi.proc.stdout), self.onProcPipeRecv, self.onProcPipeError, self._procPipeGcComplete)
+					moi.procPipe = objsocket(objsocket.SOCKTYPE_PIPE_PAIR, (moi.proc.stdout, moi.proc.stdin), self.onProcPipeRecv, self.onProcPipeError, self._procPipeGcComplete)
 				self._moiCallFunc(moi, "onActive")
 				return
 

@@ -2,6 +2,8 @@
 # -*- coding: utf-8; tab-width: 4; indent-tabs-mode: t -*-
 
 import sys
+import struct
+import pickle
 import logging
 import traceback
 from gi.repository import GLib
@@ -11,6 +13,7 @@ sys.path.append('/usr/lib/selfnetd/modules')		# fixme
 from sn_util import SnUtil
 from sn_sub_proc import LocalSockSendObj
 from sn_sub_proc import LocalSockSetWorkState
+from sn_sub_proc import LocalSockCall
 from sn_sub_proc import LocalSockRetn
 from sn_sub_proc import LocalSockExcp
 
@@ -25,7 +28,7 @@ class _SubProcObject:
 		self.userName = userName
 		self.moduleName = moduleName
 		self.tmpDir = tmpDir
-		self.connSock = _SubProcObjSocket(self.onConnRecv, self.onConnError)
+		self.connSock = _SubProcObjSocket(self.onConnRecv)
 		self.mo = None
 
 		# create module object
@@ -76,9 +79,6 @@ class _SubProcObject:
 		else:
 			assert False
 
-	def onConnError(self, sock):
-		assert False
-
 	def _sendRetn(self, retVal):
 		packetObj = LocalSockRetn()
 		packetObj.retVal = retVal
@@ -105,10 +105,9 @@ class _SubProcObject:
 
 class _SubProcObjSocket:
 
-	def __init__(self, recvFunc, errorFunc):
+	def __init__(self, recvFunc):
 		self.isClose = False
 		self.recvFunc = recvFunc
-		self.errorFunc = errorFunc
 		self.recvBuffer = ""
 		self.recvSourceId = GLib.io_add_watch(sys.stdin, GLib.IO_IN | _flagError, self._onRecv)
 
@@ -125,33 +124,34 @@ class _SubProcObjSocket:
 		self.isClose = True
 
 	def _onRecv(self, source, cb_condition):
-		assert not self.isClose
+		try:
+			assert not self.isClose
 
-		if cb_condition & _flagError:
-			self.errorFunc(self)
-			assert self.isClose		# errorFunc should close the socket
-			return False
-
-		self.recvBuffer += sys.stdin.read()
-
-		while True:
-			# get packet header
-			headerLen = struct.calcsize("!I")
-			if len(self.recvBuffer) < headerLen:
-				return True
-
-			# get packet data
-			dataLen = struct.unpack("!I", self.recvBuffer[:headerLen])[0]
-			totalLen = headerLen + dataLen
-			if len(self.recvBuffer) < totalLen:
-				return True
-
-			# invoke callback function
-			dataObj = pickle.loads(self.recvBuffer[headerLen:totalLen])
-			self.recvBuffer = self.recvBuffer[totalLen:]
-			self.recvFunc(self, dataObj)
-			if self.isClose:
+			if cb_condition & _flagError:
+				logging.error("_SubProcObjSocket._onRecv, %s"%(SnUtil.cbConditionToStr(cb_condition)))
 				return False
+
+			self.recvBuffer += sys.stdin.read()
+			while True:
+				# get packet header
+				headerLen = struct.calcsize("!I")
+				if len(self.recvBuffer) < headerLen:
+					return True
+
+				# get packet data
+				dataLen = struct.unpack("!I", self.recvBuffer[:headerLen])[0]
+				totalLen = headerLen + dataLen
+				if len(self.recvBuffer) < totalLen:
+					return True
+
+				# invoke callback function
+				dataObj = pickle.loads(self.recvBuffer[headerLen:totalLen])
+				self.recvBuffer = self.recvBuffer[totalLen:]
+				self.recvFunc(self, dataObj)
+				if self.isClose:
+					return False
+		except Exception as e:
+			logging.error(traceback.format_exc())
 
 def _type_check(obj, typeobj):
 	return str(obj.__class__) == str(typeobj)
@@ -185,5 +185,5 @@ try:
 
 	logging.info("selfnetd-subproc: Mainloop exits")
 except Exception as e:
-	logging.info(traceback.format_exc())
+	logging.error(traceback.format_exc())
 
