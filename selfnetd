@@ -66,6 +66,7 @@ param = SnParam()
 if parseResult.pid_file is not None:
 	self.pidFile = parseResult.pid_file
 param.disposeFlag = 0
+param.logLevel = parseResult.debug_level
 
 try:
 	# create directory
@@ -78,21 +79,7 @@ try:
 		logging.getLogger().addHandler(logging.FileHandler(param.logFile))
 	else:
 		logging.getLogger().addHandler(logging.StreamHandler(sys.stderr))
-
-	if parseResult.debug_level is not None:
-		if parseResult.debug_level == "CRITICAL":
-			logLevel = logging.CRITICAL
-		elif parseResult.debug_level == "ERROR":
-			logLevel = logging.ERROR
-		elif parseResult.debug_level == "WARNING":
-			logLevel = logging.WARNING
-		elif parseResult.debug_level == "INFO":
-			logLevel = logging.INFO
-		elif parseResult.debug_level == "DEBUG":
-			logLevel = logging.DEBUG
-		else:
-			assert False
-		logging.getLogger().setLevel(logLevel)
+	logging.getLogger().setLevel(SnUtil.getLoggingLevel(param.logLevel))
 
 	# set signal handler
 	signal.signal(signal.SIGHUP, sighandler_hup)

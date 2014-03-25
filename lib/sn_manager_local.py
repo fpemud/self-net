@@ -369,22 +369,17 @@ class SnLocalManager:
 
 		return ret
 
-	def _startSubProc(self, peerName, userName, moduleName, tmpDir):
+	def _startSubProc(self, peerName, userName, moduleName, tmpDir, logFile):
 		if userName is None:
-			cmdStr = "\"%s\" \"%s\" \"\" \"%s\" \"%s\""%(self.param.subprocFile, peerName, moduleName, tmpDir)
+			cmdStr = "\"%s\" \"%s\" \"\" \"%s\" \"%s\" %s \"%s\""%(self.param.subprocFile, peerName, moduleName, tmpDir, self.param.logLevel, logFile)
 		else:
-			cmdStr = "\"%s\" \"%s\" \"%s\" \"%s\" \"%s\""%(self.param.subprocFile, peerName, userName, moduleName, tmpDir)
+			cmdStr = "\"%s\" \"%s\" \"%s\" \"%s\" \"%s\" %s \"%s\""%(self.param.subprocFile, peerName, userName, moduleName, tmpDir, self.param.logLevel, logFile)
 
-		print "**** _startSubProc, Start, %s"%(cmdStr)
-
-		ret = subprocess.Popen(cmdStr,
+		return subprocess.Popen(cmdStr,
 								shell = True,
 								stdin = subprocess.PIPE,
 								stdout = subprocess.PIPE,
 								stderr = subprocess.STDOUT)
-
-		print "**** _startSubProc, Start2, %d"%(ret.pid)
-		return ret
 
 	def _sendReject(self, peerName, userName, moduleName, rejectMessage):
 		moi = self._moiGet(peerName, userName, moduleName)
@@ -433,8 +428,16 @@ class SnLocalManager:
 		moi.workState = workState
 
 	def _moduleLog(self, peerName, userName, moduleName, logLevel, msg, args):
-		logging.getLogger(
+		moi = self._moiGet(peerName, userName, moduleName)
 
+		if userName is None:
+			modName = "%s-%s"%(peerName, moduleName)
+		else:
+			modName = "%s-%s-%s"%(peerName, userName, moduleName)
+
+		logging.getLogger(modName).addHandler(logging.FileHandler(moi.logFile))
+		logging.getLogger(modName).setLevel(SnUtil.getLoggingLevel(self.param.logLevel))
+		logging.getLogger(modName).log(logLevel, msg, args)
 
 	def _procPipeGcComplete(self, procPipe):
 		"""We don't do graceful close on procPipe"""
@@ -787,7 +790,7 @@ class _MoiObj:
 	STATE_PEER_EXCEPT = 6
 	STATE_INACTIVE = 7
 
-	GC_START = 1p
+	GC_START = 1
 	GC_STARTED = 2
 
 	peerName = None							# str

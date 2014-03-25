@@ -30,13 +30,12 @@ class SnModuleInstance:
 	WORK_STATE_IDLE = 0
 	WORK_STATE_WORKING = 1
 
-	def __init__(self, coreObj, peerName, userName, moduleName, tmpDir, logFile):
+	def __init__(self, coreObj, peerName, userName, moduleName, tmpDir):
 		self.coreObj = coreObj
 		self.peerName = peerName
 		self.userName = userName
 		self.moduleName = moduleName
 		self.tmpDir = tmpDir
-		self.logFile = logFile
 
 	##### callback functions ####
 

@@ -2,6 +2,7 @@
 # -*- coding: utf-8; tab-width: 4; indent-tabs-mode: t -*-
 
 import os
+import logging
 import shutil
 import subprocess
 import pwd
@@ -321,6 +322,21 @@ class SnUtil:
 	    if cb_condition & GLib.IO_NVAL:
 	            ret += "NVAL "
 	    return ret
+
+	@staticmethod
+	def getLoggingLevel(logLevel):
+		if logLevel == "CRITICAL":
+			return logging.CRITICAL
+		elif logLevel == "ERROR":
+			return logging.ERROR
+		elif logLevel == "WARNING":
+			return logging.WARNING
+		elif logLevel == "INFO":
+			return logging.INFO
+		elif logLevel == "DEBUG":
+			return logging.DEBUG
+		else:
+			assert False
 
 class SnSleepNotifier:
 
