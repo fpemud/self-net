@@ -178,7 +178,7 @@ class CbConditionException(Exception):
 
 class _ObjSocketException(Exception):
 	def __init__(self, excObj):
-		super(_ObjSocketException, self).__init__()
+		super(_ObjSocketException, self).__init__(str(excObj))
 		self.excObj = excObj
 
 class _AdapterObjSslSocket:
