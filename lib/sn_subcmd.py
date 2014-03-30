@@ -81,7 +81,7 @@ class SnSubCmdMain:
 
 	def peerPowerOperation(self, peerName, opName):
 		dbusObj = dbus.SystemBus().get_object('org.fpemud.SelfNet', '/org/fpemud/SelfNet')
-		peerId = dbusObj.GetPeerByName(peerName, dbus_interface='org.fpemud.SelfNet')
+		peerId = dbusObj.GetPeer(peerName, dbus_interface='org.fpemud.SelfNet')
 		if peerId == -1:
 			raise Exception("peer \"%s\" does not exist"%(peerName))
 
