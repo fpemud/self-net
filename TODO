@@ -1,0 +1,3 @@
+add power notification after suspend or shutdown
+support module raise exception not only in callback functions
+
