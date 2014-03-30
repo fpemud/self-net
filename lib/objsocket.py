@@ -99,6 +99,10 @@ class objsocket:
 		self.mySock = None
 
 	def _onSend(self, source, cb_condition):
+		# fixme, sometimes after close there's still _onSend pending
+		if self.mySock is None:
+			return False
+
 		# send data as much as possible
 		try:
 			if cb_condition & _flagError:
