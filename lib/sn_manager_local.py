@@ -285,11 +285,11 @@ class SnLocalManager:
 		if _type_check(packetObj, LocalSockSendObj):
 			self._sendObject(moi.peerName, moi.userName, moi.moduleName, packetObj.dataObj)
 		elif _type_check(packetObj, LocalSockSetWorkState):
-			self._sendObject(moi.peerName, moi.userName, moi.moduleName, packetObj.workState)
+			self._setWorkState(moi.peerName, moi.userName, moi.moduleName, packetObj.workState)
 		elif _type_check(packetObj, LocalSockRetn):
 			self._moiCallFuncReturn(moi, packetObj.retVal)
 		elif _type_check(packetObj, LocalSockExcp):
-			self._moiCallFuncExcept(packetObj, packetObj.excObj, packetObj.excInfo)
+			self._moiCallFuncExcept(moi, packetObj.excObj, packetObj.excInfo)
 		else:
 			assert False
 
@@ -378,9 +378,10 @@ class SnLocalManager:
 								stdout = subprocess.PIPE)
 
 	def _sendReject(self, peerName, userName, moduleName, rejectMessage):
-		moi = self._moiGet(peerName, userName, moduleName)
-		if moi.gcFlag is not None:
+		if self._moiGcFind(peerName, userName, moduleName) is not None:
 			return
+
+		moi = self._moiGet(peerName, userName, moduleName)
 
 		logging.warning("SnLocalManager.sendReject, %s, %s, %s, %s", peerName, userName, moduleName, rejectMessage)
 
@@ -392,9 +393,10 @@ class SnLocalManager:
 			self.param.peerManager.sendDataObject(peerName, userName, moduleName, messageObj)
 
 	def _sendExcept(self, peerName, userName, moduleName):
-		moi = self._moiGet(peerName, userName, moduleName)
-		if moi.gcFlag is not None:
+		if self._moiGcFind(peerName, userName, moduleName) is not None:
 			return
+
+		moi = self._moiGet(peerName, userName, moduleName)
 
 		logging.warning("SnLocalManager.sendExcept, %s, %s, %s", peerName, userName, moduleName)
 
@@ -405,10 +407,11 @@ class SnLocalManager:
 			self.param.peerManager.sendDataObject(peerName, userName, moduleName, messageObj)
 
 	def _sendObject(self, peerName, userName, moduleName, obj):
-		moi = self._moiGet(peerName, userName, moduleName)
-		if moi.gcFlag is not None:
+		if self._moiGcFind(peerName, userName, moduleName) is not None:
 			return
-	
+
+		moi = self._moiGet(peerName, userName, moduleName)
+
 		assert moi.state in [ _MoiObj.STATE_ACTIVE, _MoiObj.STATE_FULL ]
 		if peerName == socket.gethostname():
 			SnUtil.idleInvoke(self.onPeerSockRecv, peerName, userName, moduleName, obj)
@@ -416,9 +419,10 @@ class SnLocalManager:
 			self.param.peerManager.sendDataObject(peerName, userName, moduleName, obj)
 
 	def _setWorkState(self, peerName, userName, moduleName, workState):
-		moi = self._moiGet(peerName, userName, moduleName)
-		if moi.gcFlag is not None:
+		if self._moiGcFind(peerName, userName, moduleName) is not None:
 			return
+
+		moi = self._moiGet(peerName, userName, moduleName)
 
 		assert moi.state in [ _MoiObj.STATE_ACTIVE, _MoiObj.STATE_FULL ]
 		moi.workState = workState
@@ -628,7 +632,7 @@ class SnLocalManager:
 		logging.debug("SnLocalManager.moiGcStart: %s", _moi_key_to_str(gcmoi))
 		gcmoi.gcFlag = _MoiObj.GC_STARTED
 
-		if gcmoi.state == _MoiObj.STATE_FULL:
+		if gcmoi.state in [ _MoiObj.STATE_ACTIVE, _MoiObj.STATE_FULL ]:
 			self._moiChangeState(gcmoi, _MoiObj.STATE_INACTIVE, "")
 		elif gcmoi.state in [ _MoiObj.STATE_REJECT, _MoiObj.STATE_PEER_REJECT, _MoiObj.STATE_EXCEPT, _MoiObj.STATE_PEER_EXCEPT ]:
 			if not gcmoi.propDict["standalone"]:

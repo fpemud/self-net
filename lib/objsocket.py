@@ -100,8 +100,14 @@ class objsocket:
 
 	def _onSend(self, source, cb_condition):
 		# fixme, sometimes after close there's still _onSend pending
+		# fixme, sometimes there's multiple _onSend pending
+		# it is all because there's some mess in the glib io_add_watch registration and unregistration
 		if self.mySock is None:
 			return False
+		if len(self.sendBuffer) == 0:
+			return False
+
+		assert len(self.sendBuffer) > 0
 
 		# send data as much as possible
 		try:
