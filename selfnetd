@@ -32,16 +32,28 @@ def parseArgs():
 		help="Set output debug message level")
 	return argParser.parse_args()
 
-def sighandler_hup(signum, frame):
-	logging.debug("selfnetd: SIGHUP occured")
+def sighandler_hup(signum):
+	global param
+	if param.disposeFlag == 0:
+		logging.debug("selfnetd: SIGHUP occured")
+	else:
+		logging.debug("selfnetd: SIGHUP ignored, in disposing")
 
-def sighandler_int(signum, frame):
-	logging.debug("selfnetd: SIGINT occured")
-	SnUtil.idleInvoke(_dispose)
+def sighandler_int(signum):
+	global param
+	if param.disposeFlag == 0:
+		logging.debug("selfnetd: SIGINT occured")
+		SnUtil.idleInvoke(_dispose)
+	else:
+		logging.debug("selfnetd: SIGINT ignored, already in disposing")
 
-def sighandler_term(signum, frame):
-	logging.debug("selfnetd: SIGTERM occured")
-	SnUtil.idleInvoke(_dispose)
+def sighandler_term(signum):
+	global param
+	if param.disposeFlag == 0:
+		logging.debug("selfnetd: SIGTERM occured")
+		SnUtil.idleInvoke(_dispose)
+	else:
+		logging.debug("selfnetd: SIGTERM ignored, already in disposing")
 
 def _dispose():
 	global param
@@ -81,11 +93,6 @@ try:
 		logging.getLogger().addHandler(logging.StreamHandler(sys.stderr))
 	logging.getLogger().setLevel(SnUtil.getLoggingLevel(param.logLevel))
 
-	# set signal handler
-	signal.signal(signal.SIGHUP, sighandler_hup)
-	signal.signal(signal.SIGINT, sighandler_int)
-	signal.signal(signal.SIGTERM, sighandler_term)
-
 	# daemonize
 	dc = None
 	if parseResult.daemonize:
@@ -105,6 +112,10 @@ try:
 
 		# create dbus root object
 		param.dbusMainObject = DbusMainObject(param)
+
+		# add signal handlers
+		GLib.unix_signal_add(GLib.PRIORITY_HIGH, signal.SIGINT, sighandler_int, None)
+		GLib.unix_signal_add(GLib.PRIORITY_HIGH, signal.SIGTERM, sighandler_term, None)
 
 		# start main loop
 		logging.info("selfnetd: Mainloop begins")

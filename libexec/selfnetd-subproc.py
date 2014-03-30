@@ -1,7 +1,9 @@
 #!/usr/bin/python2
 # -*- coding: utf-8; tab-width: 4; indent-tabs-mode: t -*-
 
+import os
 import sys
+import fcntl
 import struct
 import pickle
 import logging
@@ -28,12 +30,16 @@ class _SubProcObject:
 		self.userName = userName
 		self.moduleName = moduleName
 		self.tmpDir = tmpDir
-		self.connSock = _SubProcObjSocket(self.onConnRecv)
 		self.mo = None
+		self.connSock = None
 
 		# create module object
 		exec("from %s import ModuleInstanceObject"%(self.moduleName.replace("-", "_")))
 		self.mo = ModuleInstanceObject(self, self.peerName, self.userName, self.moduleName, self.tmpDir)
+
+		# create connSock object
+		fcntl.fcntl(sys.stdin, fcntl.F_SETFL, os.O_NONBLOCK)
+		self.connSock = _SubProcObjSocket(self.onConnRecv)
 
 		logging.debug("_SubProcObject.init: End")
 		return
@@ -48,34 +54,34 @@ class _SubProcObject:
 				logging.debug("_SubProcObject.onActive: Start")
 				self.mo.onInit()
 				self.mo.onActive()
-				self._sendRetn(None)
 				logging.debug("_SubProcObject.onActive: End")
+				self._sendRetn(None)
 			except Exception as e:
+				logging.debug("_SubProcObject.onActive: Except, %s", traceback.format_exc())
 				self._sendExcp(e, traceback.format_exc())
-				self.mainloop.quit()
 		elif packetObj.funcName == "onRecv":
 			assert len(packetObj.funcArgs) == 1
 			try:
 				logging.debug("_SubProcObject.onRecv: Start")
 				self.mo.onRecv(packetObj.funcArgs[0])
-				self._sendRetn(None)
 				logging.debug("_SubProcObject.onRecv: End")
+				self._sendRetn(None)
 			except SnRejectException as e:
+				logging.debug("_SubProcObject.onRecv: Reject")
 				self._sendExcp(e, None)			# no traceback needed for reject exception
 			except Exception as e:
+				logging.debug("_SubProcObject.onRecv: Except, %s", traceback.format_exc())
 				self._sendExcp(e, traceback.format_exc())
-				self.mainloop.quit()
 		elif packetObj.funcName == "onInactive":
 			assert len(packetObj.funcArgs) == 0
 			try:
 				logging.debug("_SubProcObject.onInactive: Start")
 				self.mo.onInactive()
-				self._sendRetn(None)
 				logging.debug("_SubProcObject.onInactive: End")
-				self.mainloop.quit()
+				self._sendRetn(None)
 			except Exception as e:
+				logging.debug("_SubProcObject.onInactive: Except, %s", traceback.format_exc())
 				self._sendExcp(e, traceback.format_exc())
-				self.mainloop.quit()
 		else:
 			assert False
 
@@ -118,6 +124,8 @@ class _SubProcObjSocket:
 		header = struct.pack("!I", len(data))
 		packet = header + data
 		sys.stdout.write(packet)
+		sys.stdout.flush()
+		logging.debug("****** debug, %d", len(packet))
 
 	def close(self):
 		assert not self.isClose

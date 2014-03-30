@@ -1,7 +1,9 @@
 #!/usr/bin/python2
 # -*- coding: utf-8; tab-width: 4; indent-tabs-mode: t -*-
 
+import os
 import sys
+import fcntl
 import socket
 import pickle
 import struct
@@ -34,6 +36,7 @@ class objsocket:
 			assert False
 		else:
 			assert False
+		assert self.adapterObj.checkSock(mySock)
 
 		self.mySock = mySock
 		self.gcState = self._GC_STATE_NONE
@@ -176,6 +179,9 @@ class _ObjSocketException(Exception):
 
 class _AdapterObjSslSocket:
 
+	def checkSock(self, mySock):
+		return True
+
 	def send(self, mySock, sendBuffer):
 		if len(sendBuffer) > 128:						# fixme
 			sendLen = 128
@@ -211,8 +217,14 @@ class _AdapterObjSslSocket:
 
 class _AdapterObjPipePair:
 
+	def checkSock(self, mySock):
+		if (fcntl.fcntl(mySock[0].fileno(), fcntl.F_GETFL) & os.O_NONBLOCK) == 0:
+			return False
+		return True
+
 	def send(self, mySock, sendBuffer):
 		mySock[1].write(sendBuffer)
+		mySock[1].flush()
 		return len(sendBuffer)
 
 	def recv(self, mySock):
@@ -226,7 +238,7 @@ class _AdapterObjPipePair:
 		mySock[1].close()
 
 	def addSendWatch(self, mySock, mySendFunc):
-		return GLib.io_add_watch(mySock[1], GLib.IO_OUT, mySendFunc)
+		return GLib.io_add_watch(mySock[1], GLib.IO_OUT | _flagError, mySendFunc)
 
 	def addRecvWatch(self, mySock, myRecvFunc):
 		return GLib.io_add_watch(mySock[0], GLib.IO_IN | _flagError, myRecvFunc)
