@@ -193,7 +193,7 @@ class _AdapterObjSslSocket:
 		except (SSL.WantReadError, SSL.WantWriteError):
 			return 0
 		except (socket.error, SSL.Error) as e:
-			raise _ObjSocketException(e.excObj)
+			raise _ObjSocketException(e)
 
 	def recv(self, mySock):
 		try:
