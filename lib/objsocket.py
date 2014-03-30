@@ -111,7 +111,7 @@ class objsocket:
 			self.sendBuffer = self.sendBuffer[sendLen:]
 		except _ObjSocketException as e:
 			if self.gcState == self._GC_STATE_NONE:
-				self.errorFunc(self, e)
+				self.errorFunc(self, e.excObj)
 				assert self.mySock is None		# errorFunc should close the socket
 				return False
 			elif self.gcState == self._GC_STATE_PENDING:
