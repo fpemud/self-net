@@ -9,6 +9,7 @@ import pwd
 import socket
 import re
 from gi.repository import GLib
+from gi.repository import GObject
 
 class SnUtil:
 
@@ -233,6 +234,13 @@ class SnUtil:
 			func(*args)
 			return False
 		GLib.idle_add(_idleCallback, func, *args)
+
+	@staticmethod
+	def timeoutInvoke(timeout, func, *args):
+		def _timeoutCallback(func, *args):
+			func(*args)
+			return False
+		GObject.timeout_add_seconds(timeout, _timeoutCallback, func, *args)
 
 	@staticmethod
 	def checkSshPubKey(pubkey, keyType, userName, hostName):

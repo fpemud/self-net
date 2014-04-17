@@ -74,7 +74,7 @@ class SnPeerClient:
 		self.sockSet.add((hostname, port))
 
 		# do operation
-		logging.debug("SnPeerClient.connect: Start, %s, %d", hostname, port)
+		#logging.debug("SnPeerClient.connect: Start, %s, %d", hostname, port)
 		self.asyncns.getaddrinfo(hostname, None)
 		self.asyncns.wait(False)
 		GLib.io_add_watch(self.asyncns.get_fd(), GLib.IO_IN | _flagError, self._onResolveComplete, hostname, port)
@@ -94,7 +94,7 @@ class SnPeerClient:
 			hostaddr, dummy = resq.get_done()[0][4]
 		except Exception as e:
 			self.sockSet.remove((hostname, port))
-			logging.debug("SnPeerClient.connect: Resolve failed, %s, %d, %s, %s", hostname, port, e.__class__, e)
+			#logging.debug("SnPeerClient.connect: Resolve failed, %s, %d, %s, %s", hostname, port, e.__class__, e)
 			return False
 
 		# do connect
@@ -107,7 +107,7 @@ class SnPeerClient:
 				pass
 			else:
 				self.sockSet.remove((hostname, port))
-				logging.debug("SnPeerClient.connect: Resolve failed, %s, %d, %s, %s", hostname, port, e.__class__, e)
+				#logging.debug("SnPeerClient.connect: Resolve failed, %s, %d, %s, %s", hostname, port, e.__class__, e)
 				sock.close()
 				return False
 
@@ -122,12 +122,12 @@ class SnPeerClient:
 
 		if cb_condition & _flagError:
 			source.close()
-			logging.debug("SnPeerClient.connect: Connect failed, %s, %d, %s", hostname, port, SnUtil.cbConditionToStr(cb_condition))
+			#logging.debug("SnPeerClient.connect: Connect failed, %s, %d, %s", hostname, port, SnUtil.cbConditionToStr(cb_condition))
 			return False
 
 		# give socket to _HandShaker
 		self.handshaker.addSocket(source, False, hostname, port)
-		logging.debug("SnPeerClient.connect: Success, %s, %d", hostname, port)
+		#logging.debug("SnPeerClient.connect: Success, %s, %d", hostname, port)
 		return False
 
 class _HandShaker:
