@@ -1,14 +1,9 @@
-#!/usr/bin/python2
+#!/usr/bin/python3s
 # -*- coding: utf-8; tab-width: 4; indent-tabs-mode: t -*-
 
-import os
-import shutil
 import dbus
 import dbus.service
-from gi.repository import GObject
-from sn_util import SnUtil
 from sn_manager_local import SnLocalManager
-from sn_manager_local import _MoiObj			# fixme
 from sn_manager_peer import SnPeerManager
 
 ################################################################################
@@ -37,10 +32,11 @@ from sn_manager_peer import SnPeerManager
 # str               GetName()
 # str               GetPowerState()
 # void              DoPowerOperation(opName:str)
-# 
+#
 # Signals:
 # PowerStateChanged(newPowerState:str)
 #
+
 
 class DbusMainObject(dbus.service.Object):
 
@@ -95,6 +91,7 @@ class DbusMainObject(dbus.service.Object):
 	def DebugGetModuleInfo(self):
 		return self.param.localManager.debugGetModuleInfo()
 
+
 class DbusPeerObject(dbus.service.Object):
 
 	def __init__(self, param, peerId, peerName):
@@ -104,18 +101,16 @@ class DbusPeerObject(dbus.service.Object):
 
 		# register dbus object path
 		bus_name = dbus.service.BusName('org.fpemud.SelfNet', bus=dbus.SystemBus())
-		dbus.service.Object.__init__(self, bus_name, '/org/fpemud/SelfNet/Peers/%d'%(self.peerId))
+		dbus.service.Object.__init__(self, bus_name, '/org/fpemud/SelfNet/Peers/%d' % (self.peerId))
 
 	def release(self):
 		self.remove_from_connection()
 
-	@dbus.service.method('org.fpemud.SelfNet.Peer', sender_keyword='sender',
-	                     in_signature='', out_signature='s')
+	@dbus.service.method('org.fpemud.SelfNet.Peer', sender_keyword='sender', in_signature='', out_signature='s')
 	def GetName(self, sender=None):
 		return self.peerName
-	                     
-	@dbus.service.method('org.fpemud.SelfNet.Peer', sender_keyword='sender',
-	                     in_signature='', out_signature='s')
+
+	@dbus.service.method('org.fpemud.SelfNet.Peer', sender_keyword='sender', in_signature='', out_signature='s')
 	def GetPowerState(self, sender=None):
 		powerStateDict = {
 			SnPeerManager.POWER_STATE_UNKNOWN: "unknown",
@@ -129,17 +124,13 @@ class DbusPeerObject(dbus.service.Object):
 		powerState = self.param.peerManager.getPeerPowerState(self.peerName)
 		return powerStateDict[powerState]
 
-	@dbus.service.method('org.fpemud.SelfNet.Peer', sender_keyword='sender',
-	                     in_signature='s', out_signature='',
-	                     async_callbacks=('reply_handler', 'error_handler'))
+	@dbus.service.method('org.fpemud.SelfNet.Peer', sender_keyword='sender', in_signature='s', out_signature='', async_callbacks=('reply_handler', 'error_handler'))
 	def DoPowerOperation(self, opName, reply_handler, error_handler, sender=None):
-		if opName not in [ "poweron", "poweroff", "reboot", "wakeup", "suspend", "hibernate", "hybrid-sleep" ]:
-			error_handler(Exception("invalid power operation name \"%s\""%(opName)))
+		if opName not in ["poweron", "poweroff", "reboot", "wakeup", "suspend", "hibernate", "hybrid-sleep"]:
+			error_handler(Exception("invalid power operation name \"%s\"" % (opName)))
 			return
 		self.param.peerManager.doPeerPowerOperationAsync(self.peerName, str(opName), reply_handler, error_handler)
 
 	@dbus.service.signal('org.fpemud.SelfNet.Peer', signature='s')
 	def PowerStateChanged(self, newPowerState):
 		pass
-
-

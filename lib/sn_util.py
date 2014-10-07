@@ -1,4 +1,4 @@
-#!/usr/bin/python2
+#!/usr/bin/python3
 # -*- coding: utf-8; tab-width: 4; indent-tabs-mode: t -*-
 
 import os
@@ -208,8 +208,8 @@ class SnUtil:
 	def dropPriviledgeTo(userName):
 		assert os.getuid() == 0
 		pwobj = pwd.getpwnam(userName)
-	    os.setgid(pwobj.pw_gid)
-	    os.setuid(pwobj.pw_uid)
+		os.setgid(pwobj.pw_gid)
+		os.setuid(pwobj.pw_uid)
 
 	@staticmethod
 	def euidInvoke(userName, func, *args):
@@ -301,7 +301,6 @@ class SnUtil:
 		rc, ret = SnUtil.shell("/bin/netstat -anp | grep \"%s\""%(socketInfo), "retcode+stdout")
 		if rc != 0:
 			return -1
-		print ret
 
 		m = re.search(" +([0-9]+)/.*$", ret, re.MULTILINE)
 		assert m is not None
@@ -316,20 +315,20 @@ class SnUtil:
 
 	@staticmethod
 	def cbConditionToStr(cb_condition):
-	    ret = ""
-	    if cb_condition & GLib.IO_IN:
-	            ret += "IN "
-	    if cb_condition & GLib.IO_OUT:
-	            ret += "OUT "
-	    if cb_condition & GLib.IO_PRI:
-	            ret += "PRI "
-	    if cb_condition & GLib.IO_ERR:
-	            ret += "ERR "
-	    if cb_condition & GLib.IO_HUP:
-	            ret += "HUP "
-	    if cb_condition & GLib.IO_NVAL:
-	            ret += "NVAL "
-	    return ret
+		ret = ""
+		if cb_condition & GLib.IO_IN:
+			ret += "IN "
+		if cb_condition & GLib.IO_OUT:
+			ret += "OUT "
+		if cb_condition & GLib.IO_PRI:
+			ret += "PRI "
+		if cb_condition & GLib.IO_ERR:
+			ret += "ERR "
+		if cb_condition & GLib.IO_HUP:
+			ret += "HUP "
+		if cb_condition & GLib.IO_NVAL:
+			ret += "NVAL "
+		return ret
 
 	@staticmethod
 	def getLoggingLevel(logLevel):

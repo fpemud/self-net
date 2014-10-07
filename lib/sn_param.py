@@ -1,7 +1,8 @@
-#!/usr/bin/python2
+#!/usr/bin/python3
 # -*- coding: utf-8; tab-width: 4; indent-tabs-mode: t -*-
 
 import os
+
 
 class SnParam:
 
@@ -21,7 +22,7 @@ class SnParam:
 
 		self.confFile = os.path.join(self.cfgDir, "selfnetd.conf")
 		self.hostsFile = os.path.join(self.cfgDir, "hosts.xml")
-		self.modulesFile = os.path.join(self.cfgDir, "modules.xml") 
+		self.modulesFile = os.path.join(self.cfgDir, "modules.xml")
 
 		self.pidFile = os.path.join(self.runDir, "selfnetd.pid")
 		self.socketFile = os.path.join(self.runDir, "selfnetd.socket")
@@ -38,4 +39,3 @@ class SnParam:
 		self.localManager = None		# obj
 		self.peerManager = None			# obj
 		self.dbusMainObject = None		# obj
-

@@ -1,4 +1,4 @@
-#!/usr/bin/python2
+#!/usr/bin/python3
 # -*- coding: utf-8; tab-width: 4; indent-tabs-mode: t -*-
 
 import os
@@ -7,6 +7,7 @@ from sn_util import SnUtil
 from sn_module import SnModule
 from sn_module import SnModuleInstance
 from sn_module import SnRejectException
+
 
 class ModuleObject(SnModule):
 
@@ -20,6 +21,7 @@ class ModuleObject(SnModule):
 		ret["standalone"] = False
 		return ret
 
+
 class ModuleInstanceObject(SnModuleInstance):
 
 	def onInit(self):
@@ -31,7 +33,7 @@ class ModuleInstanceObject(SnModuleInstance):
 		self.sshSysEcdsaPrivFile = os.path.join(self.sshSysDir, "ssh_host_ecdsa_key")
 		self.sshSysEcdsaPubFile = os.path.join(self.sshSysDir, "ssh_host_ecdsa_key.pub")
 
-		self.sshDir = os.path.expanduser("~%s/.ssh"%(self.getUserName()))
+		self.sshDir = os.path.expanduser("~%s/.ssh" % (self.getUserName()))
 		self.authkeysFile = os.path.join(self.sshDir, "authorized_keys")
 
 		# check server configuration
@@ -81,7 +83,7 @@ class ModuleInstanceObject(SnModuleInstance):
 			pubkey = f.read()
 			if not SnUtil.checkSshPubKey(pubkey, "rsa", "root", self.getHostName()):
 				raise Exception("server rsa public key file is invalid")
-				
+
 		if not os.path.exists(self.sshSysDsaPrivFile):
 			raise Exception("server dsa private key file does not exist")
 		if not os.path.exists(self.sshSysDsaPubFile):
@@ -109,17 +111,19 @@ class ModuleInstanceObject(SnModuleInstance):
 				for link in netifaces.ifaddresses(ifname)[netifaces.AF_INET]:
 					if "addr" in link:
 						ret.append(link["addr"])
-#			if netifaces.AF_INET6 in netifaces.ifaddresses(ifname):
-#				for link in netifaces.ifaddresses(ifname)[netifaces.AF_INET6]:
-#					if "addr" in link:
-#						ret.append(link["addr"])
+# 			if netifaces.AF_INET6 in netifaces.ifaddresses(ifname):
+# 				for link in netifaces.ifaddresses(ifname)[netifaces.AF_INET6]:
+# 					if "addr" in link:
+# 						ret.append(link["addr"])
 		return ret
+
 
 class _SshServerObject:
 	hostAddrList = None					# list<str>
 	hostPubkeyRsa = None				# str
 	hostPubkeyDsa = None				# str
 	hostPubkeyEcdsa = None				# str
+
 
 class _CfgFileAuthorizedKeys:
 
@@ -161,7 +165,7 @@ class _CfgFileAuthorizedKeys:
 			if len(strList) != 3:
 				i = i + 1
 				continue
-			if strList[2] != "%s@%s"%(userName, hostName):
+			if strList[2] != "%s@%s" % (userName, hostName):
 				i = i + 1
 				continue
 			self.lineList.pop(i)
@@ -191,4 +195,3 @@ class _CfgFileAuthorizedKeys:
 			for line in self.lineList:
 				f.write(line)
 		self.lineList = []
-

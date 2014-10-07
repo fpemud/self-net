@@ -1,10 +1,11 @@
-#!/usr/bin/python2
+#!/usr/bin/python3
 # -*- coding: utf-8; tab-width: 4; indent-tabs-mode: t -*-
 
 import os
 from sn_util import SnUtil
 from sn_module import SnModule
 from sn_module import SnModuleInstance
+
 
 class ModuleObject(SnModule):
 
@@ -18,10 +19,11 @@ class ModuleObject(SnModule):
 		ret["standalone"] = False
 		return ret
 
+
 class ModuleInstanceObject(SnModuleInstance):
 
 	def onInit(self):
-		self.sshDir = os.path.expanduser("~%s/.ssh"%(self.getUserName()))
+		self.sshDir = os.path.expanduser("~%s/.ssh" % (self.getUserName()))
 		self.privkeyFile = os.path.join(self.sshDir, "id_rsa")
 		self.pubkeyFile = os.path.join(self.sshDir, "id_rsa.pub")
 		self.knownHostsFile = os.path.join(self.sshDir, "known_hosts")
@@ -48,12 +50,12 @@ class ModuleInstanceObject(SnModuleInstance):
 			if not SnUtil.checkSshPubKey(dataObj.hostPubkeyEcdsa, "ecdsa", "root", self.getPeerName()):
 				raise SnRejectException("invalid SshServerObject received")
 
-			nameList = [ self.getPeerName() ]
+			nameList = [self.getPeerName()]
 			if self.isLocalPeer():
 				nameList.append("localhost")
 				nameList += dataObj.addrList
 				for i in range(1, 256):
-					nameList.append("127.0.0.%d"%(i))
+					nameList.append("127.0.0.%d" % (i))
 			else:
 				nameList += dataObj.addrList
 
@@ -70,8 +72,10 @@ class ModuleInstanceObject(SnModuleInstance):
 		cfgf.removeHost(self.getPeerName())
 		cfgf.save()
 
+
 class _SshClientObject:
 	userPubkey = None				# str
+
 
 class _CfgFileKnownHosts:
 
@@ -113,7 +117,7 @@ class _CfgFileKnownHosts:
 		prefix = ",".join(nameList)
 		strList = pubkey.split()
 		assert len(strList) == 3
-		line = "%s %s %s\n"%(prefix, strList[0], strList[1])
+		line = "%s %s %s\n" % (prefix, strList[0], strList[1])
 
 		for i in range(0, len(self.lineList)):
 			if self.lineList[i] == "# selfnet usr-server-ssh\n":
@@ -142,4 +146,3 @@ class _CfgFileKnownHosts:
 				i = i + 1
 				continue
 			self.lineList.pop(i)
-

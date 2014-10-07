@@ -1,9 +1,10 @@
-#!/usr/bin/python2
+#!/usr/bin/python3
 # -*- coding: utf-8; tab-width: 4; indent-tabs-mode: t -*-
 
 import os
 from sn_module import SnModule
 from sn_module import SnModuleInstance
+
 
 class ModuleObject(SnModule):
 
@@ -16,6 +17,7 @@ class ModuleObject(SnModule):
 		ret["suid"] = False
 		ret["standalone"] = False
 		return ret
+
 
 class ModuleInstanceObject(SnModuleInstance):
 
@@ -38,6 +40,6 @@ class ModuleInstanceObject(SnModuleInstance):
 	def onRecv(self, dataObj):
 		raise SnRejectException("receive client data")
 
+
 class _DistccServerObject:
 	jobNumber = None				# int
-

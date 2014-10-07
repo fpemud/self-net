@@ -1,4 +1,4 @@
-#!/usr/bin/python2
+#!/usr/bin/python3
 # -*- coding: utf-8; tab-width: 4; indent-tabs-mode: t -*-
 
 import os
@@ -6,6 +6,7 @@ from sn_util import SnUtil
 from sn_module import SnModule
 from sn_module import SnModuleInstance
 from sn_module import SnRejectException
+
 
 class ModuleObject(SnModule):
 
@@ -18,6 +19,7 @@ class ModuleObject(SnModule):
 		ret["suid"] = False
 		ret["standalone"] = False
 		return ret
+
 
 class ModuleInstanceObject(SnModuleInstance):
 
@@ -51,6 +53,7 @@ class ModuleInstanceObject(SnModuleInstance):
 	def _cleanup(self):
 		cfgFile = ConfigFile(self.hostsFile)
 		cfgFile.removeHost(self.getPeerName())
+
 
 class ConfigFile:
 
@@ -95,9 +98,8 @@ class ConfigFile:
 	def _close(self):
 		buf = ""
 		for i in self.hostList:
-			buf += "%s/%d "%(i.name, i.jobNumber)
+			buf += "%s/%d " % (i.name, i.jobNumber)
 
 		f = open(self.filename, 'w')
 		f.write(buf)
 		f.close()
-

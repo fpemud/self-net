@@ -1,4 +1,4 @@
-#!/usr/bin/python2
+#!/usr/bin/python3
 # -*- coding: utf-8; tab-width: 4; indent-tabs-mode: t -*-
 
 import re
@@ -172,7 +172,7 @@ class SnPeerManager:
 		SnUtil.idleInvoke(self._disposeComplete)
 
 	def getPeerNameList(self):
-		return self.peerInfoDict.keys()
+		return list(self.peerInfoDict.keys())
 
 	def getPeerInfo(self, peerName):
 		return self.peerInfoDict[peerName].infoObj

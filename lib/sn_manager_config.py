@@ -1,9 +1,8 @@
-#!/usr/bin/python2
+#!/usr/bin/python3
 # -*- coding: utf-8; tab-width: 4; indent-tabs-mode: t -*-
 
 import os
 import re
-import pwd
 import logging
 import xml.sax.handler
 import socket
@@ -92,7 +91,7 @@ class SnConfigManager:
 		return self.cfgGlobal.userBlackList
 
 	def getHostNameList(self):
-		return self.hostDict.keys()
+		return list(self.hostDict.keys())
 
 	def getHostInfo(self, hostName):
 		if hostName == "localhost":
@@ -101,7 +100,7 @@ class SnConfigManager:
 			return self.hostDict[hostName]
 
 	def getModuleNameList(self):
-		return self.moduleDict.keys()
+		return list(self.moduleDict.keys())
 
 	def getModuleInfo(self, moduleName):
 		return self.moduleDict[moduleName]
@@ -158,7 +157,7 @@ class SnConfigManager:
 		if socket.gethostname() not in self.hostDict:
 			raise Exception("No name for localhost in hosts file")
 
-		if self.hostDict.values().count(lambda x: x.isNexus) > 1:
+		if list(self.hostDict.values()).count(lambda x: x.isNexus) > 1:
 			raise Exception("There should be only zero or one nexus machine")
 
 		if self.hostDict[socket.gethostname()].isNexus:

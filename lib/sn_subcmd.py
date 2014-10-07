@@ -1,4 +1,4 @@
-#!/usr/bin/python2
+#!/usr/bin/python3
 # -*- coding: utf-8; tab-width: 4; indent-tabs-mode: t -*-
 
 import os
@@ -8,6 +8,7 @@ import zipfile
 from OpenSSL import crypto
 from sn_util import SnUtil
 from sn_manager_peer import SnPeerManager
+
 
 class SnSubCmdMain:
 
@@ -59,10 +60,10 @@ class SnSubCmdMain:
 		else:
 			# save CA certificate, certificate and private key to a zip file for distributing
 			certFileInfo = zipfile.ZipInfo(os.path.basename(self.param.certFile))
-			certFileInfo.external_attr = 0644 << 16L
+			certFileInfo.external_attr = 0o644 << 16
 			privkeyFileInfo = zipfile.ZipInfo(os.path.basename(self.param.privkeyFile))
-			privkeyFileInfo.external_attr = 0600 << 16L
-			with zipfile.ZipFile(os.path.join(outDir, "selfnet-distribute_%s.zip"%(hostname)), "w") as zipf:
+			privkeyFileInfo.external_attr = 0o600 << 16
+			with zipfile.ZipFile(os.path.join(outDir, "selfnet-distribute_%s.zip" % (hostname)), "w") as zipf:
 				zipf.write(self.param.caCertFile, os.path.basename(self.param.caCertFile))
 				zipf.writestr(certFileInfo, crypto.dump_certificate(crypto.FILETYPE_PEM, cert))
 				zipf.writestr(privkeyFileInfo, crypto.dump_privatekey(crypto.FILETYPE_PEM, k))
@@ -72,20 +73,20 @@ class SnSubCmdMain:
 		peerIdList = dbusObj.GetPeerList(dbus_interface='org.fpemud.SelfNet')
 
 		for peerId in peerIdList:
-			peerObj = dbus.SystemBus().get_object('org.fpemud.SelfNet', '/org/fpemud/SelfNet/Peers/%d'%(peerId))
+			peerObj = dbus.SystemBus().get_object('org.fpemud.SelfNet', '/org/fpemud/SelfNet/Peers/%d' % (peerId))
 			peerName = peerObj.GetName(dbus_interface='org.fpemud.SelfNet.Peer')
 			peerPowerState = peerObj.GetPowerState(dbus_interface='org.fpemud.SelfNet.Peer')
-			print "%s:"%(peerName)
-			print "\tPowerState: %s"%(peerPowerState)
-			print ""
+			print("%s:" % (peerName))
+			print("\tPowerState: %s" % (peerPowerState))
+			print("")
 
 	def peerPowerOperation(self, peerName, opName):
 		dbusObj = dbus.SystemBus().get_object('org.fpemud.SelfNet', '/org/fpemud/SelfNet')
 		peerId = dbusObj.GetPeer(peerName, dbus_interface='org.fpemud.SelfNet')
 		if peerId == -1:
-			raise Exception("peer \"%s\" does not exist"%(peerName))
+			raise Exception("peer \"%s\" does not exist" % (peerName))
 
-		peerObj = dbus.SystemBus().get_object('org.fpemud.SelfNet', '/org/fpemud/SelfNet/Peers/%d'%(peerId))
+		peerObj = dbus.SystemBus().get_object('org.fpemud.SelfNet', '/org/fpemud/SelfNet/Peers/%d' % (peerId))
 		peerObj.DoPowerOperation(opName, dbus_interface='org.fpemud.SelfNet.Peer')
 
 	def listModules(self):
@@ -93,15 +94,15 @@ class SnSubCmdMain:
 		for mk, mv in dbusObj.DebugGetModuleInfo(dbus_interface='org.fpemud.SelfNet').items():
 			moduleState, moduleFailMessage = mv
 
-			print "%s:"%(mk)
-			print "\tState: %s"%(moduleState)
+			print("%s:" % (mk))
+			print("\tState: %s" % (moduleState))
 			if moduleState == "reject" or moduleState == "peer-reject":
-				print "\tReject Message: %s"%(moduleFailMessage)
+				print("\tReject Message: %s" % (moduleFailMessage))
 			elif moduleState == "except":
-				print "\tTraceback Message:"
-				print SnUtil.addLinePrefix(moduleFailMessage, "\t\t")
+				print("\tTraceback Message:")
+				print(SnUtil.addLinePrefix(moduleFailMessage, "\t\t"))
 
-			print ""
+			print("")
 
 	def _loadCertAndKey(self, certFile, keyFile):
 		cert = None
@@ -120,10 +121,9 @@ class SnSubCmdMain:
 		with open(certFile, "wt") as f:
 			buf = crypto.dump_certificate(crypto.FILETYPE_PEM, cert)
 			f.write(buf)
-			os.fchmod(f.fileno(), 0644)
+			os.fchmod(f.fileno(), 0o644)
 
 		with open(keyFile, "wt") as f:
 			buf = crypto.dump_privatekey(crypto.FILETYPE_PEM, key)
 			f.write(buf)
-			os.fchmod(f.fileno(), 0600)
-
+			os.fchmod(f.fileno(), 0o600)

@@ -76,7 +76,7 @@ parseResult = parseArgs()
 # initialize SnParam
 param = SnParam()
 if parseResult.pid_file is not None:
-	self.pidFile = parseResult.pid_file
+	param.pidFile = parseResult.pid_file
 param.disposeFlag = 0
 param.logLevel = parseResult.debug_level
 

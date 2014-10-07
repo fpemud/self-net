@@ -1,4 +1,4 @@
-#!/usr/bin/python2
+#!/usr/bin/python3
 # -*- coding: utf-8; tab-width: 4; indent-tabs-mode: t -*-
 
 import os
@@ -19,6 +19,7 @@ from sn_sub_proc import LocalSockCall
 from sn_sub_proc import LocalSockRetn
 from sn_sub_proc import LocalSockExcp
 
+
 class _SubProcObject:
 
 	def __init__(self, mainloop, peerName, userName, moduleName, tmpDir):
@@ -34,7 +35,7 @@ class _SubProcObject:
 		self.connSock = None
 
 		# create module object
-		exec("from %s import ModuleInstanceObject"%(self.moduleName.replace("-", "_")))
+		exec("from %s import ModuleInstanceObject" % (self.moduleName.replace("-", "_")))
 		self.mo = ModuleInstanceObject(self, self.peerName, self.userName, self.moduleName, self.tmpDir)
 
 		# create connSock object
@@ -109,6 +110,7 @@ class _SubProcObject:
 	def _moduleLog(self, peerName, userName, moduleName, logLevel, msg, args):
 		logging.log(logLevel, msg, args)
 
+
 class _SubProcObjSocket:
 
 	def __init__(self, recvFunc):
@@ -136,7 +138,7 @@ class _SubProcObjSocket:
 			assert not self.isClose
 
 			if cb_condition & _flagError:
-				logging.error("_SubProcObjSocket._onRecv, %s"%(SnUtil.cbConditionToStr(cb_condition)))
+				logging.error("_SubProcObjSocket._onRecv, %s" % (SnUtil.cbConditionToStr(cb_condition)))
 				return False
 
 			self.recvBuffer += sys.stdin.read()
@@ -160,6 +162,7 @@ class _SubProcObjSocket:
 					return False
 		except Exception as e:
 			logging.error(traceback.format_exc())
+
 
 def _type_check(obj, typeobj):
 	return str(obj.__class__) == str(typeobj)
@@ -194,4 +197,3 @@ try:
 	logging.info("selfnetd-subproc: Mainloop exits")
 except Exception as e:
 	logging.error(traceback.format_exc())
-
