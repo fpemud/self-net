@@ -3,22 +3,22 @@
 
 
 class LocalSockSendObj:
-	dataObj = None							# obj
+    dataObj = None                          # obj
 
 
 class LocalSockSetWorkState:
-	workState = None						# enum
+    workState = None                        # enum
 
 
 class LocalSockCall:
-	funcName = None							# str
-	funcArgs = None							# list<obj>
+    funcName = None                         # str
+    funcArgs = None                         # list<obj>
 
 
 class LocalSockRetn:
-	retVal = None							# obj, None means no return value
+    retVal = None                           # obj, None means no return value
 
 
 class LocalSockExcp:
-	excObj = None							# str
-	excInfo = None							# str
+    excObj = None                           # str
+    excInfo = None                          # str
