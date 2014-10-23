@@ -11,7 +11,7 @@ if [ -n "$OUTPUT" ] ; then
     ERRFLAG=1
 fi
 
-OUTPUT=`pep8 ${FILES} | grep -Ev "E501|W191"`
+OUTPUT=`pep8 ${FILES} | grep -Ev "E265|E501|W191"`
 if [ -n "$OUTPUT" ] ; then
     echo "pep8 errors:"
     echo "$OUTPUT"

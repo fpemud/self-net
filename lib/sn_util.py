@@ -14,6 +14,44 @@ from gi.repository import GObject
 class SnUtil:
 
 	@staticmethod
+	def getUidGidMinMaxInfo():
+		uidMin = -1
+		uidMax = -1
+		gidMin = -1
+		gidMax = -1
+
+		buf = ""
+		with open("/etc/login.defs", "r") as f:
+			buf = f.read()
+
+		for line in buf.split("\n"):
+			m = re.search("^UID_MIN\s+([0-9]+)", line)
+			if m is not None:
+				uidMin = int(m.group(1))
+			m = re.search("^UID_MAX\s+([0-9]+)", line)
+			if m is not None:
+				uidMax = int(m.group(1))
+			m = re.search("^GID_MIN\s+([0-9]+)", line)
+			if m is not None:
+				gidMin = int(m.group(1))
+			m = re.search("^GID_MAX\s+([0-9]+)", line)
+			if m is not None:
+				gidMax = int(m.group(1))
+
+		assert uidMin != -1 and uidMax != -1 and gidMin != -1 and gidMax != -1
+		return (uidMin, uidMax, gidMin, gidMax)
+
+	@staticmethod
+	def getNormalUserList():
+		uidMin, uidMax, gidMin, gidMax = SnUtil.getUidGidMinMaxInfo()
+
+		ret = []
+		for pw in pwd.getpwall():
+			if uidMin <= pw.pw_uid <= uidMax:
+				ret.append(pw.pw_name)
+		return ret
+
+	@staticmethod
 	def addLinePrefix(tstr, prefix):
 		return prefix + ("\n" + prefix).join(tstr.split("\n"))
 
