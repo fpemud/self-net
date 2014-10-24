@@ -4,6 +4,7 @@
 import os
 from sn_module import SnModule
 from sn_module import SnModuleInstance
+from sn_module import SnRejectException
 
 
 class ModuleObject(SnModule):

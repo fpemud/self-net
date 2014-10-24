@@ -7,7 +7,6 @@ import random
 import zipfile
 from OpenSSL import crypto
 from sn_util import SnUtil
-from sn_manager_peer import SnPeerManager
 
 
 class SnSubCmdMain:

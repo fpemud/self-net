@@ -13,6 +13,7 @@ from gi.repository import GLib
 sys.path.append('/usr/lib/selfnetd')
 sys.path.append('/usr/lib/selfnetd/modules')		# fixme
 from sn_util import SnUtil
+from sn_module import SnRejectException
 from sn_sub_proc import LocalSockSendObj
 from sn_sub_proc import LocalSockSetWorkState
 from sn_sub_proc import LocalSockCall
@@ -35,8 +36,8 @@ class _SubProcObject:
         self.connSock = None
 
         # create module object
-        exec("from %s import ModuleInstanceObject" % (self.moduleName.replace("-", "_")))
-        self.mo = ModuleInstanceObject(self, self.peerName, self.userName, self.moduleName, self.tmpDir)
+        exec("import %s" % (self.moduleName.replace("-", "_")))
+        exec("self.mo = %s.ModuleInstanceObject(self, self.peerName, self.userName, self.moduleName, self.tmpDir)" % (self.moduleName.replace("-", "_")))
 
         # create connSock object
         fcntl.fcntl(sys.stdin, fcntl.F_SETFL, os.O_NONBLOCK)
@@ -160,7 +161,7 @@ class _SubProcObjSocket:
                 self.recvFunc(self, dataObj)
                 if self.isClose:
                     return False
-        except Exception as e:
+        except:
             logging.error(traceback.format_exc())
 
 

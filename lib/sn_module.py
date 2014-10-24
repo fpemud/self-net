@@ -13,6 +13,7 @@ Replace "-" with "_" can selfnet module name be converted to python module name.
 
 import os
 import socket
+import logging
 
 
 class SnModule:

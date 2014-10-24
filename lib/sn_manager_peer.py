@@ -15,8 +15,6 @@ from sn_conn_peer import SnPeerClient
 from sn_manager_config import SnVersion
 from sn_manager_config import SnCfgSerializationObject
 from sn_manager_local import SnSysInfo
-from sn_manager_local import SnSysInfoUser
-from sn_manager_local import SnSysInfoModule
 from sn_manager_local import SnDataPacket
 
 """

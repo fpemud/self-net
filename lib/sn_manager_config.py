@@ -7,7 +7,6 @@ import logging
 import xml.sax.handler
 import socket
 import OpenSSL
-
 from sn_util import SnUtil
 
 
@@ -204,12 +203,10 @@ class SnConfigManager:
             if re.match("[A-Za-z0-9_]+", moduleId) is None:
                 raise Exception("Invalid module id for module name \"%s\"" % (m))
 
-#            try:
-            exec("from %s import ModuleObject" % (m.replace("-", "_")))
-#            except ImportError:
-#                raise Exception("Module \"%s\" does not exists"%(m))
+            moduleObj = None
+            exec("import %s" % (m.replace("-", "_")))
+            exec("moduleObj = %s.ModuleObject()" % (m.replace("-", "_")))
 
-            moduleObj = ModuleObject()
             if m != moduleObj.getModuleName():
                 raise Exception("Module \"%s\" does not exists" % (m))
             if True:

@@ -10,7 +10,6 @@ import traceback
 import subprocess
 import collections
 from objsocket import objsocket
-from gi.repository import GLib
 
 from sn_util import SnUtil
 from sn_util import SnSleepNotifier
@@ -395,8 +394,6 @@ class SnLocalManager:
         if self._moiGcFind(peerName, userName, moduleName) is not None:
             return
 
-        moi = self._moiGet(peerName, userName, moduleName)
-
         logging.warning("SnLocalManager.sendReject, %s, %s, %s, %s", peerName, userName, moduleName, rejectMessage)
 
         messageObj = SnDataPacketReject()
@@ -409,8 +406,6 @@ class SnLocalManager:
     def _sendExcept(self, peerName, userName, moduleName):
         if self._moiGcFind(peerName, userName, moduleName) is not None:
             return
-
-        moi = self._moiGet(peerName, userName, moduleName)
 
         logging.warning("SnLocalManager.sendExcept, %s, %s, %s", peerName, userName, moduleName)
 
@@ -580,8 +575,8 @@ class SnLocalManager:
                 assert moi.workState == SnModuleInstance.WORK_STATE_IDLE
 
                 if not moi.propDict["standalone"]:
-                    exec("from %s import ModuleInstanceObject" % (moi.moduleName.replace("-", "_")))
-                    moi.mo = ModuleInstanceObject(self, moi.peerName, moi.userName, moi.moduleName, moi.tmpDir)
+                    exec("import %s" % (moi.moduleName.replace("-", "_")))
+                    exec("moi.mo = %s.ModuleInstanceObject(self, moi.peerName, moi.userName, moi.moduleName, moi.tmpDir)" % (moi.moduleName.replace("-", "_")))
                 else:
                     moi.proc = self._startSubProc(moi.peerName, moi.userName, moi.moduleName, moi.tmpDir, moi.logFile)
                     fcntl.fcntl(moi.proc.stdout, fcntl.F_SETFL, os.O_NONBLOCK)
