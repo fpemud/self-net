@@ -9,6 +9,7 @@ from OpenSSL import SSL
 from gi.repository import GLib
 from sn_util import SnUtil
 
+
 class SnPeerServer:
 
     def __init__(self, certFile, privkeyFile, caCertFile, connectFunc):
@@ -23,7 +24,7 @@ class SnPeerServer:
 
     def start(self, port):
         assert self.serverSock is None
-    
+
         self.serverSock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         self.serverSock.bind(('0.0.0.0', port))
         self.serverSock.listen(5)
@@ -54,6 +55,7 @@ class SnPeerServer:
         except socket.error as e:
             logging.debug("SnPeerServer._onServerAccept: Failed, %s, %s", e.__class__, e)
             return True
+
 
 class SnPeerClient:
 
@@ -90,7 +92,7 @@ class SnPeerClient:
         hostaddr = None
         try:
             resq = self.asyncns.get_next()
-            assert type(resq) == libasyncns.AddrInfoQuery
+            assert isinstance(resq, libasyncns.AddrInfoQuery)
             hostaddr, dummy = resq.get_done()[0][4]
         except Exception as e:
             self.sockSet.remove((hostname, port))
@@ -130,6 +132,7 @@ class SnPeerClient:
         #logging.debug("SnPeerClient.connect: Success, %s, %d", hostname, port)
         return False
 
+
 class _HandShaker:
 
     HANDSHAKE_NONE = 0
@@ -168,7 +171,7 @@ class _HandShaker:
         try:
             # check error
             if cb_condition & _flagError:
-                raise _ConnException("Socket error, %s"%(SnUtil.cbConditionToStr(cb_condition)))
+                raise _ConnException("Socket error, %s" % (SnUtil.cbConditionToStr(cb_condition)))
 
             # HANDSHAKE_NONE
             if info.state == _HandShaker.HANDSHAKE_NONE:
@@ -201,7 +204,7 @@ class _HandShaker:
                 except SSL.WantWriteError:
                     info.state = _HandShaker.HANDSHAKE_WANT_WRITE
                 except SSL.Error as e:
-                    raise _ConnException("Handshake failed, %s"%(_handshake_info_to_str(info)), e)
+                    raise _ConnException("Handshake failed, %s" % (_handshake_info_to_str(info)), e)
 
             # HANDSHAKE_COMPLETE
             if info.state == _HandShaker.HANDSHAKE_COMPLETE:
@@ -209,10 +212,10 @@ class _HandShaker:
                 peerName = SnUtil.getSslSocketPeerName(info.sslSock)
                 if info.serverSide:
                     if peerName is None:
-                        raise _ConnException("Hostname incorrect, %s, %s"%(_handshake_info_to_str(info), peerName))
+                        raise _ConnException("Hostname incorrect, %s, %s" % (_handshake_info_to_str(info), peerName))
                 else:
                     if peerName is None or peerName != info.hostname:
-                        raise _ConnException("Hostname incorrect, %s, %s"%(_handshake_info_to_str(info), peerName))
+                        raise _ConnException("Hostname incorrect, %s, %s" % (_handshake_info_to_str(info), peerName))
 
                 # give socket to connectFunc
                 del self.sockDict[source]
@@ -225,7 +228,7 @@ class _HandShaker:
                 logging.debug("_HandShaker._onEvent: %s, %s", e.message, _handshake_info_to_str(info))
             else:
                 logging.debug("_HandShaker._onEvent: %s, %s, %s, %s", e.message, _handshake_info_to_str(info),
-                        e.excName, e.excMessage)
+                              e.excName, e.excMessage)
             return False
 
         # register io watch callback again
@@ -238,10 +241,13 @@ class _HandShaker:
 
         return False
 
+
 def _sslVerifyDummy(conn, cert, errnum, depth, ok):
     return ok
 
+
 class _ConnException(Exception):
+
     def __init__(self, message, excObj=None):
         super(_ConnException, self).__init__(message)
 
@@ -251,6 +257,7 @@ class _ConnException(Exception):
             self.excName = excObj.__class__
             self.excMessage = excObj.message
 
+
 class _HandShakerConnInfo:
     serverSide = None            # bool
     state = None                # enum
@@ -258,6 +265,7 @@ class _HandShakerConnInfo:
     hostname = None                # str
     port = None                    # int
     spname = None                # str
+
 
 def _handshake_state_to_str(handshake_state):
     if handshake_state == _HandShaker.HANDSHAKE_NONE:
@@ -271,11 +279,11 @@ def _handshake_state_to_str(handshake_state):
     else:
         assert False
 
+
 def _handshake_info_to_str(info):
     if info.serverSide:
         return info.spname
     else:
-        return "%s, %d"%(info.hostname, info.port)
+        return "%s, %d" % (info.hostname, info.port)
 
 _flagError = GLib.IO_PRI | GLib.IO_ERR | GLib.IO_HUP | GLib.IO_NVAL
-

@@ -22,52 +22,57 @@ from sn_manager_local import SnLocalManager
 from sn_manager_peer import SnPeerManager
 from sn_dbus import DbusMainObject
 
+
 def parseArgs():
-	argParser = argparse.ArgumentParser()
-	argParser.add_argument("--no-daemon", dest='daemonize', action="store_false", default=True,
-		help="Do not daemonize.")
-	argParser.add_argument("--pid-file", dest='pid_file', help="Specify location of a PID file.")
-	argParser.add_argument("-d", "--debug-level", dest='debug_level',
-		choices=['CRITICAL', 'ERROR', 'WARNING', 'INFO', 'DEBUG'], default="WARNING",
-		help="Set output debug message level")
-	return argParser.parse_args()
+    argParser = argparse.ArgumentParser()
+    argParser.add_argument("--no-daemon", dest='daemonize', action="store_false", default=True,
+                           help="Do not daemonize.")
+    argParser.add_argument("--pid-file", dest='pid_file', help="Specify location of a PID file.")
+    argParser.add_argument("-d", "--debug-level", dest='debug_level',
+                           choices=['CRITICAL', 'ERROR', 'WARNING', 'INFO', 'DEBUG'], default="WARNING",
+                           help="Set output debug message level")
+    return argParser.parse_args()
+
 
 def sighandler_hup(signum):
-	global param
-	if param.disposeFlag == 0:
-		logging.debug("selfnetd: SIGHUP occured")
-	else:
-		logging.debug("selfnetd: SIGHUP ignored, in disposing")
+    global param
+    if param.disposeFlag == 0:
+        logging.debug("selfnetd: SIGHUP occured")
+    else:
+        logging.debug("selfnetd: SIGHUP ignored, in disposing")
+
 
 def sighandler_int(signum):
-	global param
-	if param.disposeFlag == 0:
-		logging.debug("selfnetd: SIGINT occured")
-		SnUtil.idleInvoke(_dispose)
-	else:
-		logging.debug("selfnetd: SIGINT ignored, already in disposing")
+    global param
+    if param.disposeFlag == 0:
+        logging.debug("selfnetd: SIGINT occured")
+        SnUtil.idleInvoke(_dispose)
+    else:
+        logging.debug("selfnetd: SIGINT ignored, already in disposing")
+
 
 def sighandler_term(signum):
-	global param
-	if param.disposeFlag == 0:
-		logging.debug("selfnetd: SIGTERM occured")
-		SnUtil.idleInvoke(_dispose)
-	else:
-		logging.debug("selfnetd: SIGTERM ignored, already in disposing")
+    global param
+    if param.disposeFlag == 0:
+        logging.debug("selfnetd: SIGTERM occured")
+        SnUtil.idleInvoke(_dispose)
+    else:
+        logging.debug("selfnetd: SIGTERM ignored, already in disposing")
+
 
 def _dispose():
-	global param
-	if param.disposeFlag == 0:
-		param.dbusMainObject.release()
-		param.disposeFlag = 1
-		param.peerManager.dispose(_dispose)
-	elif param.disposeFlag == 1:
-		param.disposeFlag = 2
-		param.localManager.dispose(_dispose)
-	elif param.disposeFlag == 2:
-		param.mainloop.quit()
-	else:
-		assert False
+    global param
+    if param.disposeFlag == 0:
+        param.dbusMainObject.release()
+        param.disposeFlag = 1
+        param.peerManager.dispose(_dispose)
+    elif param.disposeFlag == 1:
+        param.disposeFlag = 2
+        param.localManager.dispose(_dispose)
+    elif param.disposeFlag == 2:
+        param.mainloop.quit()
+    else:
+        assert False
 
 ################################################################################
 
@@ -76,59 +81,58 @@ parseResult = parseArgs()
 # initialize SnParam
 param = SnParam()
 if parseResult.pid_file is not None:
-	param.pidFile = parseResult.pid_file
+    param.pidFile = parseResult.pid_file
 param.disposeFlag = 0
 param.logLevel = parseResult.debug_level
 
 try:
-	# create directory
-	SnUtil.mkDir(param.logDir)
-	SnUtil.mkDirAndClear(param.runDir)
-	param.tmpDir = tempfile.mkdtemp(prefix="selfnetd-")
+    # create directory
+    SnUtil.mkDir(param.logDir)
+    SnUtil.mkDirAndClear(param.runDir)
+    param.tmpDir = tempfile.mkdtemp(prefix="selfnetd-")
 
-	# set logging parameter
-	if parseResult.daemonize:
-		logging.getLogger().addHandler(logging.FileHandler(param.logFile))
-	else:
-		logging.getLogger().addHandler(logging.StreamHandler(sys.stderr))
-	logging.getLogger().setLevel(SnUtil.getLoggingLevel(param.logLevel))
+    # set logging parameter
+    if parseResult.daemonize:
+        logging.getLogger().addHandler(logging.FileHandler(param.logFile))
+    else:
+        logging.getLogger().addHandler(logging.StreamHandler(sys.stderr))
+    logging.getLogger().setLevel(SnUtil.getLoggingLevel(param.logLevel))
 
-	# daemonize
-	dc = None
-	if parseResult.daemonize:
-		pidf = pidfile.PIDLockFile(param.pidFile)
-		dc = daemon.DaemonContext(pidfile=pidf)
-		dc.open()
+    # daemonize
+    dc = None
+    if parseResult.daemonize:
+        pidf = pidfile.PIDLockFile(param.pidFile)
+        dc = daemon.DaemonContext(pidfile=pidf)
+        dc.open()
 
-	try:
-		# create main loop
-		DBusGMainLoop(set_as_default=True)
-		param.mainloop = GLib.MainLoop()
+    try:
+        # create main loop
+        DBusGMainLoop(set_as_default=True)
+        param.mainloop = GLib.MainLoop()
 
-		# create managers
-		param.configManager = SnConfigManager(param)
-		param.localManager = SnLocalManager(param)
-		param.peerManager = SnPeerManager(param)
+        # create managers
+        param.configManager = SnConfigManager(param)
+        param.localManager = SnLocalManager(param)
+        param.peerManager = SnPeerManager(param)
 
-		# create dbus root object
-		param.dbusMainObject = DbusMainObject(param)
+        # create dbus root object
+        param.dbusMainObject = DbusMainObject(param)
 
-		# add signal handlers
-		GLib.unix_signal_add(GLib.PRIORITY_HIGH, signal.SIGINT, sighandler_int, None)
-		GLib.unix_signal_add(GLib.PRIORITY_HIGH, signal.SIGTERM, sighandler_term, None)
+        # add signal handlers
+        GLib.unix_signal_add(GLib.PRIORITY_HIGH, signal.SIGINT, sighandler_int, None)
+        GLib.unix_signal_add(GLib.PRIORITY_HIGH, signal.SIGTERM, sighandler_term, None)
 
-		# start main loop
-		logging.info("selfnetd: Mainloop begins")
-		param.mainloop.run()
-		logging.info("selfnetd: Mainloop exits")
-	finally:
-		logging.shutdown()
-		if dc is not None:
-			dc.close()
+        # start main loop
+        logging.info("selfnetd: Mainloop begins")
+        param.mainloop.run()
+        logging.info("selfnetd: Mainloop exits")
+    finally:
+        logging.shutdown()
+        if dc is not None:
+            dc.close()
 finally:
-	# shouldn't remove log directory
-	if param.tmpDir is not None and os.path.exists(param.tmpDir):
-		shutil.rmtree(param.tmpDir)
-	if os.path.exists(param.runDir):
-		shutil.rmtree(param.runDir)
-
+    # shouldn't remove log directory
+    if param.tmpDir is not None and os.path.exists(param.tmpDir):
+        shutil.rmtree(param.tmpDir)
+    if os.path.exists(param.runDir):
+        shutil.rmtree(param.runDir)

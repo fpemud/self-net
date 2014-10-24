@@ -1,6 +1,9 @@
 #!/bin/bash
 
-FILES="./selfnetd ./selfnetctl $(find . -name '*.py' | tr '\n' ' ')"
+FILES="./selfnetd ./selfnetctl"
+FILES="${FILES} $(find ./lib -name '*.py' | tr '\n' ' ')"
+FILES="${FILES} $(find ./libexec -name '*.py' | tr '\n' ' ')"
+FILES="${FILES} $(find ./modules -name '*.py' | tr '\n' ' ')"
 ERRFLAG=0
 
 OUTPUT=`pyflakes ${FILES} 2>&1`

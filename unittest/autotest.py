@@ -11,6 +11,7 @@ sys.path.insert(0, os.path.join(curDir, "../lib"))
 
 import testsuit_sn_util
 
+
 def suite():
     suite = unittest.TestSuite()
     suite.addTest(testsuit_sn_util.Test_getUidGidMinMaxInfo())
@@ -18,4 +19,4 @@ def suite():
     return suite
 
 if __name__ == "__main__":
-    unittest.main(defaultTest = 'suite')
+    unittest.main(defaultTest='suite')

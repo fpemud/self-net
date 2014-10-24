@@ -10,25 +10,32 @@ import OpenSSL
 
 from sn_util import SnUtil
 
+
 class SnVersion:
     version = None                  # str
 
     def __eq__(self, other):
         return isinstance(other, self.__class__) and self.version == other.version
+
     def __ne__(self, other):
         return not self.__eq__(other)
+
     def __hash__(self):
         return hash(self.version)
+
 
 class SnCfgSerializationObject:
     strHostsXml = None              # str
 
     def __eq__(self, other):
         return isinstance(other, self.__class__) and self.strHostsXml == other.strHostsXml
+
     def __ne__(self, other):
         return not self.__eq__(other)
+
     def __hash__(self):
         return hash(self.strHostsXml)
+
 
 class SnCfgHostInfo:
     port = None                     # int
@@ -36,13 +43,16 @@ class SnCfgHostInfo:
     supportPoweron = None           # bool
     supportWakeup = None            # bool
 
+
 class SnCfgModuleInfo:
     moduleScope = None              # str, "sys" "usr"
     moduleType = None               # str, "server" "client" "peer"
     moduleId = None                 # str
     moduleObj = None                # obj, SnModule
 
+
 class SnConfigManager:
+
     """/etc/selfnetd
         |----cert.pem                            # mode 644
         |----privkey.pem                        # mode 600
@@ -162,10 +172,10 @@ class SnConfigManager:
 
         if self.hostDict[socket.gethostname()].isNexus:
             if not os.path.exists(self.param.caPrivkeyFile):
-                raise Exception("CA private key file \"%s\" should exist on nexus machine"%(self.param.caPrivkeyFile))
+                raise Exception("CA private key file \"%s\" should exist on nexus machine" % (self.param.caPrivkeyFile))
         else:
             if os.path.exists(self.param.caPrivkeyFile):
-                raise Exception("CA private key file \"%s\" should not exist on non-nexus machine"%(self.param.caPrivkeyFile))
+                raise Exception("CA private key file \"%s\" should not exist on non-nexus machine" % (self.param.caPrivkeyFile))
 
     def _parseModulesFile(self):
         # set default value
@@ -180,44 +190,44 @@ class SnConfigManager:
             # check parse result
             strList = m.split("-")
             if len(strList) < 3:
-                raise Exception("Invalid module name \"%s\""%(m))
+                raise Exception("Invalid module name \"%s\"" % (m))
 
             moduleScope = strList[0]
             moduleType = strList[1]
             moduleId = "-".join(strList[2:])
             if moduleScope not in ["sys", "usr"]:
-                raise Exception("Invalid module scope for module name \"%s\""%(m))
+                raise Exception("Invalid module scope for module name \"%s\"" % (m))
             if moduleType not in ["server", "client", "peer"]:
-                raise Exception("Invalid module type for module name \"%s\""%(m))
+                raise Exception("Invalid module type for module name \"%s\"" % (m))
             if len(moduleId) > 32:
-                raise Exception("Module id is too long for module name \"%s\""%(m))
+                raise Exception("Module id is too long for module name \"%s\"" % (m))
             if re.match("[A-Za-z0-9_]+", moduleId) is None:
-                raise Exception("Invalid module id for module name \"%s\""%(m))
+                raise Exception("Invalid module id for module name \"%s\"" % (m))
 
 #            try:
-            exec("from %s import ModuleObject"%(m.replace("-", "_")))
+            exec("from %s import ModuleObject" % (m.replace("-", "_")))
 #            except ImportError:
 #                raise Exception("Module \"%s\" does not exists"%(m))
 
             moduleObj = ModuleObject()
             if m != moduleObj.getModuleName():
-                raise Exception("Module \"%s\" does not exists"%(m))
+                raise Exception("Module \"%s\" does not exists" % (m))
             if True:
                 propDict = moduleObj.getPropDict()
                 if "allow-local-peer" not in propDict:
-                    raise Exception("Property \"allow-local-peer\" not provided by module \"%s\""%(m))
+                    raise Exception("Property \"allow-local-peer\" not provided by module \"%s\"" % (m))
                 if "suid" not in propDict:
-                    raise Exception("Property \"suid\" not provided by module \"%s\""%(m))
+                    raise Exception("Property \"suid\" not provided by module \"%s\"" % (m))
                 if "standalone" not in propDict:
-                    raise Exception("Property \"standalone\" not provided by module \"%s\""%(m))
+                    raise Exception("Property \"standalone\" not provided by module \"%s\"" % (m))
                 if not isinstance(propDict["allow-local-peer"], bool):
-                    raise Exception("Property \"allow-local-peer\" in module \"%s\" should be of type bool"%(m))
+                    raise Exception("Property \"allow-local-peer\" in module \"%s\" should be of type bool" % (m))
                 if not isinstance(propDict["suid"], bool):
-                    raise Exception("Property \"suid\" in module \"%s\" should be of type bool"%(m))
+                    raise Exception("Property \"suid\" in module \"%s\" should be of type bool" % (m))
                 if not isinstance(propDict["standalone"], bool):
-                    raise Exception("Property \"standalone\" in module \"%s\" should be of type bool"%(m))
+                    raise Exception("Property \"standalone\" in module \"%s\" should be of type bool" % (m))
                 if moduleScope == "sys" and propDict["suid"]:
-                    raise Exception("Property \"suid\" in module \"%s\" must be equal to False"%(m))
+                    raise Exception("Property \"suid\" in module \"%s\" must be equal to False" % (m))
 
             # fill SnCfgModuleInfo object
             self.moduleDict[m].moduleScope = moduleScope
@@ -225,10 +235,12 @@ class SnConfigManager:
             self.moduleDict[m].moduleId = moduleId
             self.moduleDict[m].moduleObj = moduleObj
 
+
 class _SnCfgGlobal:
     peerProbeInterval = None        # int, default is "1s"
     peerKeepaliveInterval = None    # int, default is "1s"
     userBlackList = None            # list<str>
+
 
 class _ConfFileXmlHandler(xml.sax.handler.ContentHandler):
     INIT = 0
@@ -280,6 +292,7 @@ class _ConfFileXmlHandler(xml.sax.handler.ContentHandler):
             self.cfgGlobal.userBlackList.append(content)
         else:
             pass
+
 
 class _HostFileXmlHandler(xml.sax.handler.ContentHandler):
     INIT = 0
@@ -343,6 +356,7 @@ class _HostFileXmlHandler(xml.sax.handler.ContentHandler):
         else:
             pass
 
+
 class _ModuleFileXmlHandler(xml.sax.handler.ContentHandler):
     INIT = 0
     IN_MODULES = 1
@@ -379,6 +393,7 @@ class _ModuleFileXmlHandler(xml.sax.handler.ContentHandler):
     def characters(self, content):
         pass
 
+
 def _newSnCfgGlobal():
     """create new object, set default values"""
 
@@ -387,6 +402,7 @@ def _newSnCfgGlobal():
     cfgGlobal.peerKeepaliveInterval = 1
     cfgGlobal.userBlackList = []
     return cfgGlobal
+
 
 def _newSnCfgHostInfo():
     """create new object, set default values"""
@@ -398,9 +414,9 @@ def _newSnCfgHostInfo():
     curHostInfo.supportWakeOnWlan = False
     return curHostInfo
 
+
 def _newSnCfgModuleInfo():
     """create new object, set default values"""
 
     curModuleInfo = SnCfgModuleInfo()
     return curModuleInfo
-

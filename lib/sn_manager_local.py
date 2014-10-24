@@ -561,7 +561,7 @@ class SnLocalManager:
 
         # change state
         oldState = moi.state
-        logging.info("SnLocalManager.moiChangeState: %s, %s -> %s", _moi_key_to_str(moi),  _moi_state_to_str(oldState), _moi_state_to_str(newState))
+        logging.info("SnLocalManager.moiChangeState: %s, %s -> %s", _moi_key_to_str(moi), _moi_state_to_str(oldState), _moi_state_to_str(newState))
         moi.state = newState
 
         # change workState, clear peerPacketQueue
@@ -803,6 +803,7 @@ class SnLocalManager:
 
 
 class _MoiObj:
+
     """MOI: module object internal"""
 
     STATE_PENDING = 0

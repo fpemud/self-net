@@ -14,6 +14,7 @@ Replace "-" with "_" can selfnet module name be converted to python module name.
 import os
 import socket
 
+
 class SnModule:
 
     def getModuleName(self):
@@ -24,6 +25,7 @@ class SnModule:
                           suid: true | false
                           standalone: true | false"""
         assert False            # implement by subclass
+
 
 class SnModuleInstance:
 
@@ -84,7 +86,7 @@ class SnModuleInstance:
         self.coreObj._sendObject(self.peerName, self.userName, self.moduleName, obj)
 
     def setWorkState(self, workState):
-        assert workState in [ SnModuleInstance.WORK_STATE_IDLE, SnModuleInstance.WORK_STATE_WORKING ]
+        assert workState in [SnModuleInstance.WORK_STATE_IDLE, SnModuleInstance.WORK_STATE_WORKING]
         self.coreObj._setWorkState(self.peerName, self.userName, self.moduleName, workState)
 
     def logDebug(self, pattern, *args):
@@ -102,6 +104,6 @@ class SnModuleInstance:
     def logCritical(self, pattern, *args):
         self.coreObj._moduleLog(self.peerName, self.userName, self.moduleName, logging.CRITICAL, pattern, args)
 
+
 class SnRejectException(Exception):
     pass
-

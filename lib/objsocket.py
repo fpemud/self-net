@@ -10,6 +10,7 @@ from OpenSSL import SSL
 from gi.repository import GLib
 from sn_util import SnUtil
 
+
 class objsocket:
 
     SOCKTYPE_SOCKET = 0                  # normal socket
@@ -176,15 +177,20 @@ class objsocket:
         self.gcCompleteFunc(self)
         assert self.mySock is None                # gcCompleteFunc should close the socket
 
+
 class CbConditionException(Exception):
+
     def __init__(self, cb_condition):
         s = SnUtil.cbConditionToStr(cb_condition)
         super(CbConditionException, self).__init__(s)
 
+
 class _ObjSocketException(Exception):
+
     def __init__(self, excObj):
         super(_ObjSocketException, self).__init__(str(excObj))
         self.excObj = excObj
+
 
 class _AdapterObjSslSocket:
 
@@ -224,6 +230,7 @@ class _AdapterObjSslSocket:
     def addRecvWatch(self, mySock, myRecvFunc):
         return GLib.io_add_watch(mySock, GLib.IO_IN | _flagError, myRecvFunc)
 
+
 class _AdapterObjPipePair:
 
     def checkSock(self, mySock):
@@ -253,4 +260,3 @@ class _AdapterObjPipePair:
         return GLib.io_add_watch(mySock[0], GLib.IO_IN | _flagError, myRecvFunc)
 
 _flagError = GLib.IO_PRI | GLib.IO_ERR | GLib.IO_HUP | GLib.IO_NVAL
-

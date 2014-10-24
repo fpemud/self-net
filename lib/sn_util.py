@@ -11,6 +11,7 @@ import re
 from gi.repository import GLib
 from gi.repository import GObject
 
+
 class SnUtil:
 
     @staticmethod
@@ -57,7 +58,7 @@ class SnUtil:
 
     @staticmethod
     def getSysctl(name):
-        msg = SnUtil.shell("/sbin/sysctl -n %s"%(name), "stdout")
+        msg = SnUtil.shell("/sbin/sysctl -n %s" % (name), "stdout")
         return msg.rstrip('\n')
 
     @staticmethod
@@ -145,7 +146,7 @@ class SnUtil:
         else:
             assert False
 
-        for port in range(portStart, portEnd+1):
+        for port in range(portStart, portEnd + 1):
             s = socket.socket(socket.AF_INET, sType)
             try:
                 s.bind((('', port)))
@@ -154,7 +155,7 @@ class SnUtil:
                 continue
             finally:
                 s.close()
-        raise Exception("No valid %s port in [%d,%d]."%(portType, portStart, portEnd))
+        raise Exception("No valid %s port in [%d,%d]." % (portType, portStart, portEnd))
 
     @staticmethod
     def shell(cmd, flags=""):
@@ -164,28 +165,28 @@ class SnUtil:
 
         # Execute shell command, throws exception when failed
         if flags == "":
-            retcode = subprocess.Popen(cmd, shell = True).wait()
+            retcode = subprocess.Popen(cmd, shell=True).wait()
             if retcode != 0:
-                raise Exception("Executing shell command \"%s\" failed, return code %d"%(cmd, retcode))
+                raise Exception("Executing shell command \"%s\" failed, return code %d" % (cmd, retcode))
             return
 
         # Execute shell command, throws exception when failed, returns stdout+stderr
         if flags == "stdout":
             proc = subprocess.Popen(cmd,
-                                    shell = True,
-                                    stdout = subprocess.PIPE,
-                                    stderr = subprocess.STDOUT)
+                                    shell=True,
+                                    stdout=subprocess.PIPE,
+                                    stderr=subprocess.STDOUT)
             out = proc.communicate()[0]
             if proc.returncode != 0:
-                raise Exception("Executing shell command \"%s\" failed, return code %d"%(cmd, proc.returncode))
+                raise Exception("Executing shell command \"%s\" failed, return code %d" % (cmd, proc.returncode))
             return out
 
         # Execute shell command, returns (returncode,stdout+stderr)
         if flags == "retcode+stdout":
             proc = subprocess.Popen(cmd,
-                                    shell = True,
-                                    stdout = subprocess.PIPE,
-                                    stderr = subprocess.STDOUT)
+                                    shell=True,
+                                    stdout=subprocess.PIPE,
+                                    stderr=subprocess.STDOUT)
             out = proc.communicate()[0]
             return (proc.returncode, out)
 
@@ -200,32 +201,32 @@ class SnUtil:
         # Execute shell command, throws exception when failed
         if flags == "":
             proc = subprocess.Popen(cmd,
-                                    shell = True,
-                                    stdin = subprocess.PIPE)
+                                    shell=True,
+                                    stdin=subprocess.PIPE)
             proc.communicate(strInput)
             if proc.returncode != 0:
-                raise Exception("Executing shell command \"%s\" failed, return code %d"%(cmd, proc.returncode))
+                raise Exception("Executing shell command \"%s\" failed, return code %d" % (cmd, proc.returncode))
             return
 
         # Execute shell command, throws exception when failed, returns stdout+stderr
         if flags == "stdout":
             proc = subprocess.Popen(cmd,
-                                    shell = True,
-                                    stdin = subprocess.PIPE,
-                                    stdout = subprocess.PIPE,
-                                    stderr = subprocess.STDOUT)
+                                    shell=True,
+                                    stdin=subprocess.PIPE,
+                                    stdout=subprocess.PIPE,
+                                    stderr=subprocess.STDOUT)
             out = proc.communicate(strInput)[0]
             if proc.returncode != 0:
-                raise Exception("Executing shell command \"%s\" failed, return code %d, output %s"%(cmd, proc.returncode, out))
+                raise Exception("Executing shell command \"%s\" failed, return code %d, output %s" % (cmd, proc.returncode, out))
             return out
 
         # Execute shell command, returns (returncode,stdout+stderr)
         if flags == "retcode+stdout":
             proc = subprocess.Popen(cmd,
-                                    shell = True,
-                                    stdin = subprocess.PIPE,
-                                    stdout = subprocess.PIPE,
-                                    stderr = subprocess.STDOUT)
+                                    shell=True,
+                                    stdin=subprocess.PIPE,
+                                    stdout=subprocess.PIPE,
+                                    stderr=subprocess.STDOUT)
             out = proc.communicate(strInput)[0]
             return (proc.returncode, out)
 
@@ -237,7 +238,7 @@ class SnUtil:
 
         netmask = 0
         netmasks = mask.split('.')
-        for i in range(0,len(netmasks)):
+        for i in range(0, len(netmasks)):
             netmask *= 256
             netmask += int(netmasks[i])
         return 32 - (netmask ^ 0xFFFFFFFF).bit_length()
@@ -296,7 +297,7 @@ class SnUtil:
             return False
         if strList[0] != prefix:
             return False
-        if strList[2] != "%s@%s"%(userName, hostName):
+        if strList[2] != "%s@%s" % (userName, hostName):
             return False
         return True
 
@@ -312,13 +313,13 @@ class SnUtil:
                     needInit = True
 
         if needInit:
-            comment = "%s@%s"%(userName, hostName)
+            comment = "%s@%s" % (userName, hostName)
             SnUtil.forceDelete(privkeyFile)
             SnUtil.forceDelete(pubkeyFile)
 
             # fixme don't know why euid can't be child's uid
             #SnUtil.shell("/bin/ssh-keygen -t %s -N \"\" -C \"%s\" -f \"%s\" -q"%(keyType, comment, privkeyFile), "stdout")
-            SnUtil.shell("/usr/bin/su -m %s -c \"/bin/ssh-keygen -t %s -N \\\"\\\" -C \\\"%s\\\" -f \\\"%s\\\" -q\""%(userName, keyType, comment, privkeyFile), "stdout")
+            SnUtil.shell("/usr/bin/su -m %s -c \"/bin/ssh-keygen -t %s -N \\\"\\\" -C \\\"%s\\\" -f \\\"%s\\\" -q\"" % (userName, keyType, comment, privkeyFile), "stdout")
 
             assert os.path.exists(privkeyFile) and os.path.exists(pubkeyFile)
 
@@ -336,7 +337,7 @@ class SnUtil:
     def getPidBySocket(socketInfo):
         """need to be run by root. socketInfo is like 0.0.0.0:80"""
 
-        rc, ret = SnUtil.shell("/bin/netstat -anp | grep \"%s\""%(socketInfo), "retcode+stdout")
+        rc, ret = SnUtil.shell("/bin/netstat -anp | grep \"%s\"" % (socketInfo), "retcode+stdout")
         if rc != 0:
             return -1
 
@@ -383,6 +384,7 @@ class SnUtil:
         else:
             assert False
 
+
 class SnSleepNotifier:
 
     SLEEP_TYPE_SUSPEND = 0
@@ -395,4 +397,3 @@ class SnSleepNotifier:
 
     def dispose(self):
         pass
-

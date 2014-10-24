@@ -8,38 +8,38 @@ from sn_module import SnModuleInstance
 
 class ModuleObject(SnModule):
 
-	def getModuleName(self):
-		return "sys-server-distcc"
+    def getModuleName(self):
+        return "sys-server-distcc"
 
-	def getPropDict(self):
-		ret = dict()
-		ret["allow-local-peer"] = False
-		ret["suid"] = False
-		ret["standalone"] = False
-		return ret
+    def getPropDict(self):
+        ret = dict()
+        ret["allow-local-peer"] = False
+        ret["suid"] = False
+        ret["standalone"] = False
+        return ret
 
 
 class ModuleInstanceObject(SnModuleInstance):
 
-	def onInit(self):
-		self.cfgDir = "/etc/distcc"
-		if not os.path.isdir(self.cfgDir):
-			raise Exception("distcc configuration directory does not exist")
+    def onInit(self):
+        self.cfgDir = "/etc/distcc"
+        if not os.path.isdir(self.cfgDir):
+            raise Exception("distcc configuration directory does not exist")
 
-		return
+        return
 
-	def onActive(self):
-		# send sys param to client
-		obj = _DistccServerObject()
-		obj.jobNumber = 4
-		self.sendObject(obj)
+    def onActive(self):
+        # send sys param to client
+        obj = _DistccServerObject()
+        obj.jobNumber = 4
+        self.sendObject(obj)
 
-	def onInactive(self):
-		return
+    def onInactive(self):
+        return
 
-	def onRecv(self, dataObj):
-		raise SnRejectException("receive client data")
+    def onRecv(self, dataObj):
+        raise SnRejectException("receive client data")
 
 
 class _DistccServerObject:
-	jobNumber = None				# int
+    jobNumber = None				# int

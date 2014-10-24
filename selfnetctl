@@ -7,50 +7,51 @@ sys.path.append('/usr/lib/selfnetd')
 from sn_param import SnParam
 from sn_subcmd import SnSubCmdMain
 
+
 def parseArgs():
-	argParser = argparse.ArgumentParser()
-	subParsers = argParser.add_subparsers()
+    argParser = argparse.ArgumentParser()
+    subParsers = argParser.add_subparsers()
 
-	apGenCaCert = subParsers.add_parser("generate-ca-cert")
-	apGenCaCert.set_defaults(subcmd="generate_ca_cert")
+    apGenCaCert = subParsers.add_parser("generate-ca-cert")
+    apGenCaCert.set_defaults(subcmd="generate_ca_cert")
 
-	apGenCert = subParsers.add_parser("generate-cert")
-	apGenCert.set_defaults(subcmd="generate_cert")
-	apGenCert.add_argument("--hostname", required=True)
-	apGenCert.add_argument("--outdir")
-	apGenCert.add_argument("--export", action="store_true", default=False)
+    apGenCert = subParsers.add_parser("generate-cert")
+    apGenCert.set_defaults(subcmd="generate_cert")
+    apGenCert.add_argument("--hostname", required=True)
+    apGenCert.add_argument("--outdir")
+    apGenCert.add_argument("--export", action="store_true", default=False)
 
-	apListPeer = subParsers.add_parser("list-peers")
-	apListPeer.set_defaults(subcmd="list_peers")
+    apListPeer = subParsers.add_parser("list-peers")
+    apListPeer.set_defaults(subcmd="list_peers")
 
-	apOpPowerOn = subParsers.add_parser("poweron")
-	apOpPowerOn.set_defaults(subcmd="poweron")
-	apOpPowerOn.add_argument("peerName")
+    apOpPowerOn = subParsers.add_parser("poweron")
+    apOpPowerOn.set_defaults(subcmd="poweron")
+    apOpPowerOn.add_argument("peerName")
 
-	apOpPowerOff = subParsers.add_parser("poweroff")
-	apOpPowerOff.set_defaults(subcmd="poweroff")
-	apOpPowerOff.add_argument("peerName")
+    apOpPowerOff = subParsers.add_parser("poweroff")
+    apOpPowerOff.set_defaults(subcmd="poweroff")
+    apOpPowerOff.add_argument("peerName")
 
-	apOpReboot = subParsers.add_parser("reboot")
-	apOpReboot.set_defaults(subcmd="reboot")
-	apOpReboot.add_argument("peerName")
-	
-	apOpSuspend = subParsers.add_parser("suspend")
-	apOpSuspend.set_defaults(subcmd="suspend")
-	apOpSuspend.add_argument("peerName")
+    apOpReboot = subParsers.add_parser("reboot")
+    apOpReboot.set_defaults(subcmd="reboot")
+    apOpReboot.add_argument("peerName")
 
-	apOpHibernate = subParsers.add_parser("hibernate")
-	apOpHibernate.set_defaults(subcmd="hibernate")
-	apOpHibernate.add_argument("peerName")
+    apOpSuspend = subParsers.add_parser("suspend")
+    apOpSuspend.set_defaults(subcmd="suspend")
+    apOpSuspend.add_argument("peerName")
 
-	apOpHybridSleep = subParsers.add_parser("hybrid-sleep")
-	apOpHybridSleep.set_defaults(subcmd="hybrid-sleep")
-	apOpHybridSleep.add_argument("peerName")
+    apOpHibernate = subParsers.add_parser("hibernate")
+    apOpHibernate.set_defaults(subcmd="hibernate")
+    apOpHibernate.add_argument("peerName")
 
-	apListModule = subParsers.add_parser("list-modules")
-	apListModule.set_defaults(subcmd="list_modules")
+    apOpHybridSleep = subParsers.add_parser("hybrid-sleep")
+    apOpHybridSleep.set_defaults(subcmd="hybrid-sleep")
+    apOpHybridSleep.add_argument("peerName")
 
-	return argParser.parse_args()
+    apListModule = subParsers.add_parser("list-modules")
+    apListModule.set_defaults(subcmd="list_modules")
+
+    return argParser.parse_args()
 
 ################################################################################
 
@@ -59,17 +60,16 @@ parseResult = parseArgs()
 
 # some assistant sub command
 if parseResult.subcmd == "generate_ca_cert":
-	SnSubCmdMain(param).generateCaCert()
+    SnSubCmdMain(param).generateCaCert()
 elif parseResult.subcmd == "generate_cert":
-	SnSubCmdMain(param).generateCert(parseResult.hostname, parseResult.outdir, parseResult.export)
+    SnSubCmdMain(param).generateCert(parseResult.hostname, parseResult.outdir, parseResult.export)
 elif parseResult.subcmd == "list_peers":
-	SnSubCmdMain(param).listPeers()
-elif parseResult.subcmd in [ "poweron", "poweroff", "reboot", "suspend", "hibernate", "hybrid-sleep" ]:
-	SnSubCmdMain(param).peerPowerOperation(parseResult.peerName, parseResult.subcmd)
+    SnSubCmdMain(param).listPeers()
+elif parseResult.subcmd in ["poweron", "poweroff", "reboot", "suspend", "hibernate", "hybrid-sleep"]:
+    SnSubCmdMain(param).peerPowerOperation(parseResult.peerName, parseResult.subcmd)
 elif parseResult.subcmd == "list_modules":
-	SnSubCmdMain(param).listModules()
+    SnSubCmdMain(param).listModules()
 else:
-	assert False
+    assert False
 
 sys.exit(0)
-

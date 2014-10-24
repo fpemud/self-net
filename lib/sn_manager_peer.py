@@ -5,7 +5,6 @@ import re
 import socket
 import logging
 import dbus
-from datetime import datetime
 from objsocket import objsocket
 from gi.repository import GLib
 from gi.repository import GObject
@@ -97,20 +96,26 @@ can give it a proper power state when it's inactive. If it fails to do so, it's
 power state should be POWER_STATE_UNKNOWN.
 """
 
+
 class SnSysPacket:
     data = None                        # object
+
 
 class SnSysPacketReject:
     message = None                    # str
 
+
 class SnSysPacketPowerOp:
     name = None                        # str
+
 
 class SnSysPacketPowerOpAck:
     error_message = None            # str, None means success, not-None means failure
 
+
 class SnSysPacketPowerStateWhenInactive:
     name = None                        # str
+
 
 class SnPeerManager:
 
@@ -189,14 +194,14 @@ class SnPeerManager:
     def doPeerPowerOperationAsync(self, peerName, opName, okFunc, errFunc):
         """call okFunc when success, call errFunc when failure"""
 
-        assert opName in [ "poweron", "poweroff", "reboot", "wakeup", "suspend", "hibernate", "hybrid-sleep" ]
+        assert opName in ["poweron", "poweroff", "reboot", "wakeup", "suspend", "hibernate", "hybrid-sleep"]
 
         if self.peerInfoDict[peerName].opArgPower is not None:
             errFunc(Exception("another power operation is pending"))
             return
 
         if opName == "poweron":
-            if self.getPeerPowerState(peerName) not in [ self.POWER_STATE_UNKNOWN, self.POWER_STATE_POWEROFF ]:
+            if self.getPeerPowerState(peerName) not in [self.POWER_STATE_UNKNOWN, self.POWER_STATE_POWEROFF]:
                 errFunc(Exception("the current power state of peer doesn't support this power operation"))
                 return
             if not self.param.configManager.getHostInfo(peerName).supportPoweron:
@@ -205,7 +210,7 @@ class SnPeerManager:
 
             assert False
         elif opName == "wakeup":
-            if self.getPeerPowerState(peerName) not in [ self.POWER_STATE_UNKNOWN, self.POWER_STATE_SUSPEND, self.POWER_STATE_HIBERNATE, self.POWER_STATE_HYBRID_SLEEP ]:
+            if self.getPeerPowerState(peerName) not in [self.POWER_STATE_UNKNOWN, self.POWER_STATE_SUSPEND, self.POWER_STATE_HIBERNATE, self.POWER_STATE_HYBRID_SLEEP]:
                 errFunc(Exception("the current power state of peer doesn't support this power operation"))
                 return
             if not self.param.configManager.getHostInfo(peerName).supportWakeup:
@@ -238,7 +243,7 @@ class SnPeerManager:
         # only peer in self-net is allowed
         if peerName not in self.peerInfoDict:
             sslSock.close()
-            logging.debug("SnPeerManager.onSocketConnected: Fail, foreign peer, %s"%(peerName))
+            logging.debug("SnPeerManager.onSocketConnected: Fail, foreign peer, %s" % (peerName))
             return
 
         # only one connection between a pair of hosts
@@ -293,10 +298,10 @@ class SnPeerManager:
             else:
                 self._sendReject(peerName, "invalid system packet data format")
         elif _type_check(packetObj, SnDataPacket):
-            self.param.localManager.onPeerSockRecv(peerName, packetObj.srcUserName, 
-                        packetObj.srcModuleName, packetObj.data)
+            self.param.localManager.onPeerSockRecv(peerName, packetObj.srcUserName,
+                                                   packetObj.srcModuleName, packetObj.data)
         else:
-            self._sendReject(peerName, "invalid packet format, %s"%(packetObj.__class__))
+            self._sendReject(peerName, "invalid packet format, %s" % (packetObj.__class__))
 
     def onSocketError(self, sock, excObj):
         peerName = self._getPeerNameBySock(sock)
@@ -382,25 +387,25 @@ class SnPeerManager:
         for m in peerInfo.moduleList:
             strList = m.moduleName.split("-")
             if len(strList) < 3:
-                self._sendReject(peerName, "invalid module name \"%s\""%(m.moduleName))
+                self._sendReject(peerName, "invalid module name \"%s\"" % (m.moduleName))
                 return
 
             moduleScope = strList[0]
             if moduleScope not in ["sys", "usr"]:
-                self._sendReject(peerName, "invalid module scope for module name \"%s\""%(m.moduleName))
+                self._sendReject(peerName, "invalid module scope for module name \"%s\"" % (m.moduleName))
                 return
 
             moduleType = strList[1]
             if moduleType not in ["server", "client", "peer"]:
-                self._sendReject(peerName, "invalid module type for module name \"%s\""%(m.moduleName))
+                self._sendReject(peerName, "invalid module type for module name \"%s\"" % (m.moduleName))
                 return
 
             moduleId = "-".join(strList[2:])
             if len(moduleId) > 32:
-                self._sendReject(peerName, "module id is too long for module name \"%s\""%(m.moduleName))
+                self._sendReject(peerName, "module id is too long for module name \"%s\"" % (m.moduleName))
                 return
             if re.match("[A-Za-z0-9_]+", moduleId) is None:
-                self._sendReject(peerName, "invalid module id for module name \"%s\""%(m.moduleName))
+                self._sendReject(peerName, "invalid module id for module name \"%s\"" % (m.moduleName))
                 return
 
         # do operation
@@ -413,8 +418,8 @@ class SnPeerManager:
         self.param.localManager.onPeerChange(peerName, peerInfo)
 
     def _recvPowerOp(self, peerName, powerOp):
-        if powerOp.name not in [ "poweroff", "reboot", "suspend", "hibernate", "hybrid-sleep" ]:
-            self._sendReject(peerName, "invalid power operation name \"%s\""%(powerOp.name))
+        if powerOp.name not in ["poweroff", "reboot", "suspend", "hibernate", "hybrid-sleep"]:
+            self._sendReject(peerName, "invalid power operation name \"%s\"" % (powerOp.name))
             return
 
         try:
@@ -460,7 +465,7 @@ class SnPeerManager:
         elif powerStateWhenInactive.name == "hybrid-sleep":
             self.peerInfoDict[peerName].powerStateWhenInactive = self.POWER_STATE_HYBRID_SLEEP
         else:
-            self._sendReject(peerName, "invalid power state name \"%s\""%(powerStateWhenInactive.name))
+            self._sendReject(peerName, "invalid power state name \"%s\"" % (powerStateWhenInactive.name))
 
     def _recvReject(self, peerName, rejectMessage):
         logging.error("receive reject, %s, %s", peerName, rejectMessage)
@@ -501,7 +506,7 @@ class SnPeerManager:
 
     def _peerToShutdown(self, peerName):
         oldState = self.peerInfoDict[peerName].fsmState
-    
+
         # remove peer, don't modify powerStateWhenInactive
         self.peerInfoDict[peerName].sock.close()
         self.peerInfoDict[peerName].fsmState = _PeerInfoInternal.STATE_NONE
@@ -515,7 +520,7 @@ class SnPeerManager:
 
     def _peerToReject(self, peerName):
         oldState = self.peerInfoDict[peerName].fsmState
-    
+
         # remove peer
         self.peerInfoDict[peerName].sock.close()
         self.peerInfoDict[peerName].powerStateWhenInactive = self.POWER_STATE_UNKNOWN
@@ -544,6 +549,7 @@ class SnPeerManager:
         logging.debug("SnPeerManager.dispose: End")
         self.disposeCompleteFunc()
 
+
 class _PeerInfoInternal:
     STATE_NONE = 0
     STATE_INIT = 1
@@ -558,8 +564,10 @@ class _PeerInfoInternal:
     sock = None                                # obj, peer socket
     opArgPower = None                        # (okFunc, errFunc)
 
+
 def _dbgmsg_peer_state_change(peerName, oldPeerState, peerState):
-    return "Peer %s, %s -> %s"%(peerName, _peer_state_to_str(oldPeerState), _peer_state_to_str(peerState))
+    return "Peer %s, %s -> %s" % (peerName, _peer_state_to_str(oldPeerState), _peer_state_to_str(peerState))
+
 
 def _peer_state_to_str(peerState):
     if peerState == _PeerInfoInternal.STATE_NONE:
@@ -577,6 +585,6 @@ def _peer_state_to_str(peerState):
     else:
         assert False
 
+
 def _type_check(obj, typeobj):
     return str(obj.__class__) == str(typeobj)
-
