@@ -22,13 +22,13 @@ if [ -n "$OUTPUT" ] ; then
     ERRFLAG=1
 fi
 
-#OUTPUT=`unittest/autotest.py 2>&1`
-#if [ "$?" == 1 ] ; then
-#    echo "unittest errors:"
-#    echo "$OUTPUT"
-#    echo ""
-#    ERRFLAG=1
-#fi
+OUTPUT=`unittest/autotest.py 2>&1`
+if [ "$?" == 1 ] ; then
+    echo "unittest errors:"
+    echo "$OUTPUT"
+    echo ""
+    ERRFLAG=1
+fi
 
 if [ "${ERRFLAG}" == 1 ] ; then
     exit 1
