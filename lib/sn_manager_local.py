@@ -25,18 +25,18 @@ from sn_module import SnRejectException
 #
 # moi object is created and destroyed when peer module appears and disappears,
 # but moi object must go through a garbage-collection process before destruction
-# if it has start functioning (out of PENDING state).
+# if it has started functioning (out of PENDING state).
 #
 # New moi object won't go out of the PENDING state and start work before the
 # old moi object is finally destroyed. The new moi object can be destroyed directly
-# because it has not begon functioning.
+# because it has not begun functioning.
 #
 # moi object starts receive packet immediately after it is created. Packet is
 # received into moi.peerPacketQueue.
 #
 # moi object can only send / recv business packet (except and reject packet is
-# system packet) in ACTIVE or FULL state. And moi object can not send / recv
-# packet if it is in garbage-collection.
+# system packet) in ACTIVE or FULL state. moi object can not send / recv packet
+# if it is in garbage-collection process.
 #
 
 # _ModuleObjInternal FSM state condition:
@@ -813,24 +813,24 @@ class _MoiObj:
     GC_START = 1
     GC_STARTED = 2
 
-    peerName = None                            # str
-    userName = None                            # str, can be None
+    peerName = None                          # str
+    userName = None                          # str, can be None
     moduleName = None                        # str, "sys-server-name"
-    moduleScope = None                        # str, "sys" "usr"
+    moduleScope = None                       # str, "sys" "usr"
     moduleType = None                        # str, "server" "client" "peer"
-    moduleId = None                            # str
-    propDict = None                            # dict
+    moduleId = None                          # str
+    propDict = None                          # dict
     tmpDir = None                            # str
-    logFile = None                            # str
+    logFile = None                           # str
     mo = None                                # obj, SnModuleInstance, standalone module: None
-    proc = None                                # obj, not-standalone module: None
-    procPipe = None                            # obj, not-standalone module: None
-    state = None                            # enum
-    failMessage = None                        # str
-    calling = None                            # str
-    workState = None                        # enum
+    proc = None                              # obj, not-standalone module: None
+    procPipe = None                          # obj, not-standalone module: None
+    state = None                             # enum
+    failMessage = None                       # str
+    calling = None                           # str
+    workState = None                         # enum
     gcFlag = None                            # enum, can be None
-    peerPacketQueue = None                    # deque<obj>
+    peerPacketQueue = None                   # deque<obj>
 
 
 def _moi_key_to_str(moi):

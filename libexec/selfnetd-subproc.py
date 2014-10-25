@@ -1,4 +1,4 @@
-#!/usr/bin/python3
+#!/usr/bin/python2
 # -*- coding: utf-8; tab-width: 4; indent-tabs-mode: t -*-
 
 import os
@@ -35,10 +35,6 @@ class _SubProcObject:
         self.mo = None
         self.connSock = None
 
-        # create module object
-        exec("import %s" % (self.moduleName.replace("-", "_")))
-        exec("self.mo = %s.ModuleInstanceObject(self, self.peerName, self.userName, self.moduleName, self.tmpDir)" % (self.moduleName.replace("-", "_")))
-
         # create connSock object
         fcntl.fcntl(sys.stdin, fcntl.F_SETFL, os.O_NONBLOCK)
         self.connSock = _SubProcObjSocket(self.onConnRecv)
@@ -54,6 +50,8 @@ class _SubProcObject:
             assert len(packetObj.funcArgs) == 0
             try:
                 logging.debug("_SubProcObject.onActive: Start")
+                exec("import %s" % (self.moduleName.replace("-", "_")))
+                exec("self.mo = %s.ModuleInstanceObject(self, self.peerName, self.userName, self.moduleName, self.tmpDir)" % (self.moduleName.replace("-", "_")))
                 self.mo.onInit()
                 self.mo.onActive()
                 logging.debug("_SubProcObject.onActive: End")
