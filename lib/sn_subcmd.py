@@ -6,7 +6,7 @@ import dbus
 import random
 import zipfile
 import socket
-import crypto
+from OpenSSL import crypto
 from sn_util import SnUtil
 
 
