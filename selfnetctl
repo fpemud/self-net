@@ -1,4 +1,4 @@
-#!/usr/bin/python3
+#!/usr/bin/python2
 # -*- coding: utf-8; tab-width: 4; indent-tabs-mode: t -*-
 
 import sys
@@ -13,13 +13,15 @@ def parseArgs():
     subParsers = argParser.add_subparsers()
 
     apGenCaCert = subParsers.add_parser("generate-ca-cert")
-    apGenCaCert.set_defaults(subcmd="generate_ca_cert")
+    apGenCaCert.set_defaults(subcmd="gen_ca_cert")
+
+    apGenMyCert = subParsers.add_parser("generate-my-cert")
+    apGenMyCert.set_defaults(subcmd="gen_my_cert")
 
     apGenCert = subParsers.add_parser("generate-cert")
-    apGenCert.set_defaults(subcmd="generate_cert")
+    apGenCert.set_defaults(subcmd="gen_cert")
     apGenCert.add_argument("--hostname", required=True)
     apGenCert.add_argument("--outdir")
-    apGenCert.add_argument("--export", action="store_true", default=False)
 
     apListPeer = subParsers.add_parser("list-peers")
     apListPeer.set_defaults(subcmd="list_peers")
@@ -59,10 +61,12 @@ param = SnParam()
 parseResult = parseArgs()
 
 # some assistant sub command
-if parseResult.subcmd == "generate_ca_cert":
+if parseResult.subcmd == "gen_ca_cert":
     SnSubCmdMain(param).generateCaCert()
-elif parseResult.subcmd == "generate_cert":
-    SnSubCmdMain(param).generateCert(parseResult.hostname, parseResult.outdir, parseResult.export)
+elif parseResult.subcmd == "gen_my_cert":
+    SnSubCmdMain(param).generateMyCert()
+elif parseResult.subcmd == "gen_cert":
+    SnSubCmdMain(param).generateCert(parseResult.hostname, parseResult.outdir)
 elif parseResult.subcmd == "list_peers":
     SnSubCmdMain(param).listPeers()
 elif parseResult.subcmd in ["poweron", "poweroff", "reboot", "suspend", "hibernate", "hybrid-sleep"]:

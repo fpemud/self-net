@@ -5,7 +5,8 @@ import os
 import dbus
 import random
 import zipfile
-from OpenSSL import crypto
+import socket
+import crypto
 from sn_util import SnUtil
 
 
@@ -31,41 +32,37 @@ class SnSubCmdMain:
         # save certificate and private key
         self._dumpCertAndKey(cert, k, self.param.caCertFile, self.param.caPrivkeyFile)
 
-    def generateCert(self, hostname, outDir, isExport):
+    def generateMyCert(self):
+        # get CA certificate and private key
+        caCert, caKey = self._loadCertAndKey(self.param.caCertFile, self.param.caPrivkeyFile)
+
+        # generate certificate and private key
+        cert, k = self._genCertAndKey(caCert, caKey, socket.gethostname())
+
+        # save certificate and private key
+        certFile = os.path.join(self.param.cfgDir, os.path.basename(self.param.certFile))
+        privkeyFile = os.path.join(self.param.cfgDir, os.path.basename(self.param.privkeyFile))
+        self._dumpCertAndKey(cert, k, certFile, privkeyFile)
+
+    def generateCert(self, hostname, outDir):
         if outDir is None:
-            outDir = self.param.cfgDir
+            outDir = "."
 
         # get CA certificate and private key
         caCert, caKey = self._loadCertAndKey(self.param.caCertFile, self.param.caPrivkeyFile)
 
         # generate certificate and private key
-        k = crypto.PKey()
-        k.generate_key(crypto.TYPE_RSA, 1024)
+        cert, k = self._genCertAndKey(caCert, caKey, hostname)
 
-        cert = crypto.X509()
-        cert.get_subject().CN = hostname
-        cert.set_serial_number(random.randint(0, 65535))
-        cert.gmtime_adj_notBefore(0)
-        cert.gmtime_adj_notAfter(36500 * 24 * 3600)
-        cert.set_issuer(caCert.get_subject())
-        cert.set_pubkey(k)
-        cert.sign(caKey, 'sha1')
-
-        if not isExport:
-            # save certificate and private key
-            certFile = os.path.join(outDir, os.path.basename(self.param.certFile))
-            privkeyFile = os.path.join(outDir, os.path.basename(self.param.privkeyFile))
-            self._dumpCertAndKey(cert, k, certFile, privkeyFile)
-        else:
-            # save CA certificate, certificate and private key to a zip file for distributing
-            certFileInfo = zipfile.ZipInfo(os.path.basename(self.param.certFile))
-            certFileInfo.external_attr = 0o644 << 16
-            privkeyFileInfo = zipfile.ZipInfo(os.path.basename(self.param.privkeyFile))
-            privkeyFileInfo.external_attr = 0o600 << 16
-            with zipfile.ZipFile(os.path.join(outDir, "selfnet-distribute_%s.zip" % (hostname)), "w") as zipf:
-                zipf.write(self.param.caCertFile, os.path.basename(self.param.caCertFile))
-                zipf.writestr(certFileInfo, crypto.dump_certificate(crypto.FILETYPE_PEM, cert))
-                zipf.writestr(privkeyFileInfo, crypto.dump_privatekey(crypto.FILETYPE_PEM, k))
+        # save CA certificate, certificate and private key to a zip file for distributing
+        certFileInfo = zipfile.ZipInfo(os.path.basename(self.param.certFile))
+        certFileInfo.external_attr = 0o644 << 16
+        privkeyFileInfo = zipfile.ZipInfo(os.path.basename(self.param.privkeyFile))
+        privkeyFileInfo.external_attr = 0o600 << 16
+        with zipfile.ZipFile(os.path.join(outDir, "selfnet-distribute_%s.zip" % (hostname)), "w") as zipf:
+            zipf.write(self.param.caCertFile, os.path.basename(self.param.caCertFile))
+            zipf.writestr(certFileInfo, crypto.dump_certificate(crypto.FILETYPE_PEM, cert))
+            zipf.writestr(privkeyFileInfo, crypto.dump_privatekey(crypto.FILETYPE_PEM, k))
 
     def listPeers(self):
         dbusObj = dbus.SystemBus().get_object('org.fpemud.SelfNet', '/org/fpemud/SelfNet')
@@ -115,6 +112,21 @@ class SnSubCmdMain:
             key = crypto.load_privatekey(crypto.FILETYPE_PEM, buf)
 
         return (cert, key)
+
+    def _genCertAndKey(self, caCert, caKey, cn):
+        k = crypto.PKey()
+        k.generate_key(crypto.TYPE_RSA, 1024)
+
+        cert = crypto.X509()
+        cert.get_subject().CN = cn
+        cert.set_serial_number(random.randint(0, 65535))
+        cert.gmtime_adj_notBefore(0)
+        cert.gmtime_adj_notAfter(36500 * 24 * 3600)
+        cert.set_issuer(caCert.get_subject())
+        cert.set_pubkey(k)
+        cert.sign(caKey, 'sha1')
+
+        return (cert, k)
 
     def _dumpCertAndKey(self, cert, key, certFile, keyFile):
         with open(certFile, "wt") as f:
