@@ -80,7 +80,7 @@ Peer FSM state notes:
   Peers can do data communication in STATE_FULL.
   After a peer enters STATE_REJECT, we won't connect to it, but we still accept
 its connection. According to the protocol, both end will enter STATE_REJECT, so
-only when one end restarts the connection can be back on again. There's only one
+only when one end restarts can the connection be back on again. There's only one
 exception: one end enters STATE_REJECT, the other end enters STATE_NONE. Then
 the conenction will be reestablished by the STATE_NONE end.
 """

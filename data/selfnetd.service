@@ -6,7 +6,7 @@ After=network.target
 Type=dbus
 PIDFile=/var/run/selfnetd/selfnetd.pid
 BusName=org.fpemud.SelfNet
-ExecStart=/sbin/selfnetd
+ExecStart=/usr/sbin/selfnetd
 ExecReload=/bin/kill -HUP $MAINPID
 
 [Install]
