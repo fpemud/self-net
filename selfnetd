@@ -130,6 +130,9 @@ try:
         logging.shutdown()
         if dc is not None:
             dc.close()
+except Exception as e:
+    logging.exception(e)
+    raise
 finally:
     # shouldn't remove log directory
     if param.tmpDir is not None and os.path.exists(param.tmpDir):

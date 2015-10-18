@@ -61,4 +61,3 @@ uninstall:
 	rm -Rf "$(DESTDIR)/$(prefix)/lib/selfnetd"
 
 .PHONY: check-git-repository all clean dist distclean install uninstall
-
