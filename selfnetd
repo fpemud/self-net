@@ -8,6 +8,7 @@ import tempfile
 import logging
 import argparse
 import signal
+from logging import handlers
 from daemon import daemon
 from daemon import pidfile
 from gi.repository import GLib
@@ -94,6 +95,7 @@ try:
     # set logging parameter
     if parseResult.daemonize:
         logging.getLogger().addHandler(logging.FileHandler(param.logFile))
+        logging.getLogger().addHandler(logging.handlers.SysLogHandler())
     else:
         logging.getLogger().addHandler(logging.StreamHandler(sys.stderr))
     logging.getLogger().setLevel(SnUtil.getLoggingLevel(param.logLevel))
