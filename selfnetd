@@ -6,9 +6,9 @@ import sys
 import shutil
 import tempfile
 import logging
+import logging.handlers
 import argparse
 import signal
-from logging import handlers
 from daemon import daemon
 from daemon import pidfile
 from gi.repository import GLib
