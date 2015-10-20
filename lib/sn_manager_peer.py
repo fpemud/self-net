@@ -149,7 +149,7 @@ class SnPeerManager:
 
         # create timers
         self.peerProbeTimer = None
-        self._timerOperation()
+        self._startOrStopPeerProbeTimer()
 
         logging.debug("SnPeerManager.__init__: End")
         return
@@ -266,7 +266,7 @@ class SnPeerManager:
         logging.info("SnPeerManager.onSocketConnected: %s", _dbgmsg_peer_state_change(peerName, oldFsmState, self.peerInfoDict[peerName].fsmState))
 
         # timer operation
-        self._timerOperation()
+        self._startOrStopPeerProbeTimer()
 
         # send localInfo
         self._sendObject(peerName, self.param.configManager.getVersion())
@@ -309,11 +309,12 @@ class SnPeerManager:
         self._peerToShutdown(peerName)
         logging.info("SnPeerManager.onSocketError: %s, %s", str(excObj), _dbgmsg_peer_state_change(peerName, oldFsmState, newFsmState))
 
-        self._timerOperation()
+        self._startOrStopPeerProbeTimer()
 
     def onPeerProbe(self):
         for pname, pinfo in self.peerInfoDict.items():
             if pinfo.fsmState == _PeerInfoInternal.STATE_NONE:
+                logging.debug("SnPeerManager.onPeerProbe: Try connect to peer %s", pname)
                 self.clientEndPoint.connect(pname, self.param.configManager.getHostInfo(pname).port)
         return True
 
@@ -473,7 +474,7 @@ class SnPeerManager:
         self._peerToReject(peerName)
         logging.info("SnPeerManager._recvReject: %s", _dbgmsg_peer_state_change(peerName, oldFsmState, newFsmState))
 
-        self._timerOperation()
+        self._startOrStopPeerProbeTimer()
 
     def _sendObject(self, peerName, obj):
         packetObj = SnSysPacket()
@@ -500,7 +501,7 @@ class SnPeerManager:
         self._peerToReject(peerName)
         logging.info("SnPeerManager._gcComplete: %s", _dbgmsg_peer_state_change(peerName, oldFsmState, newFsmState))
 
-        self._timerOperation()
+        self._startOrStopPeerProbeTimer()
 
     def _peerToShutdown(self, peerName):
         oldState = self.peerInfoDict[peerName].fsmState
@@ -531,15 +532,15 @@ class SnPeerManager:
         if oldState == _PeerInfoInternal.STATE_FULL:
             self.param.localManager.onPeerChange(peerName, None)
 
-    def _timerOperation(self):
-        if any(x for x in self.peerInfoDict.values() if x.sock is None):
+    def _startOrStopPeerProbeTimer(self):
+        if any(x for x in self.peerInfoDict.values() if x.fsmState == _PeerInfoInternal.STATE_NONE):
             if self.peerProbeTimer is None:
-                logging.debug("SnPeerManager._timerOperation: PeerProbeTimer starts")
+                logging.debug("SnPeerManager._startOrStopPeerProbeTimer: Peer probe timer starts")
                 interval = self.param.configManager.getPeerProbeInterval()
                 self.peerProbeTimer = GObject.timeout_add_seconds(interval, self.onPeerProbe)
         else:
             if self.peerProbeTimer is not None:
-                logging.debug("SnPeerManager._timerOperation: PeerProbeTimer stops")
+                logging.debug("SnPeerManager._startOrStopPeerProbeTimer: Peer probe timer stops")
                 GLib.source_remove(self.peerProbeTimer)
                 self.peerProbeTimer = None
 

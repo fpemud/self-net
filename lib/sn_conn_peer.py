@@ -71,7 +71,9 @@ class SnPeerClient:
 
     def connect(self, hostname, port):
         # don't do repeat connect
+        logging.debug("temp: %s, %s", hostname, port)
         if (hostname, port) in self.sockSet:
+            logging.debug("temp2: %s, %s", hostname, port)
             return
         self.sockSet.add((hostname, port))
 
