@@ -13,7 +13,7 @@ from sn_util import SnUtil
 class SnPeerServer:
 
     def __init__(self, certFile, privkeyFile, caCertFile, connectFunc):
-        self.handshaker = _HandShaker(certFile, privkeyFile, caCertFile, connectFunc)
+        self.handshaker = _HandShaker(certFile, privkeyFile, caCertFile, self._onHandShakeComplete, self._onHandShakeError)
         self.serverSock = None
         self.serverSourceId = None
 
@@ -56,11 +56,19 @@ class SnPeerServer:
             logging.debug("SnPeerServer._onServerAccept: Failed, %s, %s", e.__class__, e)
             return True
 
+    def _onHandShakeComplete(self, source, sslSock, hostname, port):
+        logging.debug("SnPeerServer._onHandShakeComplete")
+        self.connectFunc(sslSock)
+
+    def _onHandShakeError(self, source, hostname, port):
+        logging.debug("SnPeerServer._onHandShakeError")
+        source.close()
+
 
 class SnPeerClient:
 
     def __init__(self, certFile, privkeyFile, caCertFile, connectFunc):
-        self.handshaker = _HandShaker(certFile, privkeyFile, caCertFile, connectFunc)
+        self.handshaker = _HandShaker(certFile, privkeyFile, caCertFile, self._onHandShakeComplete, self._onHandShakeError)
         self.asyncns = libasyncns.Asyncns()
         self.sockSet = set()
         self.isDispose = False
@@ -71,9 +79,7 @@ class SnPeerClient:
 
     def connect(self, hostname, port):
         # don't do repeat connect
-        logging.debug("temp: %s, %s", hostname, port)
         if (hostname, port) in self.sockSet:
-            logging.debug("temp2: %s, %s", hostname, port)
             return
         self.sockSet.add((hostname, port))
 
@@ -122,17 +128,24 @@ class SnPeerClient:
         if self.isDispose:
             return False
 
-        self.sockSet.remove((hostname, port))
-
         if cb_condition & _flagError:
             source.close()
-            #logging.debug("SnPeerClient.connect: Connect failed, %s, %d, %s", hostname, port, SnUtil.cbConditionToStr(cb_condition))
             return False
 
         # give socket to _HandShaker
+        logging.debug("SnPeerClient._onConnect: Socket connected, %s, %s, %s", SnUtil.cbConditionToStr(cb_condition), hostname, port)
         self.handshaker.addSocket(source, False, hostname, port)
-        #logging.debug("SnPeerClient.connect: Success, %s, %d", hostname, port)
         return False
+
+    def _onHandShakeComplete(self, source, sslSock, hostname, port):
+        logging.debug("SnPeerClient._onHandShakeComplete: %s, %s", hostname, port)
+        self.sockSet.remove((hostname, port))
+        self.connectFunc(sslSock)
+
+    def _onHandShakeError(self, source, hostname, port):
+        logging.debug("SnPeerClient._onHandShakeError: %s, %s", hostname, port)
+        self.sockSet.remove((hostname, port))
+        source.close()
 
 
 class _HandShaker:
@@ -142,11 +155,12 @@ class _HandShaker:
     HANDSHAKE_WANT_WRITE = 2
     HANDSHAKE_COMPLETE = 3
 
-    def __init__(self, certFile, privkeyFile, caCertFile, connectFunc):
+    def __init__(self, certFile, privkeyFile, caCertFile, handShakeCompleteFunc, handShakeErrorFunc):
         self.certFile = certFile
         self.privkeyFile = privkeyFile
         self.caCertFile = caCertFile
-        self.connectFunc = connectFunc
+        self.handShakeCompleteFunc = handShakeCompleteFunc
+        self.handShakeErrorFunc = handShakeErrorFunc
         self.sockDict = dict()
 
     def dispose(self):
@@ -219,18 +233,17 @@ class _HandShaker:
                     if peerName is None or peerName != info.hostname:
                         raise _ConnException("Hostname incorrect, %s, %s" % (_handshake_info_to_str(info), peerName))
 
-                # give socket to connectFunc
+                # give socket to handShakeCompleteFunc
+                self.handShakeCompleteFunc(source, self.sockDict[source].sslSock, self.sockDict[source].hostname, self.sockDict[source].port)
                 del self.sockDict[source]
-                self.connectFunc(info.sslSock)
                 return False
         except _ConnException as e:
-            del self.sockDict[source]
-            source.close()
             if not e.hasExcObj:
                 logging.debug("_HandShaker._onEvent: %s, %s", e.message, _handshake_info_to_str(info))
             else:
-                logging.debug("_HandShaker._onEvent: %s, %s, %s, %s", e.message, _handshake_info_to_str(info),
-                              e.excName, e.excMessage)
+                logging.debug("_HandShaker._onEvent: %s, %s, %s, %s", e.message, _handshake_info_to_str(info), e.excName, e.excMessage)
+            self.handShakeErrorFunc(source, self.sockDict[source].hostname, self.sockDict[source].port)
+            del self.sockDict[source]
             return False
 
         # register io watch callback again

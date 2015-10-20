@@ -314,7 +314,6 @@ class SnPeerManager:
     def onPeerProbe(self):
         for pname, pinfo in self.peerInfoDict.items():
             if pinfo.fsmState == _PeerInfoInternal.STATE_NONE:
-                logging.debug("SnPeerManager.onPeerProbe: Try connect to peer %s", pname)
                 self.clientEndPoint.connect(pname, self.param.configManager.getHostInfo(pname).port)
         return True
 
