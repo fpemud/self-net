@@ -13,6 +13,7 @@ from sn_util import SnUtil
 class SnPeerServer:
 
     def __init__(self, certFile, privkeyFile, caCertFile, connectFunc):
+        self.connectFunc = connectFunc
         self.handshaker = _HandShaker(certFile, privkeyFile, caCertFile, self._onHandShakeComplete, self._onHandShakeError)
         self.serverSock = None
         self.serverSourceId = None
@@ -68,6 +69,7 @@ class SnPeerServer:
 class SnPeerClient:
 
     def __init__(self, certFile, privkeyFile, caCertFile, connectFunc):
+        self.connectFunc = connectFunc
         self.handshaker = _HandShaker(certFile, privkeyFile, caCertFile, self._onHandShakeComplete, self._onHandShakeError)
         self.asyncns = libasyncns.Asyncns()
         self.sockSet = set()
