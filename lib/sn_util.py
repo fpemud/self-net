@@ -319,7 +319,7 @@ class SnUtil:
 
             # fixme don't know why euid can't be child's uid
             #SnUtil.shell("/bin/ssh-keygen -t %s -N \"\" -C \"%s\" -f \"%s\" -q"%(keyType, comment, privkeyFile), "stdout")
-            SnUtil.shell("/usr/bin/su -m %s -c \"/bin/ssh-keygen -t %s -N \\\"\\\" -C \\\"%s\\\" -f \\\"%s\\\" -q\"" % (userName, keyType, comment, privkeyFile), "stdout")
+            SnUtil.shell("/bin/su -m %s -c \"/usr/bin/ssh-keygen -t %s -N \\\"\\\" -C \\\"%s\\\" -f \\\"%s\\\" -q\"" % (userName, keyType, comment, privkeyFile), "stdout")
 
             assert os.path.exists(privkeyFile) and os.path.exists(pubkeyFile)
 
