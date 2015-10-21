@@ -131,8 +131,8 @@ class SnConfigManager:
 
             foundCommonName = False
             for item in x509.get_subject().get_components():
-                if item[0] == "CN":
-                    if item[1] != socket.gethostname():
+                if item[0].decode("ascii") == "CN":
+                    if item[1].decode("ascii") != socket.gethostname():
                         raise Exception("Common name in certificate must equal to hostname")
                     foundCommonName = True
                     break
@@ -205,9 +205,8 @@ class SnConfigManager:
             if re.match("[A-Za-z0-9_]+", moduleId) is None:
                 raise Exception("Invalid module id for module name \"%s\"" % (m))
 
-            moduleObj = None
             exec("import %s" % (m.replace("-", "_")))
-            exec("moduleObj = %s.ModuleObject()" % (m.replace("-", "_")))
+            moduleObj = eval("%s.ModuleObject()" % (m.replace("-", "_")))
 
             if m != moduleObj.getModuleName():
                 raise Exception("Module \"%s\" does not exists" % (m))

@@ -5,7 +5,7 @@ import os
 import pickle
 
 
-class SODB:
+class objdb:
 	
     def __init__(self, filename):
         self.filename = filename
@@ -18,7 +18,7 @@ class SODB:
             else:
                 self.obj = None
         else:
-            with open(self.filename, 'wb'):
+            with open(self.filename, "wb"):
                 pass
             self.obj = None
             
@@ -30,7 +30,7 @@ class SODB:
     def set_object(self, obj):
         self.obj = obj
 
-    def save(self):
-        with open(self.newfilename, 'wb') as f:
+    def persist(self):
+        with open(self.newfilename, "wb") as f:
             pickle.dump(self.obj, f)
         os.rename(self.newfilename, self.filename)

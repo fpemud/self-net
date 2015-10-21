@@ -51,7 +51,7 @@ class _SubProcObject:
             try:
                 logging.debug("_SubProcObject.onActive: Start")
                 exec("import %s" % (self.moduleName.replace("-", "_")))
-                exec("self.mo = %s.ModuleInstanceObject(self, self.peerName, self.userName, self.moduleName, self.tmpDir)" % (self.moduleName.replace("-", "_")))
+                self.mo = eval("%s.ModuleInstanceObject(self, self.peerName, self.userName, self.moduleName, self.tmpDir)" % (self.moduleName.replace("-", "_")))
                 self.mo.onInit()
                 self.mo.onActive()
                 logging.debug("_SubProcObject.onActive: End")

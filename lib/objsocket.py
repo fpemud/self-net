@@ -44,8 +44,8 @@ class objsocket:
         self.errorFunc = errorFunc
         self.gcCompleteFunc = gcCompleteFunc
 
-        self.sendBuffer = ""
-        self.recvBuffer = ""
+        self.sendBuffer = b''
+        self.recvBuffer = b''
         self.recvSourceId = self.adapterObj.addRecvWatch(self.mySock, self._onRecv)
         self.sendSourceId = None
 

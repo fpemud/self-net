@@ -576,7 +576,7 @@ class SnLocalManager:
 
                 if not moi.propDict["standalone"]:
                     exec("import %s" % (moi.moduleName.replace("-", "_")))
-                    exec("moi.mo = %s.ModuleInstanceObject(self, moi.peerName, moi.userName, moi.moduleName, moi.tmpDir)" % (moi.moduleName.replace("-", "_")))
+                    moi.mo = eval("%s.ModuleInstanceObject(self, moi.peerName, moi.userName, moi.moduleName, moi.tmpDir)" % (moi.moduleName.replace("-", "_")))
                 else:
                     moi.proc = self._startSubProc(moi.peerName, moi.userName, moi.moduleName, moi.tmpDir, moi.logFile)
                     fcntl.fcntl(moi.proc.stdout, fcntl.F_SETFL, os.O_NONBLOCK)
