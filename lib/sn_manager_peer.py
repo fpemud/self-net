@@ -490,7 +490,7 @@ class SnPeerManager:
         self.peerInfoDict[peerName].sock.send(packetObj)
 
         # graceful close, wait reject message to be sent
-        self.peerInfoDict[peerName].sock.gracefulClose()
+        self.peerInfoDict[peerName].sock.graceful_close()
 
     def _gcComplete(self, sock):
         peerName = self._getPeerNameBySock(sock)

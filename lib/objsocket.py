@@ -61,7 +61,7 @@ class objsocket:
         self.sendBuffer += packet
         self.sendSourceId = self.adapterObj.addSendWatch(self.mySock, self._onSend)
 
-    def gracefulClose(self):
+    def graceful_close(self):
         """This function does not close the socket, the socket must be closed
            by graceful close complete callback funtion"""
 
