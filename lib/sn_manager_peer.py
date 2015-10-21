@@ -1,4 +1,4 @@
-#!/usr/bin/python2
+#!/usr/bin/python3
 # -*- coding: utf-8; tab-width: 4; indent-tabs-mode: t -*-
 
 import re
@@ -164,7 +164,7 @@ class SnPeerManager:
         self.clientEndPoint.dispose()
         self.serverEndPoint.dispose()
 
-        for peerName, peerInfo in self.peerInfoDict.items():
+        for peerName, peerInfo in list(self.peerInfoDict.items()):
             if (peerInfo.fsmState == _PeerInfoInternal.STATE_INIT
                     or peerInfo.fsmState == _PeerInfoInternal.STATE_VER_MATCH
                     or peerInfo.fsmState == _PeerInfoInternal.STATE_CFG_MATCH
@@ -312,7 +312,7 @@ class SnPeerManager:
         self._startOrStopPeerProbeTimer()
 
     def onPeerProbe(self):
-        for pname, pinfo in self.peerInfoDict.items():
+        for pname, pinfo in list(self.peerInfoDict.items()):
             if pinfo.fsmState == _PeerInfoInternal.STATE_NONE:
                 self.clientEndPoint.connect(pname, self.param.configManager.getHostInfo(pname).port)
         return True
@@ -330,7 +330,7 @@ class SnPeerManager:
     ##### implementation ####
 
     def _getPeerNameBySock(self, sock):
-        for pi, pv in self.peerInfoDict.items():
+        for pi, pv in list(self.peerInfoDict.items()):
             if pv.sock == sock:
                 return pi
         assert False
@@ -532,7 +532,7 @@ class SnPeerManager:
             self.param.localManager.onPeerChange(peerName, None)
 
     def _startOrStopPeerProbeTimer(self):
-        if any(x for x in self.peerInfoDict.values() if x.fsmState == _PeerInfoInternal.STATE_NONE):
+        if any(x for x in list(self.peerInfoDict.values()) if x.fsmState == _PeerInfoInternal.STATE_NONE):
             if self.peerProbeTimer is None:
                 logging.debug("SnPeerManager._startOrStopPeerProbeTimer: Peer probe timer starts")
                 interval = self.param.configManager.getPeerProbeInterval()

@@ -1,4 +1,4 @@
-#!/usr/bin/python2
+#!/usr/bin/python3
 # -*- coding: utf-8; tab-width: 4; indent-tabs-mode: t -*-
 
 import os
@@ -87,7 +87,7 @@ class SnSubCmdMain:
 
     def listModules(self):
         dbusObj = dbus.SystemBus().get_object('org.fpemud.SelfNet', '/org/fpemud/SelfNet')
-        for mk, mv in dbusObj.DebugGetModuleInfo(dbus_interface='org.fpemud.SelfNet').items():
+        for mk, mv in list(dbusObj.DebugGetModuleInfo(dbus_interface='org.fpemud.SelfNet').items()):
             moduleState, moduleFailMessage = mv
 
             print("%s:" % (mk))
