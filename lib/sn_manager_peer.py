@@ -103,6 +103,11 @@ class SnSysPacketReject:
     message = None                    # str
 
 
+class SnSysPacketPowerCap:
+    wakeUpCap = None
+    macAddr = None
+
+
 class SnSysPacketPowerOp:
     name = None                        # str
 
@@ -414,6 +419,10 @@ class SnPeerManager:
 
         # do notify
         self.param.localManager.onPeerChange(peerName, peerInfo)
+
+    def _recvPowerCap(self, peerName, powerCapObj):
+        
+
 
     def _recvPowerOp(self, peerName, powerOp):
         if powerOp.name not in ["poweroff", "reboot", "suspend", "hibernate", "hybrid-sleep"]:

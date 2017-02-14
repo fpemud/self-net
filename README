@@ -1,0 +1,48 @@
+selfnetd complicant gateway
+====
+
+selfnetd can manage peer relation by itself, but it is much more effective to have it helped by gateway of the network.
+the gateway must support the following functions:
+1. list hosts
+2. host change notification
+3. wakeup host
+
+selfnetd comlicant gateway needs to listen on tcp port 2300, this channel use json as its packet payload.
+
+// out
+{
+    "host-list":
+        [
+            {
+                "ip": "1.2.3.4"
+                "mac": "01-02-03-04-05-06",
+                "hostname": "abcd",
+            },
+            {
+                "ip": "1.2.3.4"
+                "mac": "01-02-03-04-05-06",
+                "hostname": "",
+            },
+        ]
+}
+
+// out
+{
+    "host-appear":
+        {
+            "ip": "1.2.3.4"
+            "mac": "01-02-03-04-05-06",
+            "hostname": "abcd",
+        },
+}
+
+// out
+{
+    "host-disappear": "1.2.3.4",
+}
+
+// in
+{
+    "command": "try-wakeup",
+    "host": "abcd",
+}
