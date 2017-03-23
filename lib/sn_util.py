@@ -402,6 +402,16 @@ class SnUtil:
         else:
             assert False
 
+    @staticmethod
+    def recvLine(sock):
+        buf = bytes()
+        while True:
+            buf2 = sock.recv(1)
+            if len(buf2) == 0 or buf2 == b'\n':
+                break
+            buf += buf2
+        return buf
+
 
 class SnSleepNotifier:
 
@@ -427,8 +437,15 @@ class SgwApiClient:
         self.thread = _SgwApiClientThread()
         self.thread.start()
 
+        self.activePeerDict = dict()
+        self.sock = None
+        self.state = 0                      # 1: get-sock-list command pending; 2: wakup-host command pending
+
     def isGood(self):
         return (self.thread.sock is not None)
+
+    def cmdWakeup(self, mac):
+        return
 
 
 class _SgwApiClientThread:
@@ -438,30 +455,55 @@ class _SgwApiClientThread:
 
     def run(self):
         while True:
+            self.pObj.sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
             try:
-                sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-                try:
-                    sock.connect((ip, 2300))
-                except socket.error as e:
-                    sock.close()
-                    continue
+                self.pObj.sock.connect((ip, 2300))
                 
-                
+                self.pObj.sock.send(json.dumps({
+                    "command": "get-host-list",
+                }).encode("utf-8"))
+                self.pObj.state = 1     # get-sock-list command pending
 
-
-
-
-
-            finally:
-                time.sleep(180)     # sleep 3 minutes
-
-
-
-            if e.errno == errno.EAGAIN or e.errno == errno.EINPROGRESS:
+                while True:
+                    buf = SnUtil.recvLine(self.pObj.sock)
+                    if len(buf) == 0:
+                        break
+                    jsonObj = json.loads(buf)
+                    if "return" in jsonObj:
+                        if self.pObj.state == 1:
+                            for ip, data in jsonObj["return"].items():
+                                if "hostname" in data and data["hostname"] in self.peerList:
+                                    self.activePeerDict[ip] = data["hostname"]
+                                    self.upCallback(self.activePeerDict[ip])
+                        elif self.pObj.state == 2:
+                            assert False
+                        else:
+                            continue
+                    elif "notify" in jsonObj:
+                        if jsonObj["notify"] == "host-appear":
+                            for ip, data in jsonObj["data"].items():
+                                if "hostname" in data and data["hostname"] in self.peerList:
+                                    self.activePeerDict[ip] = data["hostname"]
+                                    self.upCallback(self.activePeerDict[ip])
+                        elif jsonObj["notify"] == "host-disappear":
+                            for ip in jsonObj["data"]:
+                                if ip in self.activePeerDict: 
+                                    self.downCallback(self.activePeerDict[ip])                           
+                                    del self.activePeerDict[ip]
+                        else:
+                            pass
+                    else:
+                        pass
+            except socket.error as e:
                 pass
-            else:
-                self.sockSet.remove((hostname, port))
-                #logging.debug("SnPeerClient.connect: Resolve failed, %s, %d, %s, %s", hostname, port, e.__class__, e)
-                sock.close()
-                return False
-        
+            finally:
+                if True:
+                    for hostname in self.activePeerDict.values():
+                        self.pObj.downCallback(hostname)
+                    self.activePeerDict.clear()
+                if True:
+                    self.pObj.sock.close()
+                    self.pObj.sock = None
+                if True:
+                    self.pObj.state = 0
+                time.sleep(10)
