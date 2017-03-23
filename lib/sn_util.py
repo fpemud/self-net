@@ -15,6 +15,24 @@ from gi.repository import GObject
 class SnUtil:
 
     @staticmethod
+    def getGatewayInterface():
+        ret = FcsUtil.shell("/bin/route -n4", "stdout")
+        # syntax: DestIp GatewayIp DestMask ... OutIntf
+        m = re.search("^(0\\.0\\.0\\.0)\\s+([0-9]+\\.[0-9]+\\.[0-9]+\\.[0-9]+)\\s+(0\\.0\\.0\\.0)\\s+.*\\s+(\\S+)$", ret, re.M)
+        if m is None:
+            return None
+        return m.group(4)
+
+    @staticmethod
+    def getGatewayIpAddress():
+        ret = FcsUtil.shell("/bin/route -n4", "stdout")
+        # syntax: DestIp GatewayIp DestMask ... OutIntf
+        m = re.search("^(0\\.0\\.0\\.0)\\s+([0-9]+\\.[0-9]+\\.[0-9]+\\.[0-9]+)\\s+(0\\.0\\.0\\.0)\\s+.*\\s+(\\S+)$", ret, re.M)
+        if m is None:
+            return None
+        return m.group(2)
+
+    @staticmethod
     def getUidGidMinMaxInfo():
         uidMin = -1
         uidMax = -1
@@ -397,3 +415,53 @@ class SnSleepNotifier:
 
     def dispose(self):
         pass
+
+
+class SgwApiClient:
+
+    def __init__(self, ip, peerList, upCallback, downCallback):
+        self.peerList = peerList
+        self.upCallback = upCallback
+        self.downCallback = downCallback
+
+        self.thread = _SgwApiClientThread()
+        self.thread.start()
+
+    def isGood(self):
+        return (self.thread.sock is not None)
+
+
+class _SgwApiClientThread:
+
+    def __init__(self, pObj):
+        self.pObj = pObj
+
+    def run(self):
+        while True:
+            try:
+                sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+                try:
+                    sock.connect((ip, 2300))
+                except socket.error as e:
+                    sock.close()
+                    continue
+                
+                
+
+
+
+
+
+            finally:
+                time.sleep(180)     # sleep 3 minutes
+
+
+
+            if e.errno == errno.EAGAIN or e.errno == errno.EINPROGRESS:
+                pass
+            else:
+                self.sockSet.remove((hostname, port))
+                #logging.debug("SnPeerClient.connect: Resolve failed, %s, %d, %s, %s", hostname, port, e.__class__, e)
+                sock.close()
+                return False
+        
