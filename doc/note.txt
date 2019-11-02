@@ -10,6 +10,38 @@
 4. rebooting-interval
 
 
+1. all plugins runs in seperate process.
+
+
+role: host, router, uplink
+
+role is applied on interface
+
+
+
+plugin type: server, agent, client, peer:
+
+host1,system,server1    <->   host1,system,client1
+host1,system,server1    <->   host1,user1,client1
+host1,system,server1    <->   host1,user2,client1
+host1,system,server1    <->   host2,system,client1
+host1,system,server1    <->   host2,user1,client1
+host1,system,server1    <->   host2,user3,client1
+
+host1,system,agent1     <->   host1,system,client1
+host1,user1,agent1      <->   host1,user1,client1
+host1,system,agent1     <->   host2,system,client1
+host1,user1,agent1      <->   host2,user1,client1
+
+host1,system,peer1      <->   host2,system,peer1
+host1,user1,peer1       <->   host2,user1,peer1
+
+
+plugin switch: on/off
+
+
+
+
 
 系统功能：
 1. 对比系统配置
