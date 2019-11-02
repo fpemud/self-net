@@ -1,26 +1,31 @@
-×Ô´ø¹¦ÄÜ£º
-1. ±È½ÏselfnetµÄhostÅäÖÃ
-2. µçÔ´²Ù×÷reboot¡¢poweroff¡¢poweron¡¢suspend¡¢hibernate¡¢hybrid-sleep¡¢wakeup
-3. peer mode£ºonline¡¢offline¡¢rebooting¡¢poweroff¡¢suspend¡¢hibernate¡¢last-operation(resumable)
+è‡ªå¸¦åŠŸèƒ½ï¼š
+1. auto discovery if no router present
+2. register to router if router present
+
+
+
+1. æ¯”è¾ƒselfnetçš„hosté…ç½®
+2. ç”µæºæ“ä½œrebootã€poweroffã€poweronã€suspendã€hibernateã€hybrid-sleepã€wakeup
+3. peer modeï¼šonlineã€offlineã€rebootingã€poweroffã€suspendã€hibernateã€last-operation(resumable)
 4. rebooting-interval
 
 
 
-ÏµÍ³¹¦ÄÜ£º
-1. ¶Ô±ÈÏµÍ³ÅäÖÃ
-2. Í¬²½ÏµÍ³Ä¿Â¼
+ç³»ç»ŸåŠŸèƒ½ï¼š
+1. å¯¹æ¯”ç³»ç»Ÿé…ç½®
+2. åŒæ­¥ç³»ç»Ÿç›®å½•
 
 
-ÏµÍ³ÅäÖÃ¶Ô±È¿Í»§¶Ë				system
-ÏµÍ³ÅäÖÃ¶Ô±È·şÎñ¶Ë				system
-distcc·şÎñ¶Ë					system
-distcc¿Í»§¶Ë					system
-Ô¶³Ì½çÃæ·şÎñ¶Ë					user-priviledged
-Ô¶³Ì½çÃæ¿Í»§¶Ë					user
-ssh·şÎñ¶Ë					user-priviledged
-ssh¿Í»§¶Ë					user
-Í¬²½homeÄ¿Â¼·şÎñ¶Ë				user
-Í¬²½homeÄ¿Â¼¿Í»§¶Ë				user
+ç³»ç»Ÿé…ç½®å¯¹æ¯”å®¢æˆ·ç«¯				system
+ç³»ç»Ÿé…ç½®å¯¹æ¯”æœåŠ¡ç«¯				system
+distccæœåŠ¡ç«¯					system
+distccå®¢æˆ·ç«¯					system
+è¿œç¨‹ç•Œé¢æœåŠ¡ç«¯					user-priviledged
+è¿œç¨‹ç•Œé¢å®¢æˆ·ç«¯					user
+sshæœåŠ¡ç«¯					user-priviledged
+sshå®¢æˆ·ç«¯					user
+åŒæ­¥homeç›®å½•æœåŠ¡ç«¯				user
+åŒæ­¥homeç›®å½•å®¢æˆ·ç«¯				user
 
 
 
