@@ -413,6 +413,74 @@ class SnUtil:
         return buf
 
 
+# this socket add watch into GLib default mainloop
+# this socket requires logging module be prepared
+class PipeObjSocket:
+
+    def __init__(self, fin, fout, recvFunc):
+        self.fin = fin
+        self.fout = fout
+        self.recvFunc = recvFunc
+
+        self.flagError = GLib.IO_PRI | GLib.IO_ERR | GLib.IO_HUP | GLib.IO_NVAL
+        self.isClose = False
+        self.recvBuffer = ""
+        self.recvSourceId = GLib.io_add_watch(self.fin, GLib.IO_IN | self.flagError, self._onRecv)
+
+    def send(self, data):
+        assert not self.isClose
+
+        data = pickle.dumps(data)
+        header = struct.pack("!I", len(data))
+        packet = header + data
+        self.fout.write(packet)
+        self.fout.flush()
+
+    def close(self):
+        assert not self.isClose
+        self.isClose = True
+
+    def _onRecv(self, source, cb_condition):
+        if self.isClose:
+            return False
+
+        try:
+            if cb_condition & self.flagError:
+                logging.error("StdinStdoutObjSocket._onRecv, %s" % (SnUtil.cbConditionToStr(cb_condition)))
+                return False
+
+            self.recvBuffer += self.fin.read()
+            while True:
+                # get packet header
+                headerLen = struct.calcsize("!I")
+                if len(self.recvBuffer) < headerLen:
+                    return True
+
+                # get packet data
+                dataLen = struct.unpack("!I", self.recvBuffer[:headerLen])[0]
+                totalLen = headerLen + dataLen
+                if len(self.recvBuffer) < totalLen:
+                    return True
+
+                # invoke callback function
+                data = pickle.loads(self.recvBuffer[headerLen:totalLen])
+                self.recvBuffer = self.recvBuffer[totalLen:]
+                self.recvFunc(self, data)
+                if self.isClose:
+                    return False
+        except:
+            logging.error(traceback.format_exc())
+            return False
+
+
+# this socket requires full control of sys.stdin and sys.stdout
+class StdinStdoutObjSocket(PipeObjSocket):
+
+    def __init__(self, recvFunc):
+        fcntl.fcntl(sys.stdin, fcntl.F_SETFL, os.O_NONBLOCK)
+        super(PipeObjSocket, self).__init__(sys.stdin, sys.stdout, recvFunc)
+
+
 class SnSleepNotifier:
 
     SLEEP_TYPE_SUSPEND = 0

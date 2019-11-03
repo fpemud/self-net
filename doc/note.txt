@@ -13,31 +13,184 @@
 1. all plugins runs in seperate process.
 
 
-role: host, router, uplink
+role: freeman, leader, member, sub-leader
 
 role is applied on interface
 
 
+host_id:
+1. ipv4-address
+2. ipv6-address
+3. localhost
 
-plugin type: server, agent, client, peer:
+module, peer module
 
-host1,system,server1    <->   host1,system,client1
-host1,system,server1    <->   host1,user1,client1
-host1,system,server1    <->   host1,user2,client1
-host1,system,server1    <->   host2,system,client1
-host1,system,server1    <->   host2,user1,client1
-host1,system,server1    <->   host2,user3,client1
+module instancing mode:
+1. singleton
+2. per-user
+3. per-user-host
+4. per-user-host-app
 
-host1,system,agent1     <->   host1,system,client1
-host1,user1,agent1      <->   host1,user1,client1
-host1,system,agent1     <->   host2,system,client1
-host1,user1,agent1      <->   host2,user1,client1
+<module>
+	<app-id>openssh-server</app-id>
+	<keyword>ssh-server</keyword>
+	<instancing-mode>singleton</instancing-mode>
+	<match-peer>
+		<app-id>openssh-client</app-id>
+		<keyword>ssh-client</keyword>
+	<match-peer>
+</module>
 
-host1,system,peer1      <->   host2,system,peer1
-host1,user1,peer1       <->   host2,user1,peer1
+<module>
+	<app-id>openssh-client</app-id>
+	<keyword>ssh-client</keyword>
+	<instancing-mode>per-user-host-app</instancing-mode>
+	<match-peer>
+		<app-id>openssh-server</app-id>
+		<keyword>ssh-server</keyword>
+	<match-peer>
+	<create-by-peer/>
+</module>
+
+<module>
+	<app-id>selfnet-synchronizer</app-id>
+	<instancing-mode>per-user-host-app</instancing-mode>
+	<match-peer>
+		<app-id>selfnet-synchronizer</app-id>
+	<match-peer>
+</module>
 
 
-plugin switch: on/off
+
+
+
+
+class ModuleSingleton:
+
+	def __init__(self, api):
+		pass
+
+	def peer_module_appear(self, username, peer_host_id, peer_app_id):
+		pass
+
+	def peer_module_disappear(self, username, peer_host_id, peer_app_id):
+		pass
+
+	def message_received(self, username, peer_host_id, peer_app_id, message):
+		pass
+
+
+class ModulePerUser:
+
+	def __init__(self, api, username):
+		pass
+
+	def peer_module_appear(self, peer_host_id, peer_app_id):
+		pass
+
+	def peer_module_disappear(self, peer_host_id, peer_app_id):
+		pass
+
+	def message_received(self, peer_host_id, message):
+		pass
+
+
+class ModulePerUserHost:
+
+	def __init__(self, api, username, peer_host_id):
+		pass
+
+	def peer_module_appear(self, peer_app_id):
+		pass
+
+	def peer_module_disappear(self, peer_app_id):
+		pass
+
+	def message_received(self, peer_app_id, message):
+		pass
+
+
+class ModulePerUserHostApp:
+
+	def __init__(self, api, username, peer_host_id, peer_app_id):
+		pass
+
+	def message_received(self, message):
+		pass
+
+
+
+class ModuleApi:
+
+	def sendData(self, data):
+		pass
+
+
+
+    def getPeerName(self):
+        return self.peerName
+
+    def getUserName(self):
+        return self.userName
+
+    def getModuleName(self):
+        return self.moduleName
+
+    def getHostName(self):
+        return socket.gethostname()
+
+    def isLocalPeer(self):
+        return self.peerName == socket.gethostname()
+
+    def getTmpDir(self):
+        """Temp directory is created when being used for the first time, deleted
+           before change to inactive state"""
+
+        if not os.path.exists(self.tmpDir):
+            os.mkdir(self.tmpDir)
+        return self.tmpDir
+
+    def sendObject(self, obj):
+        self.coreObj._sendObject(self.peerName, self.userName, self.moduleName, obj)
+
+    def setWorkState(self, workState):
+        assert workState in [SnModuleInstance.WORK_STATE_IDLE, SnModuleInstance.WORK_STATE_WORKING]
+        self.coreObj._setWorkState(self.peerName, self.userName, self.moduleName, workState)
+
+    def logDebug(self, pattern, *args):
+        self.coreObj._moduleLog(self.peerName, self.userName, self.moduleName, logging.DEBUG, pattern, args)
+
+    def logInfo(self, pattern, *args):
+        self.coreObj._moduleLog(self.peerName, self.userName, self.moduleName, logging.INFO, pattern, args)
+
+    def logWarning(self, pattern, *args):
+        self.coreObj._moduleLog(self.peerName, self.userName, self.moduleName, logging.WARNING, pattern, args)
+
+    def logError(self, pattern, *args):
+        self.coreObj._moduleLog(self.peerName, self.userName, self.moduleName, logging.ERROR, pattern, args)
+
+    def logCritical(self, pattern, *args):
+        self.coreObj._moduleLog(self.peerName, self.userName, self.moduleName, logging.CRITICAL, pattern, args)
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 

@@ -27,7 +27,7 @@ class SnParam:
         self.pidFile = os.path.join(self.runDir, "selfnetd.pid")
         self.socketFile = os.path.join(self.runDir, "selfnetd.socket")
         self.logFile = os.path.join(self.logDir, "selfnetd.log")
-        self.subprocFile = os.path.join(self.libexecDir, "selfnetd-subproc.py")
+        self.workerProcFile = os.path.join(self.libexecDir, "worker-proc.py")
 
         # to be set
         self.tmpDir = None              # str
