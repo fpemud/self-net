@@ -418,17 +418,17 @@ class SnUtil:
 class PipeObjSocket:
 
     def __init__(self, fin, fout, recvFunc):
+        self.flagError = GLib.IO_PRI | GLib.IO_ERR | GLib.IO_HUP | GLib.IO_NVAL
+
         self.fin = fin
         self.fout = fout
         self.recvFunc = recvFunc
 
-        self.flagError = GLib.IO_PRI | GLib.IO_ERR | GLib.IO_HUP | GLib.IO_NVAL
-        self.isClose = False
-        self.recvBuffer = ""
+        self.recvBuffer = b''
         self.recvSourceId = GLib.io_add_watch(self.fin, GLib.IO_IN | self.flagError, self._onRecv)
 
     def send(self, data):
-        assert not self.isClose
+        assert self.fin is not None
 
         data = pickle.dumps(data)
         header = struct.pack("!I", len(data))
@@ -437,37 +437,37 @@ class PipeObjSocket:
         self.fout.flush()
 
     def close(self):
-        assert not self.isClose
-        self.isClose = True
+        GLib.source_remove(self.recvSourceId)
+        self.fin = None
 
     def _onRecv(self, source, cb_condition):
-        if self.isClose:
+        if self.fin is None:
+            return False
+
+        if cb_condition & self.flagError:
+            logging.error("StdinStdoutObjSocket._onRecv, %s" % (SnUtil.cbConditionToStr(cb_condition)))
             return False
 
         try:
-            if cb_condition & self.flagError:
-                logging.error("StdinStdoutObjSocket._onRecv, %s" % (SnUtil.cbConditionToStr(cb_condition)))
-                return False
-
+            # receive
             self.recvBuffer += self.fin.read()
-            while True:
-                # get packet header
-                headerLen = struct.calcsize("!I")
-                if len(self.recvBuffer) < headerLen:
-                    return True
 
-                # get packet data
-                dataLen = struct.unpack("!I", self.recvBuffer[:headerLen])[0]
-                totalLen = headerLen + dataLen
-                if len(self.recvBuffer) < totalLen:
-                    return True
+            # get packet header
+            headerLen = struct.calcsize("!I")
+            if len(self.recvBuffer) < headerLen:
+                return True
 
-                # invoke callback function
-                data = pickle.loads(self.recvBuffer[headerLen:totalLen])
-                self.recvBuffer = self.recvBuffer[totalLen:]
-                self.recvFunc(self, data)
-                if self.isClose:
-                    return False
+            # get packet data
+            dataLen = struct.unpack("!I", self.recvBuffer[:headerLen])[0]
+            totalLen = headerLen + dataLen
+            if len(self.recvBuffer) < totalLen:
+                return True
+            data = self.recvBuffer[headerLen:totalLen]
+            self.recvBuffer = self.recvBuffer[totalLen:]
+
+            # invoke callback function
+            self.recvFunc(pickle.loads(data))
+            return True
         except:
             logging.error(traceback.format_exc())
             return False
@@ -479,6 +479,200 @@ class StdinStdoutObjSocket(PipeObjSocket):
     def __init__(self, recvFunc):
         fcntl.fcntl(sys.stdin, fcntl.F_SETFL, os.O_NONBLOCK)
         super(PipeObjSocket, self).__init__(sys.stdin, sys.stdout, recvFunc)
+
+
+class ReliableUdpObjSocket:
+
+    RETRY_TIMEOUT = 10
+    BUFFER_SIZE = 4096
+
+    PKT_FLAG_DATA = 0
+    PKT_FLAG_ACK = 1
+
+    def __init__(self, localIp, localPort, recvFunc):
+        self.flagError = GLib.IO_PRI | GLib.IO_ERR | GLib.IO_HUP | GLib.IO_NVAL
+
+        self.socket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+        self.socket.bind((localIp, localPort))
+
+        self.sendTimer = GObject.timeout_add_seconds(1, self._onSend)
+        self.recvSourceId = GLib.io_add_watch(self.socket, GLib.IO_IN | self.flagError, self._onRecv)
+        self.recvFunc = recvFunc
+        self.channels = dict()
+
+    def connect(ip, port):
+        assert self.socket is not None
+        self.__createChannel((ip, port))
+
+    def drop(ip, port):
+        assert self.socket is not None
+        del self.channels[(ip, port)]
+
+    def send(ip, port, data):
+        assert self.socket is not None
+        assert (ip, port) in self.channels
+
+        addr = (ip, port)
+        ch = self.channels[addr]
+
+        # serialize data
+        data = pickle.dumps(data)
+        header = struct.pack("!I", len(data))
+        packet = header + data
+
+        # add data into queue, send if possible
+        ch["pending_buffer"] += packet
+        if ch["sent_buffer"] is None:
+            self.__chSend(ch)
+
+    def close(self):
+        assert self.socket is not None
+
+        GLib.source_remove(self.sendTimer)
+        GLib.recvSourceId(self.recvSourceId)
+        self.socket.close()
+        self.socket = None
+
+    def _onSend(self):
+        if self.socket is None:
+            return False
+
+        for addr, ch in self.channels.items():
+            if ch["sent_buffer"] is not None:
+                if ch["timeout"] > self.RETRY_TIMEOUT:
+                    self.socket.sendto(ch["sent_buffer"], addr)
+                    ch["timeout"] = 0
+                else:
+                    ch["timeout"] += 1
+            else:
+                if ch["pending_buffer"] != b'':
+                    self.__chSend(ch)
+        return True
+
+    def _onRecv(self, source, cb_condition):
+        if self.socket is None:
+            return False
+
+        if cb_condition & self.flagError:
+            logging.error("ReliableUdpObjSocket._onRecv, %s" % (SnUtil.cbConditionToStr(cb_condition)))
+            return False
+
+        try:
+            headerLen = struct.calcsize("!BB")
+
+            # receive
+            data, addr = self.socket.recvfrom(self.BUFFER_SIZE)
+            if addr not in self.channels:
+                self.__createChannel(addr)
+            ch = self.channels[addr]
+
+            # data packet
+            if struct.unpack("!BB", data[:headerLen])[0] == self.PKT_FLAG_DATA:
+                code_next = (ch["code_in"] + 1) % 256
+                if struct.unpack("!BB", data[:headerLen])[1] != code_next:
+                    return True                                                         # invalid code, drop packet
+                ch["recv_buffer"] += data[headerLen:]
+                ch["code_in"] = code_next
+
+                # send ack
+                ackPkt = struct.pack("!BB", self.PKG_FLAG_ACK, code_next)
+                self.socket.sendto(ackPkt, addr)
+
+                # get packet header
+                headerLen = struct.calcsize("!I")
+                if len(ch["recv_buffer"]) < headerLen:
+                    return True
+
+                # get packet data
+                dataLen = struct.unpack("!I", ch["recv_buffer"][:headerLen])[0]
+                totalLen = headerLen + dataLen
+                if len(ch["recv_buffer"]) < totalLen:
+                    return True
+                data = ch["recv_buffer"][headerLen:totalLen]
+                ch["recv_buffer"] = ch["recv_buffer"][totalLen:]
+
+                # invoke callback function
+                ip, port = addr
+                self.recvFunc(ip, port, pickle.loads(data))
+                return True
+
+            # ack packet
+            if struct.unpack("!BB", data[:headerLen])[0] == self.PKT_FLAG_ACK:
+                if struct.unpack("!BB", data[:headerLen])[1] != ch["code_out"]:
+                    return True                                                         # invalid code, drop packet
+                ch["sent_buffer"] = None
+                ch["code_out"] = (ch["code_out"] + 1) % 256
+                return True
+
+            # invalid flag, drop packet
+            return True
+        except:
+            logging.error(traceback.format_exc())
+            return False
+
+    def __createChannel(self, addr):
+        self.channels[addr] = {
+            # information for sending
+            "pending_buffer": b'',
+            "sent_buffer": None,
+            "timeout": 0,
+            "code_out": 1,
+            # information for receiving
+            "recv_buffer": b'',
+            "code_in": 0,
+        }
+
+    def __chSend(self, ch):
+        headerLen = struct.calcsize("!BB")
+        dataLen = min(self.BUFFER_SIZE, len(ch["pending_buffer"])) - headerLen
+        ch["sent_buffer"] = struct.pack("!BB", self.PKT_FLAG_DATA, ch["code_out"]) + ch["pending_buffer"][:dataLen]
+        ch["pending_buffer"] = ch["pending_buffer"][dataLen:]
+        self.socket.sendto(ch["sent_buffer"], addr)
+        ch["timeout"] = 0
+
+
+class MulticastObjSocket:
+
+    BUFFER_SIZE = 4096
+
+    def __init__(self, multicastIp, multicastPort, recvFunc):
+        self.flagError = GLib.IO_PRI | GLib.IO_ERR | GLib.IO_HUP | GLib.IO_NVAL
+
+        self.ip = multicastIp
+        self.port = multicastPort
+        self.recvFunc = recvFunc
+
+        self.socket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+        self.socket.setsockopt(socket.IPPROTO_IP, socket.IP_MULTICAST_TTL, struct.pack('b', 1))
+        self.socket.bind((self.ip, self.port))
+        self.socket.setsockopt(socket.IPPROTO_IP, socket.IP_ADD_MEMBERSHIP, struct.pack('4sL', socket.inet_aton((self.ip, self.port)), socket.INADDR_ANY))
+
+        self.recvSourceId = GLib.io_add_watch(self.sock, GLib.IO_IN | self.flagError, self._onRecv)
+
+    def close(self):
+        assert self.sock is not None
+        GLib.source_remove(self.recvSourceId)
+        self.socket.close()
+        self.sock = None
+
+    def send(self, data):
+        self.socket.sendto(pickle.dumps(data), (self.ip, self.port)) 
+
+    def _onRecv(self, source, cb_condition):
+        if self.socket is None:
+            return False
+
+        if cb_condition & self.flagError:
+            logging.error("MulticastObjSocket._onRecv, %s" % (SnUtil.cbConditionToStr(cb_condition)))
+            return False
+
+        try:
+            data, addr = self.socket.recvfrom(self.BUFFER_SIZE)
+            self.recvFunc(pickle.loads(data))
+            return True
+        except:
+            logging.error(traceback.format_exc())
+            return False
 
 
 class SnSleepNotifier:

@@ -29,6 +29,11 @@ class SnParam:
         self.logFile = os.path.join(self.logDir, "selfnetd.log")
         self.workerProcFile = os.path.join(self.libexecDir, "worker-proc.py")
 
+        self.discoveryIp = "224.0.0.251"
+        self.discoveryPort = 2109
+
+        self.communicationPort = 2110
+
         # to be set
         self.tmpDir = None              # str
         self.logLevel = None            # enum

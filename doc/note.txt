@@ -18,6 +18,83 @@ role: freeman, leader, member, sub-leader
 role is applied on interface
 
 
+-----
+leader
+------
+  |
+  |
+------
+member
+------
+
+-----
+freeman
+------
+  |
+  |
+------
+freeman
+------
+
+
+-----
+leader
+------
+  |
+  |
+------
+sub-leader
+leader
+------
+  |
+  |
+------
+member
+------
+
+
+-----           -----
+leader          leader
+------          ----
+  |              |  
+  |              |
+  \              /
+------------------
+ member    member
+-----------------
+
+
+-----           -----
+leader          freeman
+------          ----
+  |              |  
+  |              |
+  \              /
+------------------
+ member    freeman
+-----------------
+
+
+
+-----
+leader
+------
+  |
+  |
+-------------------------
+sub-leader
+leader           freeman
+---------------------------
+  |                 |
+  |                 |
+------           -------
+member            freeman
+------           -------
+
+
+
+
+
 host_id:
 1. ipv4-address
 2. ipv6-address

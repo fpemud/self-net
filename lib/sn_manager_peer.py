@@ -95,32 +95,54 @@ power state should be POWER_STATE_UNKNOWN.
 """
 
 
-class SnSysPacket:
-    data = None                        # object
-
-
-class SnSysPacketReject:
-    message = None                    # str
-
-
-class SnSysPacketPowerCap:
-    wakeUpCap = None
-    macAddr = None
-
-
-class SnSysPacketPowerOp:
-    name = None                        # str
-
-
-class SnSysPacketPowerOpAck:
-    error_message = None            # str, None means success, not-None means failure
-
-
-class SnSysPacketPowerStateWhenInactive:
-    name = None                        # str
-
-
 class SnPeerManager:
+
+    def __init__(self, param):
+        logging.debug("SnPeerManager.__init__: Start")
+
+        self.param = param
+        self.discoverySock = None
+        self.commSock = None
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        MulticastObjSocket(self.param.discoveryIp, self.param.discoveryPort, self._onDiscoveryRecv)
+
+        # communication socket
+        self.commSock = ReliableUdpObjSocket("0.0.0.0", self.param.communicationPort, self._onRecv)
+
+
+
+        logging.debug("SnPeerManager.__init__: End")
+        return
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
     POWER_STATE_UNKNOWN = 0
     POWER_STATE_POWEROFF = 1
@@ -130,11 +152,14 @@ class SnPeerManager:
     POWER_STATE_HYBRID_SLEEP = 5
     POWER_STATE_RUNNING = 6
 
-    def __init__(self, param):
-        logging.debug("SnPeerManager.__init__: Start")
 
-        self.param = param
-        self.disposeCompleteFunc = None
+
+
+
+
+
+
+
 
         # create internal peer info dict
         self.peerInfoDict = dict()
