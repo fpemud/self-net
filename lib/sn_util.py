@@ -647,6 +647,11 @@ class MulticastObjSocket:
         self.socket.bind((self.ip, self.port))
         self.socket.setsockopt(socket.IPPROTO_IP, socket.IP_ADD_MEMBERSHIP, struct.pack('4sL', socket.inet_aton((self.ip, self.port)), socket.INADDR_ANY))
 
+# sock.setsockopt(socket.SOL_IP, socket.IP_MULTICAST_IF, socket.inet_aton(host))
+#   sock.setsockopt(socket.SOL_IP, socket.IP_ADD_MEMBERSHIP, 
+#                    socket.inet_aton(MCAST_GRP) + socket.inet_aton(host))
+# https://pypi.org/project/py-multicast/
+
         self.recvSourceId = GLib.io_add_watch(self.sock, GLib.IO_IN | self.flagError, self._onRecv)
 
     def close(self):
