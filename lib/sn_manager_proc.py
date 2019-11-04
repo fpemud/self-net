@@ -5,32 +5,30 @@ class SnProcManager:
 
     def __init__(self, param):
         self.param = param
+
         self.systemProc = SnWorkProc(self.param, None)
+
         self.userProcDict = dict()
-        
+        for user in SnUtil.getNormalUserList():
+            self.userProcDict[user] = SnWorkProc(self.param, user)
 
     def newModuleSingleton(self, modulePropDict):
-        
+        self._sendMessageNewModule(self.systemProc, modulePropDict, None, None, None)
+
+    def newModulePerUser(self, modulePropDict, userName):
+        self._sendMessageNewModule(self.userProcDict[userName], modulePropDict, userName, None, None)
+
+    def newModulePerUserHost(self, modulePropDict, userName, peerHostId):
+        self._sendMessageNewModule(self.userProcDict[userName], modulePropDict, userName, peerHostId, None)
+
+    def newModulePerUserHostApp(self, modulePropDict, userName, peerHostId, peerAppId):
+        self._sendMessageNewModule(self.userProcDict[userName], modulePropDict, userName, peerHostId, peerAppId)
+
+    def deleteModuleSingleton(self):
+        assert False
 
 
-    def newModule(self, userName, modulePropDict, peerHostId, peerAppId):
-
-
-
-
-
-        "type": "new-module",
-        "username": USERNAME,    # doesn't exist for system
-        "properties": {
-            FROM-PROPERTY-XML,
-        },
-        "peer-host-id": HOST-ID,
-        "peer-app-id": APP-ID,
-
-
-
-    
-    def _sendMessageNewModule(self, workerProc, username, propDict, peerHostId, peerAppId):
+    def _sendMessageNewModule(self, propDict, workerProc, username, peerHostId, peerAppId):
         message = dict()
         message["type"] = "new-module"
         if username is not None:

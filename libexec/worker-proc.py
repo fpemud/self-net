@@ -20,7 +20,7 @@ from sn_util import StdinStdoutObjSocket
 new-module message:
     {
         "type": "new-module",
-        "username": USERNAME,    # doesn't exist for system
+        "username": USERNAME,           # optional, depends on module belongs to system or user
         "properties": {
             FROM-PROPERTY-XML,
         },
@@ -31,7 +31,7 @@ new-module message:
 delete-module message:
     {
         "type": "delete-module",
-        "username": USERNAME,    # doesn't exist for system
+        "username": USERNAME,           # optional, depends on module belongs to system or user
         "properties": {
             FROM-PROPERTY-XML,
         },
@@ -42,7 +42,7 @@ delete-module message:
 data message:
     {
         "type": "data",
-        "username": USERNAME,       # doesn't exist for system
+        "username": USERNAME,           # optional, depends on module belongs to system or user
         "app-id": APP-ID,
         "peer-host-id": HOST-ID,
         "peer-app-id": APP-ID,
